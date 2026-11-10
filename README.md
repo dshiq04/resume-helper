@@ -162,7 +162,7 @@ database:
 手动初始化数据库：
 
 ```bash
-mysql -u root -p < sql/init.mysql.sql
+mysql -u root -p < init.mysql.sql
 ```
 
 ### PostgreSQL
@@ -177,13 +177,13 @@ database:
 
 ```bash
 createdb resume_helper
-psql -d resume_helper -f sql/init.postgresql.sql
+psql -d resume_helper -f init.postgresql.sql
 ```
 
 项目根目录提供：
 
-- `sql/init.mysql.sql`：创建 `resume_helper` 数据库、`applications` 与 `settings` 表及索引。
-- `sql/init.postgresql.sql`：创建 `applications` 与 `settings` 表及索引（在目标数据库中执行）。
+- `init.mysql.sql`（项目根目录）：创建 `resume_helper` 数据库、`applications` 与 `settings` 表及索引。
+- `init.postgresql.sql`（项目根目录）：创建 `applications` 与 `settings` 表及索引（在目标数据库中执行）。
 
 > 应用启动时仍会自动执行 GORM `AutoMigrate`。初始化 SQL 主要用于手动建库、DBA 审核或查看实体结构。
 
@@ -297,9 +297,8 @@ go test ./...
 ```text
 .
 ├── main.go                              # Wails 窗口 + Gin 启动入口
-├── sql/
-│   ├── init.mysql.sql                   # MySQL 初始化脚本
-│   └── init.postgresql.sql              # PostgreSQL 初始化脚本
+├── init.mysql.sql                       # MySQL 初始化脚本
+├── init.postgresql.sql                  # PostgreSQL 初始化脚本
 ├── config.example.yaml
 ├── internal/
 │   ├── config/                          # 便携式配置加载与环境变量
