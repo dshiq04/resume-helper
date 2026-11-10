@@ -15,12 +15,20 @@ export const STATUSES: Status[] = [
   "rejected",
 ];
 
+export type CategoryFilter = Category | "all";
+
+export interface StatusOption {
+  value: Status;
+  label: string;
+}
+
 export interface Application {
   id: number;
   category: Category;
   companyName: string;
   link: string;
   status: Status;
+  pinned: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -44,6 +52,7 @@ export interface ApplicationUpdate {
   companyName?: string;
   link?: string;
   status?: Status;
+  pinned?: boolean;
 }
 
 export interface Stats {

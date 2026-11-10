@@ -1,3 +1,4 @@
+import axios, { type AxiosRequestConfig } from "axios";
 import type {
   Application,
   ApplicationInput,
@@ -12,6 +13,22 @@ import type {
 } from "./types";
 
 const TOKEN_KEY = "resumetrail.token";
+
+const http = axios.create({
+  baseURL: "/api",
+  timeout: 30_000,
+  headers: {
+    Accept: "application/json",
+  },
+});
+
+http.interceptors.request.use((config) => {
+  const token = getToken();
+  if (token) {
+    config.headers.set("Authorization", `Bearer ${token}`);
+  }
+  return config;
+});
 
 export class ApiError extends Error {
   status: number;
@@ -37,59 +54,54 @@ export function clearToken() {
   localStorage.removeItem(TOKEN_KEY);
 }
 
-interface RequestOptions extends RequestInit {
-  auth?: boolean;
+interface RequestOptions extends AxiosRequestConfig {
   handleUnauthorized?: boolean;
 }
 
+interface ApiErrorPayload {
+  error?: string;
+  code?: string;
+}
+
 async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const { auth = true, handleUnauthorized = true, headers, ...rest } = options;
-  const token = getToken();
-  const nextHeaders = new Headers(headers);
-  if (!(rest.body instanceof FormData) && rest.body !== undefined && !nextHeaders.has("Content-Type")) {
-    nextHeaders.set("Content-Type", "application/json");
-  }
-  if (auth && token) {
-    nextHeaders.set("Authorization", `Bearer ${token}`);
-  }
-
-  let response: Response;
+  const { handleUnauthorized = true, ...config } = options;
   try {
-    response = await fetch(`/api${path}`, {
-      ...rest,
-      headers: nextHeaders,
+    const response = await http.request<T>({
+      url: path,
+      ...config,
     });
-  } catch {
-    throw new ApiError("network_error", 0, "network_error");
-  }
-
-  if (response.status === 401 && handleUnauthorized) {
-    clearToken();
-    window.dispatchEvent(new CustomEvent("resumetrail:unauthorized"));
-  }
-
-  if (!response.ok) {
-    let message = response.statusText || "Request failed";
-    let code: string | undefined;
-    try {
-      const payload = await response.json();
-      if (typeof payload?.error === "string") message = payload.error;
-      if (typeof payload?.code === "string") code = payload.code;
-    } catch {
-      // Ignore non-JSON bodies.
+    return response.data;
+  } catch (error) {
+    if (!axios.isAxiosError(error)) {
+      throw new ApiError("network_error", 0, "network_error");
     }
-    throw new ApiError(message, response.status, code);
-  }
 
-  if (response.status === 204) {
-    return undefined as T;
-  }
+    const status = error.response?.status ?? 0;
+    let payload = error.response?.data as ApiErrorPayload | Blob | undefined;
 
-  const contentType = response.headers.get("Content-Type") ?? "";
-  if (!contentType.includes("application/json")) {
-    return (await response.blob()) as T;
+    if (payload instanceof Blob) {
+      try {
+        payload = JSON.parse(await payload.text()) as ApiErrorPayload;
+      } catch {
+        payload = undefined;
+      }
+    }
+
+    const apiPayload = payload as ApiErrorPayload | undefined;
+    const code = apiPayload?.code;
+    const message = apiPayload?.error ?? error.message ?? "Request failed";
+
+    if (status === 401 && handleUnauthorized && code !== "invalid_password") {
+      clearToken();
+      window.dispatchEvent(new CustomEvent("resumetrail:unauthorized"));
+    }
+
+    if (status === 0) {
+      throw new ApiError("network_error", 0, "network_error");
+    }
+
+    throw new ApiError(message, status, code);
   }
-  return (await response.json()) as T;
 }
 
 export const api = {
@@ -101,30 +113,27 @@ export const api = {
   login(password: string) {
     return request<AuthSession>("/auth/login", {
       method: "POST",
-      body: JSON.stringify({ password }),
-      auth: false,
+      data: { password },
       handleUnauthorized: false,
     });
   },
   setupPassword(password: string) {
     return request<AuthSession>("/auth/setup", {
       method: "POST",
-      body: JSON.stringify({ password }),
-      auth: false,
+      data: { password },
       handleUnauthorized: false,
     });
   },
   changePassword(currentPassword: string, newPassword: string) {
     return request<AuthSession>("/auth/change-password", {
       method: "POST",
-      body: JSON.stringify({ currentPassword, newPassword }),
-      handleUnauthorized: false,
+      data: { currentPassword, newPassword },
     });
   },
   disablePassword(password: string) {
     return request<{ enabled: boolean }>("/auth/disable", {
       method: "POST",
-      body: JSON.stringify({ password }),
+      data: { password },
     });
   },
   logout() {
@@ -133,28 +142,29 @@ export const api = {
     });
   },
   listApplications(params: ListParams) {
-    const search = new URLSearchParams();
-    if (params.search) search.set("search", params.search);
+    const query: Record<string, string | number> = {
+      page: params.page ?? 1,
+      pageSize: params.pageSize ?? 10,
+    };
+    if (params.search) query.search = params.search;
     if (params.category && params.category !== "all") {
-      search.set("category", params.category);
+      query.category = params.category;
     }
     if (params.status && params.status !== "all") {
-      search.set("status", params.status);
+      query.status = params.status;
     }
-    search.set("page", String(params.page ?? 1));
-    search.set("pageSize", String(params.pageSize ?? 10));
-    return request<ApplicationList>(`/applications?${search.toString()}`);
+    return request<ApplicationList>("/applications", { params: query });
   },
   createApplication(input: ApplicationInput) {
     return request<Application>("/applications", {
       method: "POST",
-      body: JSON.stringify(input),
+      data: input,
     });
   },
   updateApplication(id: number, input: ApplicationUpdate) {
     return request<Application>(`/application/${id}`, {
       method: "PUT",
-      body: JSON.stringify(input),
+      data: input,
     });
   },
   deleteApplication(id: number) {
@@ -165,13 +175,13 @@ export const api = {
   batchDelete(ids: number[]) {
     return request<{ deleted: number }>("/applications/batch-delete", {
       method: "POST",
-      body: JSON.stringify({ ids }),
+      data: { ids },
     });
   },
   batchStatus(ids: number[], status: string) {
     return request<{ updated: number }>("/applications/batch-status", {
       method: "PATCH",
-      body: JSON.stringify({ ids, status }),
+      data: { ids, status },
     });
   },
   importExcel(file: File) {
@@ -179,11 +189,13 @@ export const api = {
     data.append("file", file);
     return request<ImportResult>("/applications/import", {
       method: "POST",
-      body: data,
+      data,
     });
   },
   async downloadTemplate() {
-    const blob = await request<Blob>("/applications/template");
+    const blob = await request<Blob>("/applications/template", {
+      responseType: "blob",
+    });
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     anchor.href = url;

@@ -1,15 +1,16 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { App as AntdApp, Button, ConfigProvider, Spin } from "antd";
 import { CloudServerOutlined, ReloadOutlined } from "@ant-design/icons";
+import { Navigate, Route, Routes } from "react-router-dom";
 import { ApiError, api } from "./api/client";
 import type { AuthSession, Stats } from "./api/types";
-import { Sidebar, type CategoryFilter } from "./components/Sidebar";
 import { LockScreen } from "./components/LockScreen";
 import { Logo } from "./components/Logo";
-import { SettingsDrawer } from "./components/SettingsDrawer";
 import { TitleBar } from "./components/TitleBar";
-import { Dashboard } from "./pages/Dashboard";
 import { I18nProvider, useI18n } from "./i18n";
+import { WorkspaceLayout } from "./layouts/WorkspaceLayout";
+import { Dashboard } from "./pages/Dashboard";
+import { SettingsPage } from "./pages/SettingsPage";
 import { createTheme, type ThemeMode } from "./theme";
 
 const THEME_KEY = "resumetrail.theme";
@@ -30,8 +31,6 @@ function AppRoot() {
   const [stage, setStage] = useState<Stage>("checking");
   const [passwordEnabled, setPasswordEnabled] = useState(false);
   const [stats, setStats] = useState<Stats | null>(null);
-  const [activeCategory, setActiveCategory] = useState<CategoryFilter>("all");
-  const [settingsOpen, setSettingsOpen] = useState(false);
 
   const checkAuth = useCallback(async () => {
     setStage("checking");
@@ -54,9 +53,7 @@ function AppRoot() {
   }, [themeMode]);
 
   useEffect(() => {
-    const handler = () => {
-      setStage("locked");
-    };
+    const handler = () => setStage("locked");
     window.addEventListener("resumetrail:unauthorized", handler);
     return () => window.removeEventListener("resumetrail:unauthorized", handler);
   }, []);
@@ -66,7 +63,6 @@ function AppRoot() {
       setStats(await api.stats());
     } catch (error) {
       if (!(error instanceof ApiError && error.status === 401)) {
-        // Keep the shell usable even if the statistics request fails.
         setStats(null);
       }
     }
@@ -87,7 +83,6 @@ function AppRoot() {
   }, [loadStats]);
 
   const handleLock = useCallback(() => {
-    setSettingsOpen(false);
     setStage("locked");
   }, []);
 
@@ -135,35 +130,31 @@ function AppRoot() {
           )}
 
           {stage === "ready" && (
-            <>
-              <div className="app-body">
-                <Sidebar
-                  active={activeCategory}
-                  onChange={setActiveCategory}
-                  stats={stats}
-                  passwordEnabled={passwordEnabled}
-                  onOpenSettings={() => setSettingsOpen(true)}
-                />
-
-                <main className="main-content">
-                  <Dashboard
-                    category={activeCategory}
+            <Routes>
+              <Route
+                element={
+                  <WorkspaceLayout
                     stats={stats}
                     onDataChanged={handleDataChanged}
+                    themeMode={themeMode}
+                    onThemeChange={setThemeMode}
+                    passwordEnabled={passwordEnabled}
+                    onPasswordEnabledChange={setPasswordEnabled}
+                    onLock={handleLock}
                   />
-                </main>
-              </div>
-
-              <SettingsDrawer
-                open={settingsOpen}
-                onClose={() => setSettingsOpen(false)}
-                themeMode={themeMode}
-                onThemeChange={setThemeMode}
-                passwordEnabled={passwordEnabled}
-                onPasswordEnabledChange={setPasswordEnabled}
-                onLock={handleLock}
-              />
-            </>
+                }
+              >
+                <Route index element={<Dashboard category="all" />} />
+                <Route path="spring" element={<Dashboard category="spring" />} />
+                <Route path="autumn" element={<Dashboard category="autumn" />} />
+                <Route
+                  path="internship"
+                  element={<Dashboard category="internship" />}
+                />
+                <Route path="settings" element={<SettingsPage />} />
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Route>
+            </Routes>
           )}
         </div>
       </AntdApp>

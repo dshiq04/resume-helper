@@ -7,11 +7,15 @@ import {
   TagOutlined,
 } from "@ant-design/icons";
 import { api } from "../api/client";
-import type { Application, Category, Status } from "../api/types";
+import type {
+  Application,
+  Category,
+  CategoryFilter,
+  Status,
+} from "../api/types";
 import { useCategoryOptions, useStatusOptions, StatusBadge } from "./badges";
 import { useI18n } from "../i18n";
 import { apiErrorMessage } from "../utils/errors";
-import type { CategoryFilter } from "./Sidebar";
 
 interface ApplicationModalProps {
   open: boolean;

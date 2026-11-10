@@ -5,54 +5,46 @@ import {
   SettingOutlined,
   SunOutlined,
 } from "@ant-design/icons";
+import { NavLink } from "react-router-dom";
 import type { Stats } from "../api/types";
 import { useI18n } from "../i18n";
 import type { MessageKey } from "../i18n";
 
-export type CategoryFilter = "all" | "spring" | "autumn" | "internship";
-
 interface SidebarProps {
-  active: CategoryFilter;
-  onChange: (value: CategoryFilter) => void;
   stats: Stats | null;
-  onOpenSettings?: () => void;
   passwordEnabled: boolean;
 }
 
 const categories: Array<{
-  key: CategoryFilter;
+  path: string;
   labelKey: MessageKey;
   icon: typeof AppstoreOutlined;
   accent: string;
 }> = [
   {
-    key: "all",
+    path: "/",
     labelKey: "nav.all",
     icon: AppstoreOutlined,
     accent: "#818cf8",
   },
-  { key: "spring", labelKey: "nav.spring", icon: SunOutlined, accent: "#34d399" },
-  { key: "autumn", labelKey: "nav.autumn", icon: CloudOutlined, accent: "#fbbf24" },
+  { path: "/spring", labelKey: "nav.spring", icon: SunOutlined, accent: "#34d399" },
+  { path: "/autumn", labelKey: "nav.autumn", icon: CloudOutlined, accent: "#fbbf24" },
   {
-    key: "internship",
+    path: "/internship",
     labelKey: "nav.internship",
     icon: RocketOutlined,
     accent: "#38bdf8",
   },
 ];
 
-export function Sidebar({
-  active,
-  onChange,
-  stats,
-  onOpenSettings,
-  passwordEnabled,
-}: SidebarProps) {
+export function Sidebar({ stats, passwordEnabled }: SidebarProps) {
   const { t } = useI18n();
 
-  const countFor = (key: CategoryFilter) => {
+  const countFor = (path: string) => {
     if (!stats) return 0;
-    return key === "all" ? stats.total : stats.byCategory[key] ?? 0;
+    if (path === "/") return stats.total;
+    const key = path.slice(1);
+    return stats.byCategory[key as keyof typeof stats.byCategory] ?? 0;
   };
 
   const total = stats?.total ?? 0;
@@ -66,18 +58,21 @@ export function Sidebar({
         {categories.map((item) => {
           const Icon = item.icon;
           return (
-            <button
-              key={item.key}
-              type="button"
-              className={`sidebar-nav-item ${active === item.key ? "is-active" : ""}`}
-              onClick={() => onChange(item.key)}
+            <NavLink
+              key={item.path}
+              to={item.path}
+              end={item.path === "/"}
+              className={({ isActive }) =>
+                `sidebar-nav-item ${isActive ? "is-active" : ""}`
+              }
+              title={t(item.labelKey)}
             >
               <span className="sidebar-nav-icon" style={{ color: item.accent }}>
                 <Icon />
               </span>
               <span className="sidebar-nav-label">{t(item.labelKey)}</span>
-              <span className="sidebar-nav-count">{countFor(item.key)}</span>
-            </button>
+              <span className="sidebar-nav-count">{countFor(item.path)}</span>
+            </NavLink>
           );
         })}
       </nav>
@@ -98,22 +93,22 @@ export function Sidebar({
       </div>
 
       <div className="sidebar-footer">
-        {onOpenSettings && (
-          <button
-            type="button"
-            className="sidebar-settings"
-            onClick={onOpenSettings}
-          >
-            <span className="sidebar-nav-icon">
-              <SettingOutlined />
-            </span>
-            <span className="sidebar-nav-label">{t("nav.settings")}</span>
-            <span
-              className={`sidebar-security-dot ${passwordEnabled ? "is-on" : ""}`}
-              title={passwordEnabled ? t("settings.passwordOn") : t("settings.passwordOff")}
-            />
-          </button>
-        )}
+        <NavLink
+          to="/settings"
+          className={({ isActive }) =>
+            `sidebar-settings ${isActive ? "is-active" : ""}`
+          }
+          title={t("nav.settings")}
+        >
+          <span className="sidebar-nav-icon">
+            <SettingOutlined />
+          </span>
+          <span className="sidebar-nav-label">{t("nav.settings")}</span>
+          <span
+            className={`sidebar-security-dot ${passwordEnabled ? "is-on" : ""}`}
+            title={passwordEnabled ? t("settings.passwordOn") : t("settings.passwordOff")}
+          />
+        </NavLink>
         <p className="sidebar-note">{t("settings.aboutText")}</p>
       </div>
     </aside>

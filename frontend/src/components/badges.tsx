@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import type { Category, Status } from "../api/types";
+import type { Category, Status, StatusOption } from "../api/types";
 import { STATUSES } from "../api/types";
 import { useI18n } from "../i18n";
 import type { MessageKey } from "../i18n";
@@ -23,7 +23,7 @@ export function CategoryBadge({ category }: { category: Category }) {
   );
 }
 
-export function useStatusOptions() {
+export function useStatusOptions(): StatusOption[] {
   const { t, locale } = useI18n();
   return useMemo(
     () =>

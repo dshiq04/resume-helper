@@ -5,9 +5,8 @@ import {
   TeamOutlined,
   TrophyOutlined,
 } from "@ant-design/icons";
-import type { Stats } from "../api/types";
+import type { CategoryFilter, Stats } from "../api/types";
 import { useI18n } from "../i18n";
-import type { CategoryFilter } from "../components/Sidebar";
 
 interface StatsCardsProps {
   stats: Stats | null;
