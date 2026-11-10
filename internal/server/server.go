@@ -25,6 +25,7 @@ type Server struct {
 	cfg      *config.Config
 	db       *gorm.DB
 	assets   fs.FS
+	auth     *authManager
 	engine   *gin.Engine
 	http     *http.Server
 	listener net.Listener
@@ -36,6 +37,7 @@ func New(cfg *config.Config, db *gorm.DB, assets fs.FS) *Server {
 		cfg:    cfg,
 		db:     db,
 		assets: assets,
+		auth:   newAuthManager(db),
 	}
 	s.engine = s.newEngine()
 	return s
@@ -48,14 +50,26 @@ func (s *Server) newEngine() *gin.Engine {
 	api := r.Group("/api")
 	{
 		api.GET("/health", s.health)
-		api.GET("/applications", s.listApplications)
-		api.POST("/applications", s.createApplication)
-		api.POST("/applications/batch-delete", s.batchDeleteApplications)
-		api.PATCH("/applications/batch-status", s.batchUpdateStatus)
-		api.PUT("/application/:id", s.updateApplication)
-		api.DELETE("/application/:id", s.deleteApplication)
-		api.GET("/stats", s.stats)
-		api.GET("/system/info", s.systemInfo)
+		api.GET("/auth/status", s.authStatus)
+		api.POST("/auth/login", s.authLogin)
+		api.POST("/auth/setup", s.authSetup)
+	}
+
+	protected := api.Group("")
+	protected.Use(s.auth.requireAuth())
+	{
+		protected.POST("/auth/logout", s.authLogout)
+		protected.POST("/auth/change-password", s.authChangePassword)
+		protected.POST("/auth/disable", s.authDisable)
+
+		protected.GET("/applications", s.listApplications)
+		protected.POST("/applications", s.createApplication)
+		protected.POST("/applications/batch-delete", s.batchDeleteApplications)
+		protected.PATCH("/applications/batch-status", s.batchUpdateStatus)
+		protected.PUT("/application/:id", s.updateApplication)
+		protected.DELETE("/application/:id", s.deleteApplication)
+		protected.GET("/stats", s.stats)
+		protected.GET("/system/info", s.systemInfo)
 	}
 
 	s.registerStaticRoutes(r)
