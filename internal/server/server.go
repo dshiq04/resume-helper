@@ -1,0 +1,197 @@
+package server
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"io/fs"
+	"log"
+	"net"
+	"net/http"
+	"runtime"
+	"strconv"
+	"strings"
+	"time"
+
+	"resume-helper/internal/config"
+
+	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
+)
+
+const Version = "1.0.0"
+
+type Server struct {
+	cfg      *config.Config
+	db       *gorm.DB
+	assets   fs.FS
+	engine   *gin.Engine
+	http     *http.Server
+	listener net.Listener
+}
+
+func New(cfg *config.Config, db *gorm.DB, assets fs.FS) *Server {
+	gin.SetMode(gin.ReleaseMode)
+	s := &Server{
+		cfg:    cfg,
+		db:     db,
+		assets: assets,
+	}
+	s.engine = s.newEngine()
+	return s
+}
+
+func (s *Server) newEngine() *gin.Engine {
+	r := gin.New()
+	r.Use(gin.Logger(), gin.Recovery(), corsMiddleware(), securityHeaders())
+
+	api := r.Group("/api")
+	{
+		api.GET("/health", s.health)
+		api.GET("/applications", s.listApplications)
+		api.POST("/applications", s.createApplication)
+		api.POST("/applications/batch-delete", s.batchDeleteApplications)
+		api.PATCH("/applications/batch-status", s.batchUpdateStatus)
+		api.PUT("/application/:id", s.updateApplication)
+		api.DELETE("/application/:id", s.deleteApplication)
+		api.GET("/stats", s.stats)
+		api.GET("/system/info", s.systemInfo)
+	}
+
+	s.registerStaticRoutes(r)
+	return r
+}
+
+// Start binds the HTTP listener and serves in a background goroutine. It
+// returns the URL clients should use. If the configured port is unavailable,
+// an ephemeral port is selected instead.
+func (s *Server) Start() (string, error) {
+	host := strings.TrimSpace(s.cfg.Server.Host)
+	if host == "" {
+		host = "127.0.0.1"
+	}
+
+	listen := func(port int) (net.Listener, error) {
+		return net.Listen("tcp", net.JoinHostPort(host, strconv.Itoa(port)))
+	}
+
+	listener, err := listen(s.cfg.Server.Port)
+	if err != nil && s.cfg.Server.Port != 0 {
+		log.Printf("port %d is unavailable (%v); falling back to an ephemeral port", s.cfg.Server.Port, err)
+		listener, err = listen(0)
+	}
+	if err != nil {
+		return "", fmt.Errorf("listen on %s: %w", host, err)
+	}
+	s.listener = listener
+	s.http = &http.Server{
+		Handler:           s.engine,
+		ReadHeaderTimeout: 10 * time.Second,
+	}
+
+	go func() {
+		if err := s.http.Serve(listener); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Printf("http server stopped: %v", err)
+		}
+	}()
+
+	actualPort := listener.Addr().(*net.TCPAddr).Port
+	displayHost := host
+	if displayHost == "0.0.0.0" || displayHost == "::" || displayHost == "[::]" {
+		displayHost = "127.0.0.1"
+	}
+	return fmt.Sprintf("http://%s", net.JoinHostPort(displayHost, strconv.Itoa(actualPort))), nil
+}
+
+func (s *Server) Stop(ctx context.Context) error {
+	if s.http == nil {
+		return nil
+	}
+	return s.http.Shutdown(ctx)
+}
+
+func (s *Server) health(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{
+		"status":  "ok",
+		"version": Version,
+		"time":    time.Now(),
+	})
+}
+
+func (s *Server) systemInfo(c *gin.Context) {
+	location := ""
+	if s.cfg.Database.Driver == "sqlite" {
+		location = s.cfg.Database.DSN
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"version":     Version,
+		"goVersion":   runtime.Version(),
+		"driver":      s.cfg.Database.Driver,
+		"database":    databaseLabel(s.cfg.Database.Driver),
+		"location":    location,
+		"configPath":  s.cfg.SourcePath,
+		"dataDir":     s.cfg.DataDir,
+		"docsVersion": 1,
+	})
+}
+
+func databaseLabel(driver string) string {
+	switch driver {
+	case "mysql":
+		return "MySQL"
+	case "postgres":
+		return "PostgreSQL"
+	default:
+		return "SQLite"
+	}
+}
+
+func corsMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		origin := c.GetHeader("Origin")
+		if origin != "" {
+			c.Header("Access-Control-Allow-Origin", origin)
+			c.Header("Vary", "Origin")
+			c.Header("Access-Control-Allow-Credentials", "true")
+		} else {
+			c.Header("Access-Control-Allow-Origin", "*")
+		}
+		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
+		c.Header("Access-Control-Allow-Headers", "Origin, Content-Type, Accept, Authorization, X-Requested-With")
+		c.Header("Access-Control-Max-Age", "86400")
+		if c.Request.Method == http.MethodOptions {
+			c.AbortWithStatus(http.StatusNoContent)
+			return
+		}
+		c.Next()
+	}
+}
+
+func securityHeaders() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.Header("X-Content-Type-Options", "nosniff")
+		c.Header("X-Frame-Options", "SAMEORIGIN")
+		c.Header("Referrer-Policy", "strict-origin-when-cross-origin")
+		c.Next()
+	}
+}
+
+func apiError(c *gin.Context, status int, code, message string) {
+	c.AbortWithStatusJSON(status, gin.H{
+		"error": message,
+		"code":  code,
+	})
+}
+
+func parseID(c *gin.Context) (uint, bool) {
+	value, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil || value == 0 {
+		apiError(c, http.StatusBadRequest, "invalid_id", "Invalid record id.")
+		return 0, false
+	}
+	return uint(value), true
+}
+
+func isRecordNotFound(err error) bool {
+	return errors.Is(err, gorm.ErrRecordNotFound)
+}
