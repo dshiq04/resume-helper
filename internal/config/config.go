@@ -1,7 +1,6 @@
 package config
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -12,7 +11,6 @@ import (
 )
 
 const (
-	AppDirName    = "ResumeHelper"
 	defaultPort   = 19876
 	defaultHost   = "127.0.0.1"
 	defaultDriver = "sqlite"
@@ -36,8 +34,8 @@ type ServerConfig struct {
 type DatabaseConfig struct {
 	// Driver is one of: sqlite, mysql, postgres.
 	Driver string `yaml:"driver"`
-	// DSN is the GORM driver DSN. When empty for sqlite a database file inside
-	// the user's config directory is used.
+	// DSN is the GORM driver DSN. When empty for sqlite, resume-helper.db is
+	// created next to the executable.
 	DSN string `yaml:"dsn"`
 }
 
@@ -53,18 +51,25 @@ func Default() Config {
 	}
 }
 
-// Load reads the first config file it finds and applies environment overrides.
-// Search order: RESUME_HELPER_CONFIG, ./config.yaml, <user config>/ResumeHelper/config.yaml.
-// If no file exists a commented default is written to the user config folder.
+// Load reads the portable config file and applies environment overrides.
+//
+// By default both config.yaml and the SQLite database live in the application
+// directory (the folder containing the executable). During `go run` the
+// working directory is used instead. RESUME_HELPER_DATA_DIR can point both
+// files at a custom directory, and RESUME_HELPER_CONFIG can select a specific
+// config file.
 func Load() (*Config, error) {
 	cfg := Default()
-	dataDir, err := userDataDir()
+	dataDir, err := dataDirectory()
 	if err != nil {
 		return nil, err
 	}
 	cfg.DataDir = dataDir
 
-	path := findConfigFile(dataDir)
+	path, err := findConfigFile(dataDir)
+	if err != nil {
+		return nil, err
+	}
 	if path != "" {
 		raw, err := os.ReadFile(path)
 		if err != nil {
@@ -77,7 +82,11 @@ func Load() (*Config, error) {
 	} else {
 		path = filepath.Join(dataDir, "config.yaml")
 		if err := os.WriteFile(path, []byte(defaultConfigFile(dataDir)), 0o644); err != nil {
-			return nil, fmt.Errorf("write default config: %w", err)
+			return nil, fmt.Errorf(
+				"write default config to %s: %w (move the application to a writable folder or set RESUME_HELPER_DATA_DIR)",
+				path,
+				err,
+			)
 		}
 		cfg.SourcePath = path
 	}
@@ -100,8 +109,16 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("server.port must be between 0 and 65535")
 	}
 
-	if cfg.Database.Driver == "sqlite" && strings.TrimSpace(cfg.Database.DSN) == "" {
-		cfg.Database.DSN = filepath.Join(dataDir, "resume-helper.db")
+	if cfg.Database.Driver == "sqlite" {
+		dsn := strings.TrimSpace(cfg.Database.DSN)
+		switch {
+		case dsn == "":
+			cfg.Database.DSN = filepath.Join(cfg.DataDir, "resume-helper.db")
+		case dsn == ":memory:" || strings.HasPrefix(dsn, "file:"):
+			// Keep special SQLite DSNs untouched.
+		case !filepath.IsAbs(dsn):
+			cfg.Database.DSN = filepath.Join(cfg.DataDir, dsn)
+		}
 	}
 
 	if cfg.Database.Driver != "sqlite" && strings.TrimSpace(cfg.Database.DSN) == "" {
@@ -128,38 +145,68 @@ func applyEnv(cfg *Config) {
 	}
 }
 
-func findConfigFile(dataDir string) string {
+func findConfigFile(dataDir string) (string, error) {
 	if path := strings.TrimSpace(os.Getenv("RESUME_HELPER_CONFIG")); path != "" {
-		return path
-	}
-	if _, err := os.Stat("config.yaml"); err == nil {
-		return "config.yaml"
+		abs, err := filepath.Abs(path)
+		if err != nil {
+			return "", fmt.Errorf("resolve config path %s: %w", path, err)
+		}
+		if _, err := os.Stat(abs); err != nil {
+			return "", fmt.Errorf("config file %s: %w", abs, err)
+		}
+		return abs, nil
 	}
 	path := filepath.Join(dataDir, "config.yaml")
 	if _, err := os.Stat(path); err == nil {
-		return path
+		return path, nil
 	}
-	return ""
+	return "", nil
 }
 
-func userDataDir() (string, error) {
-	base, err := os.UserConfigDir()
+// dataDirectory returns the portable application directory. The executable's
+// folder is used for packaged builds; `go run` uses the current directory so
+// development files stay in the project instead of a temporary build folder.
+func dataDirectory() (string, error) {
+	if value := strings.TrimSpace(os.Getenv("RESUME_HELPER_DATA_DIR")); value != "" {
+		dir, err := filepath.Abs(value)
+		if err != nil {
+			return "", fmt.Errorf("resolve data directory %s: %w", value, err)
+		}
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			return "", fmt.Errorf("create data directory %s: %w", dir, err)
+		}
+		return dir, nil
+	}
+
+	if executable, err := os.Executable(); err == nil {
+		executable = filepath.Clean(executable)
+		if !isDevelopmentExecutable(executable) {
+			return filepath.Dir(executable), nil
+		}
+	}
+
+	cwd, err := os.Getwd()
 	if err != nil {
-		return "", fmt.Errorf("locate user config directory: %w", err)
+		return "", fmt.Errorf("locate working directory: %w", err)
 	}
-	if base == "" {
-		return "", errors.New("user config directory is unavailable")
-	}
-	dir := filepath.Join(base, AppDirName)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return "", fmt.Errorf("create config directory: %w", err)
-	}
-	return dir, nil
+	return cwd, nil
 }
 
-func defaultConfigFile(dataDir string) string {
-	dbPath := filepath.ToSlash(filepath.Join(dataDir, "resume-helper.db"))
-	return fmt.Sprintf(`# ResumeTrail configuration
+func isDevelopmentExecutable(path string) bool {
+	lower := strings.ToLower(path)
+	if strings.Contains(lower, "go-build") {
+		return true
+	}
+	dev := strings.ToLower(strings.TrimSpace(os.Getenv("RESUME_HELPER_DEV")))
+	return dev == "1" || dev == "true"
+}
+
+func defaultConfigFile(_ string) string {
+	return `# ResumeTrail portable configuration
+# This file lives next to the application. Keep it there so all data stays
+# inside the application folder and nothing is written to AppData or other
+# system directories.
+#
 # Edit this file and restart the application for changes to take effect.
 # The database password is never stored here; application passwords are
 # hashed with bcrypt inside the database.
@@ -171,11 +218,13 @@ server:
 database:
   # sqlite | mysql | postgres
   driver: sqlite
-  # SQLite: optional path. Defaults to %s
+  # SQLite: empty means resume-helper.db next to this file. Relative paths
+  # are also resolved next to this config file.
+  # Default: resume-helper.db
   # MySQL example:
   #   dsn: "user:password@tcp(127.0.0.1:3306)/resume_helper?charset=utf8mb4&parseTime=True&loc=Local"
   # PostgreSQL example:
   #   dsn: "host=127.0.0.1 user=postgres password=secret dbname=resume_helper port=5432 sslmode=disable TimeZone=Local"
-  dsn: "%s"
-`, dbPath, dbPath)
+  dsn: ""
+`
 }

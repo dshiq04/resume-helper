@@ -29,6 +29,7 @@ type Application struct {
 	CompanyName string    `gorm:"type:varchar(255);not null;index" json:"companyName"`
 	Link        string    `gorm:"type:text" json:"link"`
 	Status      string    `gorm:"type:varchar(32);not null;default:screening;index" json:"status"`
+	Pinned      bool      `gorm:"not null;default:false;index" json:"pinned"`
 	CreatedAt   time.Time `json:"createdAt"`
 	UpdatedAt   time.Time `json:"updatedAt"`
 }

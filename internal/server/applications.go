@@ -31,6 +31,7 @@ type applicationUpdateInput struct {
 	CompanyName *string `json:"companyName"`
 	Link        *string `json:"link"`
 	Status      *string `json:"status"`
+	Pinned      *bool   `json:"pinned"`
 }
 
 type idsInput struct {
@@ -99,7 +100,7 @@ func (s *Server) listApplications(c *gin.Context) {
 
 	var items []models.Application
 	if err := build().
-		Order("updated_at DESC, id DESC").
+		Order("pinned DESC, updated_at DESC, id DESC").
 		Offset((params.Page - 1) * params.PageSize).
 		Limit(params.PageSize).
 		Find(&items).Error; err != nil {
@@ -197,6 +198,9 @@ func (s *Server) updateApplication(c *gin.Context) {
 			return
 		}
 		updates["status"] = status
+	}
+	if input.Pinned != nil {
+		updates["pinned"] = *input.Pinned
 	}
 
 	if len(updates) > 0 {
