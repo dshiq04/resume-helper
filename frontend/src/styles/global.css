@@ -89,6 +89,20 @@ textarea {
   background: var(--bg);
 }
 
+.app-watermark {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.app-content {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
 /* -------------------------------------------------------------------------- */
 /* Title bar                                                                  */
 /* -------------------------------------------------------------------------- */

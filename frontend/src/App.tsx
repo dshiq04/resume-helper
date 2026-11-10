@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { App as AntdApp, Button, ConfigProvider, Spin } from "antd";
+import { App as AntdApp, Button, ConfigProvider, Spin, Watermark } from "antd";
 import { CloudServerOutlined, ReloadOutlined } from "@ant-design/icons";
 import { Navigate, Route, Routes } from "react-router-dom";
 import { ApiError, api } from "./api/client";
@@ -99,7 +99,24 @@ function AppRoot() {
             }
           />
 
-          {stage === "checking" && (
+          <Watermark
+            className="app-watermark"
+            content="开发中品质，请谅解"
+            gap={[140, 140]}
+            offset={[24, 24]}
+            rotate={-24}
+            zIndex={4}
+            font={{
+              color:
+                themeMode === "dark"
+                  ? "rgba(226, 232, 240, 0.09)"
+                  : "rgba(71, 85, 105, 0.11)",
+              fontSize: 14,
+              fontWeight: 600,
+            }}
+          >
+            <div className="app-content">
+              {stage === "checking" && (
             <div className="boot-screen">
               <div className="boot-logo">
                 <Logo size={58} />
@@ -156,6 +173,8 @@ function AppRoot() {
               </Route>
             </Routes>
           )}
+            </div>
+          </Watermark>
         </div>
       </AntdApp>
     </ConfigProvider>
