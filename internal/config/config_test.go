@@ -92,3 +92,26 @@ func TestLoadRejectsMissingExplicitConfig(t *testing.T) {
 		t.Fatal("expected an error for a missing explicit config file")
 	}
 }
+
+func TestExplicitConfigUsesConfigFolderForRelativeSQLite(t *testing.T) {
+	isolateEnv(t)
+	configDir := t.TempDir()
+	configFile := filepath.Join(configDir, "portable.yaml")
+	content := "database:\n  driver: sqlite\n  dsn: \"portable.db\"\n"
+	if err := os.WriteFile(configFile, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("RESUME_HELPER_CONFIG", configFile)
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load(): %v", err)
+	}
+	if cfg.DataDir != configDir {
+		t.Fatalf("DataDir = %q, want %q", cfg.DataDir, configDir)
+	}
+	wantDB := filepath.Join(configDir, "portable.db")
+	if cfg.Database.DSN != wantDB {
+		t.Fatalf("SQLite DSN = %q, want %q", cfg.Database.DSN, wantDB)
+	}
+}

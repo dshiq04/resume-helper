@@ -91,6 +91,13 @@ func Load() (*Config, error) {
 		cfg.SourcePath = path
 	}
 
+	// When a specific config file is supplied without an explicit data
+	// directory, keep the SQLite database beside that config file.
+	if strings.TrimSpace(os.Getenv("RESUME_HELPER_CONFIG")) != "" &&
+		strings.TrimSpace(os.Getenv("RESUME_HELPER_DATA_DIR")) == "" {
+		cfg.DataDir = filepath.Dir(path)
+	}
+
 	applyEnv(&cfg)
 
 	cfg.Database.Driver = strings.ToLower(strings.TrimSpace(cfg.Database.Driver))
