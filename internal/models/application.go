@@ -1,0 +1,59 @@
+package models
+
+import (
+	"strings"
+	"time"
+)
+
+const (
+	CategorySpring     = "spring"
+	CategoryAutumn     = "autumn"
+	CategoryInternship = "internship"
+
+	StatusScreening = "screening"
+	StatusWritten   = "written"
+	StatusInterview = "interview"
+	StatusOffer     = "offer"
+	StatusRejected  = "rejected"
+)
+
+var (
+	Categories = []string{CategorySpring, CategoryAutumn, CategoryInternship}
+	Statuses   = []string{StatusScreening, StatusWritten, StatusInterview, StatusOffer, StatusRejected}
+)
+
+// Application is one resume submission.
+type Application struct {
+	ID          uint      `gorm:"primaryKey" json:"id"`
+	Category    string    `gorm:"type:varchar(32);not null;index" json:"category"`
+	CompanyName string    `gorm:"type:varchar(255);not null;index" json:"companyName"`
+	Link        string    `gorm:"type:text" json:"link"`
+	Status      string    `gorm:"type:varchar(32);not null;default:screening;index" json:"status"`
+	CreatedAt   time.Time `json:"createdAt"`
+	UpdatedAt   time.Time `json:"updatedAt"`
+}
+
+func IsValidCategory(value string) bool {
+	return contains(Categories, value)
+}
+
+func IsValidStatus(value string) bool {
+	return contains(Statuses, value)
+}
+
+func NormalizeCategory(value string) string {
+	return strings.ToLower(strings.TrimSpace(value))
+}
+
+func NormalizeStatus(value string) string {
+	return strings.ToLower(strings.TrimSpace(value))
+}
+
+func contains(values []string, value string) bool {
+	for _, item := range values {
+		if item == value {
+			return true
+		}
+	}
+	return false
+}

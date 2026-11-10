@@ -1,0 +1,26 @@
+# ResumeTrail configuration
+# Copy this file to ./config.yaml (or %AppData%\ResumeHelper\config.yaml on
+# Windows) and restart the application after editing.
+#
+# Application passwords are NOT configured here. Enable or disable an
+# optional password from Settings inside the app; it is stored as a bcrypt
+# hash in the database.
+
+server:
+  host: 127.0.0.1
+  port: 19876
+
+database:
+  # sqlite | mysql | postgres
+  driver: sqlite
+  # SQLite: optional file path. Leave empty to use
+  # <user config directory>/ResumeHelper/resume-helper.db
+  dsn: ""
+
+  # MySQL example:
+  # driver: mysql
+  # dsn: "user:password@tcp(127.0.0.1:3306)/resume_helper?charset=utf8mb4&parseTime=True&loc=Local"
+
+  # PostgreSQL example:
+  # driver: postgres
+  # dsn: "host=127.0.0.1 user=postgres password=secret dbname=resume_helper port=5432 sslmode=disable TimeZone=Local"
