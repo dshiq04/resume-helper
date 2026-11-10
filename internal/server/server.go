@@ -68,6 +68,8 @@ func (s *Server) newEngine() *gin.Engine {
 		protected.PATCH("/applications/batch-status", s.batchUpdateStatus)
 		protected.PUT("/application/:id", s.updateApplication)
 		protected.DELETE("/application/:id", s.deleteApplication)
+		protected.POST("/applications/import", s.importApplications)
+		protected.GET("/applications/template", s.downloadTemplate)
 		protected.GET("/stats", s.stats)
 		protected.GET("/system/info", s.systemInfo)
 	}
