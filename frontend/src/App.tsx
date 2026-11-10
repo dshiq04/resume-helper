@@ -4,11 +4,11 @@ import { CloudServerOutlined, ReloadOutlined } from "@ant-design/icons";
 import { ApiError, api } from "./api/client";
 import type { AuthSession, Stats } from "./api/types";
 import { Sidebar, type CategoryFilter } from "./components/Sidebar";
-import { StatsCards } from "./components/StatsCards";
 import { LockScreen } from "./components/LockScreen";
 import { Logo } from "./components/Logo";
 import { TitleBar } from "./components/TitleBar";
-import { I18nProvider, useI18n, type MessageKey } from "./i18n";
+import { Dashboard } from "./pages/Dashboard";
+import { I18nProvider, useI18n } from "./i18n";
 import { createTheme, type ThemeMode } from "./theme";
 
 const THEME_KEY = "resumetrail.theme";
@@ -80,9 +80,11 @@ function AppRoot() {
     setStage("ready");
   }, []);
 
+  const handleDataChanged = useCallback(() => {
+    void loadStats();
+  }, [loadStats]);
+
   const themeConfig = useMemo(() => createTheme(themeMode), [themeMode]);
-  const titleKey = `dashboard.title.${activeCategory}` as MessageKey;
-  const subtitleKey = `dashboard.subtitle.${activeCategory}` as MessageKey;
 
   return (
     <ConfigProvider locale={antdLocale} theme={themeConfig}>
@@ -135,27 +137,11 @@ function AppRoot() {
               />
 
               <main className="main-content">
-                <div className="dashboard-header">
-                  <div>
-                    <span className="season-pill">
-                      {t("dashboard.season", {
-                        year: new Date().getFullYear(),
-                      })}
-                    </span>
-                    <h1>{t(titleKey)}</h1>
-                    <p>{t(subtitleKey)}</p>
-                  </div>
-                </div>
-
-                <StatsCards stats={stats} category={activeCategory} />
-
-                <section className="workspace-preview">
-                  <div className="workspace-preview-mark">
-                    <Logo size={46} />
-                  </div>
-                  <h2>{t("table.emptyTitle")}</h2>
-                  <p>{t("table.emptyDescription")}</p>
-                </section>
+                <Dashboard
+                  category={activeCategory}
+                  stats={stats}
+                  onDataChanged={handleDataChanged}
+                />
               </main>
             </div>
           )}
