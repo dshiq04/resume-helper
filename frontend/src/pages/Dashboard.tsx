@@ -28,6 +28,7 @@ import type { CategoryFilter } from "../components/Sidebar";
 import { StatsCards } from "../components/StatsCards";
 import { CategoryBadge, StatusBadge, useStatusOptions } from "../components/badges";
 import { ApplicationModal } from "../components/ApplicationModal";
+import { ImportModal } from "../components/ImportModal";
 import { apiErrorMessage } from "../utils/errors";
 import { openExternal } from "../utils/desktop";
 import type { Stats } from "../api/types";
@@ -36,7 +37,6 @@ interface DashboardProps {
   category: CategoryFilter;
   stats: Stats | null;
   onDataChanged: () => void;
-  onOpenImport?: () => void;
 }
 
 type EditingField = "companyName" | "link";
@@ -50,7 +50,6 @@ export function Dashboard({
   category,
   stats,
   onDataChanged,
-  onOpenImport,
 }: DashboardProps) {
   const { t, formatDate, locale } = useI18n();
   const { message } = AntdApp.useApp();
@@ -66,6 +65,7 @@ export function Dashboard({
   const [loading, setLoading] = useState(true);
   const [selectedKeys, setSelectedKeys] = useState<number[]>([]);
   const [addOpen, setAddOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [reloadToken, setReloadToken] = useState(0);
   const [editing, setEditing] = useState<EditingState | null>(null);
   const [editValue, setEditValue] = useState("");
@@ -268,6 +268,12 @@ export function Dashboard({
     },
     [category, onDataChanged, refresh],
   );
+
+  const handleImported = useCallback(() => {
+    onDataChanged();
+    setPage(1);
+    refresh();
+  }, [onDataChanged, refresh]);
 
   const batchStatusItems = useMemo<MenuProps["items"]>(
     () =>
@@ -508,16 +514,14 @@ export function Dashboard({
           <p>{t(subtitleKey)}</p>
         </div>
         <div className="dashboard-actions">
-          {onOpenImport && (
-            <Button
-              className="soft-action-button"
-              size="large"
-              icon={<FileExcelOutlined />}
-              onClick={onOpenImport}
-            >
-              {t("action.import")}
-            </Button>
-          )}
+          <Button
+            className="soft-action-button"
+            size="large"
+            icon={<FileExcelOutlined />}
+            onClick={() => setImportOpen(true)}
+          >
+            {t("action.import")}
+          </Button>
           <Button
             type="primary"
             size="large"
@@ -633,6 +637,12 @@ export function Dashboard({
         defaultCategory={category}
         onClose={() => setAddOpen(false)}
         onCreated={handleCreated}
+      />
+
+      <ImportModal
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        onImported={handleImported}
       />
     </>
   );

@@ -6,6 +6,7 @@ import type { AuthSession, Stats } from "./api/types";
 import { Sidebar, type CategoryFilter } from "./components/Sidebar";
 import { LockScreen } from "./components/LockScreen";
 import { Logo } from "./components/Logo";
+import { SettingsDrawer } from "./components/SettingsDrawer";
 import { TitleBar } from "./components/TitleBar";
 import { Dashboard } from "./pages/Dashboard";
 import { I18nProvider, useI18n } from "./i18n";
@@ -30,6 +31,7 @@ function AppRoot() {
   const [passwordEnabled, setPasswordEnabled] = useState(false);
   const [stats, setStats] = useState<Stats | null>(null);
   const [activeCategory, setActiveCategory] = useState<CategoryFilter>("all");
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   const checkAuth = useCallback(async () => {
     setStage("checking");
@@ -84,6 +86,11 @@ function AppRoot() {
     void loadStats();
   }, [loadStats]);
 
+  const handleLock = useCallback(() => {
+    setSettingsOpen(false);
+    setStage("locked");
+  }, []);
+
   const themeConfig = useMemo(() => createTheme(themeMode), [themeMode]);
 
   return (
@@ -128,22 +135,35 @@ function AppRoot() {
           )}
 
           {stage === "ready" && (
-            <div className="app-body">
-              <Sidebar
-                active={activeCategory}
-                onChange={setActiveCategory}
-                stats={stats}
-                passwordEnabled={passwordEnabled}
-              />
-
-              <main className="main-content">
-                <Dashboard
-                  category={activeCategory}
+            <>
+              <div className="app-body">
+                <Sidebar
+                  active={activeCategory}
+                  onChange={setActiveCategory}
                   stats={stats}
-                  onDataChanged={handleDataChanged}
+                  passwordEnabled={passwordEnabled}
+                  onOpenSettings={() => setSettingsOpen(true)}
                 />
-              </main>
-            </div>
+
+                <main className="main-content">
+                  <Dashboard
+                    category={activeCategory}
+                    stats={stats}
+                    onDataChanged={handleDataChanged}
+                  />
+                </main>
+              </div>
+
+              <SettingsDrawer
+                open={settingsOpen}
+                onClose={() => setSettingsOpen(false)}
+                themeMode={themeMode}
+                onThemeChange={setThemeMode}
+                passwordEnabled={passwordEnabled}
+                onPasswordEnabledChange={setPasswordEnabled}
+                onLock={handleLock}
+              />
+            </>
           )}
         </div>
       </AntdApp>

@@ -47,7 +47,12 @@ func main() {
 		log.Fatalf("start HTTP server: %v", err)
 	}
 	log.Printf("ResumeTrail %s is serving at %s", server.Version, baseURL)
-	log.Printf("database: %s (%s)", cfg.Database.Driver, cfg.SourcePath)
+	log.Printf(
+		"database: %s %s (config: %s)",
+		database.DatabaseLabel(cfg.Database.Driver),
+		database.SafeDSN(cfg.Database.Driver, cfg.Database.DSN),
+		cfg.SourcePath,
+	)
 
 	if isHeadless() {
 		runHeadless(httpServer, baseURL)

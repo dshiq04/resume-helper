@@ -85,7 +85,7 @@ export function LockScreen({ onAuthenticated }: LockScreenProps) {
             autoFocus
             value={password}
             onChange={(event) => setPassword(event.target.value)}
-            placeholder="••••••••"
+            placeholder={t("auth.password")}
             prefix={<LockOutlined className="auth-input-icon" />}
             autoComplete="current-password"
           />

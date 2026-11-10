@@ -2,6 +2,8 @@ package database
 
 import (
 	"fmt"
+	"log"
+	"os"
 	"strings"
 	"time"
 
@@ -30,8 +32,14 @@ func Open(cfg config.DatabaseConfig) (*gorm.DB, error) {
 		return nil, fmt.Errorf("unsupported database driver: %s", cfg.Driver)
 	}
 
+	dbLogger := logger.New(log.New(os.Stdout, "\r\n", log.LstdFlags), logger.Config{
+		SlowThreshold:             500 * time.Millisecond,
+		LogLevel:                  logger.Warn,
+		IgnoreRecordNotFoundError: true,
+		Colorful:                  false,
+	})
 	db, err := gorm.Open(dialector, &gorm.Config{
-		Logger:                                   logger.Default.LogMode(logger.Warn),
+		Logger:                                   dbLogger,
 		DisableForeignKeyConstraintWhenMigrating: true,
 		NowFunc: func() time.Time {
 			return time.Now().Local()
