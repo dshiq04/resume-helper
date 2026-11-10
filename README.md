@@ -1,59 +1,340 @@
-# Welcome to Your New Wails3 Project!
+# 履途 ResumeTrail
 
-Congratulations on generating your Wails3 application! This README will guide you through the next steps to get your project up and running.
+一个专注、漂亮的简历投递记录工具。后端使用 **Go + Gin + GORM**，前端使用 **React + Ant Design**，并通过 **Wails 3** 以无边框桌面窗口运行。支持本地 SQLite、MySQL、PostgreSQL 三种数据库。
 
-## Getting Started
+![ResumeTrail 界面预览](docs/preview-light.png)
 
-1. Navigate to your project directory in the terminal.
+## 功能
 
-2. To run your application in development mode, use the following command:
+- **置顶**：重要的投递可固定在列表最上方，始终优先展示。
+- **三类投递看板**：春招、秋招、实习，侧边栏可快速切换并显示数量；分类使用 React Router 路由页面（`/spring`、`/autumn`、`/internship`）。
+- **完整投递字段**：企业名称、投递链接、状态，状态默认「初筛」。
+- **内联编辑**：点击企业名称或链接即可直接修改；状态下拉框即时更新。
+- **官网直达**：鼠标悬浮到投递链接时出现打开按钮，点击后通过系统默认浏览器打开（Wails 桌面环境）。
+- **单条删除 / 批量删除**：每行提供删除按钮，表头支持多选后批量删除。
+- **批量修改状态**：多选记录后一键切换为初筛 / 笔试 / 面试 / Offer / 淘汰。
+- **搜索**：按企业名称、投递链接模糊搜索，并可按状态筛选。
+- **Excel 导入**：支持 `.xlsx` / `.xlsm` 批量导入，内置中英双语模板与下拉选项，导入结果会显示成功、跳过和错误明细。
+- **可选密码保护**：在设置页开启后，启动应用需要解锁；密码使用 **bcrypt** 哈希落库，绝不明文保存。
+- **五种界面语言**：简体中文、繁體中文、English、日本語、한국어，包含 Ant Design 组件语言同步。
+- **浅色 / 深色主题**：可在标题栏或设置页切换。
+- **自定义窗口标题栏**：无系统默认状态栏，最小化 / 最大化 / 关闭按钮位于页面右上角，支持拖动窗口。
+- **响应式三端布局**：电脑端使用完整侧边栏 + 表格；平板端使用图标导航栏 + 双列卡片；手机端使用底部导航 + 单列卡片。
+- **设置独立页面**：通过 `/settings` 路由访问，和投递工作台解耦。
+- **数据统计**：总投递、待推进、面试中、Offer 数量及 Offer 转化率。
+- **便携式数据**：配置文件和 SQLite 数据库默认存放在程序所在目录，不向 AppData 或其他系统目录写入数据。
+- **多数据库支持**：SQLite（零配置本地存储）、MySQL、PostgreSQL，自动迁移表结构，并提供初始化 SQL 文件。
 
-   ```
-   wails3 dev
-   ```
+## 界面预览
 
-   This will start your application and enable hot-reloading for both frontend and backend changes.
+| 电脑端 | 平板端 | 手机端 |
+| --- | --- | --- |
+| ![桌面](docs/preview-light.png) | ![平板](docs/preview-tablet.png) | ![手机](docs/preview-mobile.png) |
 
-3. To build your application for production, use:
+## 技术栈
 
-   ```
-   wails3 build
-   ```
+| 层 | 技术 |
+| --- | --- |
+| 桌面外壳 | Wails 3（无边框窗口） |
+| HTTP 后端 | Go、Gin |
+| 数据访问 | GORM |
+| 数据库 | SQLite（纯 Go 驱动）、MySQL、PostgreSQL |
+| 密码 | bcrypt |
+| Excel | excelize |
+| 前端 | React 18、TypeScript、Vite |
+| 请求层 | Axios |
+| 前端路由 | React Router |
+| UI | Ant Design 5、Ant Design Icons |
+| 多语言 | 自研 i18n Context + Ant Design locale |
 
-   This will create a production-ready executable in the `build` directory.
+## 前端页面与路由
 
-## Exploring Wails3 Features
+| 路由 | 页面 |
+| --- | --- |
+| `/` | 全部投递 |
+| `/spring` | 春招投递 |
+| `/autumn` | 秋招投递 |
+| `/internship` | 实习投递 |
+| `/settings` | 设置页 |
 
-Now that you have your project set up, it's time to explore the features that Wails3 offers:
+所有 API 请求统一通过 `src/api/client.ts` 中的 Axios 实例发送，自动附加 Bearer Token，并统一处理 401 会话过期。
 
-1. **Check out the examples**: The best way to learn is by example. Visit the `examples` directory in the `v3/examples` directory to see various sample applications.
+## 快速开始
 
-2. **Run an example**: To run any of the examples, navigate to the example's directory and use:
+### 环境要求
 
-   ```
-   go run .
-   ```
+- Go **1.26+**
+- Node.js **20+** 与 npm
+- Windows 10/11 需要 WebView2 Runtime（通常系统已自带）
+- 其他平台按 Wails 3 要求安装对应 WebKit / 开发依赖
 
-   Note: Some examples may be under development during the alpha phase.
+### 安装与运行
 
-3. **Explore the documentation**: Visit the [Wails3 documentation](https://v3.wails.io/) for in-depth guides and API references.
+```bash
+# 1. 安装前端依赖
+npm install --prefix frontend
 
-4. **Join the community**: Have questions or want to share your progress? Join the [Wails Discord](https://discord.gg/JDdSxwjhGf) or visit the [Wails discussions on GitHub](https://github.com/wailsapp/wails/discussions).
+# 2. 构建前端（frontend/dist 会被嵌入 Go 二进制）
+npm run build --prefix frontend
 
-## Project Structure
+# 3. 启动桌面应用
+go run .
+```
 
-Take a moment to familiarize yourself with your project structure:
+也可以使用 Taskfile：
 
-- `frontend/`: Contains your frontend code (HTML, CSS, JavaScript/TypeScript)
-- `main.go`: The entry point of your Go backend
-- `app.go`: Define your application structure and methods here
-- `wails.json`: Configuration file for your Wails project
+```bash
+task install
+task frontend:build
+task run
+```
 
-## Next Steps
+> `main.go` 使用 `//go:embed all:frontend/dist` 嵌入前端。首次克隆后请先构建前端，否则 Go 编译会提示找不到 `frontend/dist`。
 
-1. Modify the frontend in the `frontend/` directory to create your desired UI.
-2. Add backend functionality in `main.go`.
-3. Use `wails3 dev` to see your changes in real-time.
-4. When ready, build your application with `wails3 build`.
+### 浏览器预览模式（无桌面窗口）
 
-Happy coding with Wails3! If you encounter any issues or have questions, don't hesitate to consult the documentation or reach out to the Wails community.
+```bash
+go run . --headless
+# 或
+RESUME_HELPER_HEADLESS=true go run .
+```
+
+启动后打开日志中打印的地址（默认 `http://127.0.0.1:19876`）。此模式适合 UI 调试；窗口控制按钮在浏览器中不会真正控制操作系统窗口。
+
+### 构建可执行文件
+
+```bash
+task build
+```
+
+等价于：
+
+```bash
+npm run build --prefix frontend
+go build -trimpath -ldflags="-s -w -H windowsgui" -o bin/resume-helper.exe .
+```
+
+Linux / macOS 构建时请去掉 `-H windowsgui`。Taskfile 已按操作系统自动处理。
+
+## 便携式数据目录
+
+ResumeTrail 默认**只使用程序自身目录**，不会在 C 盘的用户目录、AppData、Documents 等位置创建配置文件或数据库：
+
+```text
+ResumeTrail/
+├── resume-helper.exe
+├── config.yaml          # 首次启动自动生成
+└── resume-helper.db     # 默认 SQLite 数据库
+```
+
+- 发布版：以可执行文件所在目录为数据目录。
+- 开发版（`go run .`）：以当前项目目录为数据目录，避免写入 Go 临时构建目录。
+- 自定义数据目录：设置环境变量 `RESUME_HELPER_DATA_DIR`。
+- 自定义配置文件：设置环境变量 `RESUME_HELPER_CONFIG`（文件必须存在）。
+- 如果程序放在只读目录（例如 `C:\Program Files`）且无法创建配置，请将整个程序文件夹移动到可写位置，或设置 `RESUME_HELPER_DATA_DIR`。
+
+SQLite 的 `dsn` 为空时默认使用程序目录下的 `resume-helper.db`；相对路径也会基于配置所在目录解析，因此整个文件夹可以整体移动。
+
+## 配置数据库
+
+首次启动会在程序目录（开发模式下为项目根目录）自动生成 `config.yaml`。也可以复制 `config.example.yaml` 后修改。
+
+### SQLite（默认）
+
+```yaml
+server:
+  host: 127.0.0.1
+  port: 19876
+
+database:
+  driver: sqlite
+  dsn: ""
+```
+
+### MySQL
+
+```yaml
+database:
+  driver: mysql
+  dsn: "user:password@tcp(127.0.0.1:3306)/resume_helper?charset=utf8mb4&parseTime=True&loc=Local"
+```
+
+手动初始化数据库：
+
+```bash
+mysql -u root -p < sql/init.mysql.sql
+```
+
+### PostgreSQL
+
+```yaml
+database:
+  driver: postgres
+  dsn: "host=127.0.0.1 user=postgres password=secret dbname=resume_helper port=5432 sslmode=disable TimeZone=Local"
+```
+
+手动初始化数据库：
+
+```bash
+createdb resume_helper
+psql -d resume_helper -f sql/init.postgresql.sql
+```
+
+项目根目录提供：
+
+- `sql/init.mysql.sql`：创建 `resume_helper` 数据库、`applications` 与 `settings` 表及索引。
+- `sql/init.postgresql.sql`：创建 `applications` 与 `settings` 表及索引（在目标数据库中执行）。
+
+> 应用启动时仍会自动执行 GORM `AutoMigrate`。初始化 SQL 主要用于手动建库、DBA 审核或查看实体结构。
+
+### 环境变量覆盖
+
+| 变量 | 说明 |
+| --- | --- |
+| `RESUME_HELPER_CONFIG` | 指定 config.yaml 路径（必须存在） |
+| `RESUME_HELPER_DATA_DIR` | 指定配置与默认数据库所在目录 |
+| `RESUME_HELPER_HOST` | 监听地址，默认 `127.0.0.1` |
+| `RESUME_HELPER_PORT` | 监听端口，默认 `19876`；端口被占用时会自动使用随机端口 |
+| `RESUME_HELPER_DB_DRIVER` | `sqlite` / `mysql` / `postgres` |
+| `RESUME_HELPER_DB_DSN` | 数据库 DSN |
+| `RESUME_HELPER_HEADLESS` | `true` / `1` 时仅启动 Gin 服务 |
+
+## 密码保护
+
+- 密码是**可选项**：默认关闭，可在「设置 → 安全」中开启。
+- 开启后，应用启动时显示解锁界面；会话保存在内存中，有效期 24 小时，应用重启后需要重新解锁。
+- 数据库中仅保存 bcrypt 哈希（`settings` 表的 `auth.password_hash`），不会保存明文密码。
+- 支持修改密码、立即锁定、关闭密码保护。
+- 如果忘记密码，可在确认数据库中无重要数据后，删除数据库文件并重新启动；也可手动删除 `settings` 表中 `auth.password_hash` 记录。
+
+## Excel 导入
+
+在「导入 Excel」弹窗中可下载模板，然后拖入文件。数据写入第一个工作表，表头支持以下别名（不区分大小写）：
+
+| 字段 | 支持的表头 |
+| --- | --- |
+| 大分类 | `Category`、`大分类`、`分类`、`类别`、`招聘类型`、`採用区分`、`채용유형` |
+| 企业名称 | `Company`、`Company Name`、`企业名称`、`公司名称`、`企业`、`公司`、`会社名`、`기업명`、`회사명` |
+| 投递链接 | `Link`、`URL`、`Application Link`、`投递链接`、`链接`、`网址`、`応募リンク`、`지원링크` |
+| 状态 | `Status`、`状态`、`进度`、`進捗`、`진행상태` |
+
+分类与状态支持多语言写法：
+
+- 分类：`spring` / `春招` / `春採用` / `봄 채용` 等
+- 状态：`screening` / `初筛` / `書類選考` / `서류 전형` 等
+
+规则：
+
+- 企业名称必填；链接可选，缺少 `https://` 会自动补全。
+- 分类为空默认春招，状态为空默认初筛。
+- 单文件最大 10 MB、最多 5000 行。
+- 无法识别的分类或状态会跳过该行，并在结果中显示行号和原因。
+- 只支持 `.xlsx` / `.xlsm`，不支持旧版 `.xls`。
+
+## API 概览
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| `GET` | `/api/health` | 健康检查 |
+| `GET` | `/api/auth/status` | 密码状态与当前会话状态 |
+| `POST` | `/api/auth/login` | 解锁 |
+| `POST` | `/api/auth/setup` | 首次设置密码 |
+| `POST` | `/api/auth/change-password` | 修改密码 |
+| `POST` | `/api/auth/disable` | 关闭密码保护 |
+| `POST` | `/api/auth/logout` | 注销会话 |
+| `GET` | `/api/applications` | 分页列表，支持 `search`、`category`、`status`；置顶记录优先 |
+| `POST` | `/api/applications` | 新增投递 |
+| `PUT` | `/api/application/:id` | 局部更新（企业、链接、状态、分类、置顶） |
+| `DELETE` | `/api/application/:id` | 删除单条 |
+| `POST` | `/api/applications/batch-delete` | 批量删除 |
+| `PATCH` | `/api/applications/batch-status` | 批量修改状态 |
+| `POST` | `/api/applications/import` | 上传 Excel 导入 |
+| `GET` | `/api/applications/template` | 下载导入模板 |
+| `GET` | `/api/stats` | 分类 / 状态统计 |
+| `GET` | `/api/system/info` | 数据库、配置文件、版本信息 |
+
+开启密码后，除健康检查、认证接口和静态资源外，其余 `/api` 请求需要携带：
+
+```http
+Authorization: Bearer <token>
+```
+
+## 响应式布局
+
+| 端 | 断点 | 布局 |
+| --- | --- | --- |
+| 电脑 | ≥ 1200px | 完整侧边栏、统计卡片四列、桌面数据表格 |
+| 平板 | 768–1199px | 84px 图标导航栏、两列统计、双列投递卡片 |
+| 手机 | < 768px | 底部导航栏、单列投递卡片、筛选与操作全宽排列 |
+
+布局与组件解耦：`useMediaQuery` 负责切换列表形态，`ApplicationTable` 与 `ApplicationCards` 复用同一套企业、链接、状态和操作子组件。
+
+## 开发
+
+```bash
+# 终端 1：启动 Gin（无桌面窗口）
+go run . --headless
+
+# 终端 2：启动 Vite，/api 会代理到 http://127.0.0.1:19876
+cd frontend
+npm run dev
+```
+
+Vite 默认运行在 `http://127.0.0.1:9245`，可通过 `RESUME_HELPER_API` 环境变量修改代理目标。
+
+前端生产构建后才能被 Go 的 `embed` 使用。
+
+### 测试
+
+```bash
+go test ./...
+```
+
+覆盖投递 CRUD、搜索、统计、批量操作、置顶、可选密码、Excel 模板与导入，以及便携式配置目录行为。
+
+## 项目结构
+
+```text
+.
+├── main.go                              # Wails 窗口 + Gin 启动入口
+├── sql/
+│   ├── init.mysql.sql                   # MySQL 初始化脚本
+│   └── init.postgresql.sql              # PostgreSQL 初始化脚本
+├── config.example.yaml
+├── internal/
+│   ├── config/                          # 便携式配置加载与环境变量
+│   ├── database/                        # 多数据库连接、迁移
+│   ├── models/                          # GORM 实体（Application、Setting）
+│   └── server/                          # Gin 路由、CRUD、认证、Excel
+├── frontend/
+│   ├── src/
+│   │   ├── api/                         # Axios 客户端与类型
+│   │   ├── components/
+│   │   │   ├── applications/            # 表格、卡片、单元格、状态与操作
+│   │   │   ├── dashboard/               # 页头、工具栏、批量操作栏
+│   │   │   └── settings/                # 外观、安全、存储、关于
+│   │   ├── hooks/                       # useApplications、useInlineEdit、useMediaQuery
+│   │   ├── layouts/WorkspaceLayout.tsx  # 路由嵌套布局与上下文
+│   │   ├── pages/
+│   │   │   ├── Dashboard.tsx            # 投递工作台
+│   │   │   └── SettingsPage.tsx         # 设置页
+│   │   ├── i18n/                        # 五种语言
+│   │   └── styles/global.css            # 全局与三端响应式样式
+│   └── vite.config.ts
+└── Taskfile.yml
+```
+
+## 数据与隐私
+
+- 配置文件和 SQLite 数据库默认都位于程序目录，不会主动写入 C 盘用户目录或系统目录。
+- 所有数据保存在本地数据库，不包含任何遥测或上传逻辑。
+- 密码只以 bcrypt 哈希存储。
+- 导入的 Excel 文件只在内存中解析，不保留临时副本。
+- MySQL / PostgreSQL 的 DSN 会出现在用户自己的配置文件中，请妥善保管该文件。
+
+## 已知说明
+
+- 桌面窗口通过 Wails 3 提供，因此需要 WebView2 / WebKit 运行环境；浏览器预览模式下窗口按钮不会控制真实窗口。
+- 如果程序目录不可写（例如安装在 Program Files），启动时会在日志中提示；请移动到可写目录或设置 `RESUME_HELPER_DATA_DIR`。
+- 仅支持 `.xlsx` / `.xlsm`，不支持旧版 `.xls`。
+- 当前界面语言与主题保存在浏览器 `localStorage` 中。

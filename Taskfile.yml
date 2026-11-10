@@ -3,6 +3,8 @@ version: '3'
 vars:
   APP_NAME: "resume-helper"
   BIN_DIR: "bin"
+  BIN_EXT: '{{if eq OS "windows"}}.exe{{end}}'
+  LDFLAGS: '{{if eq OS "windows"}}-s -w -H windowsgui{{else}}-s -w{{end}}'
 
 tasks:
   install:
@@ -18,7 +20,7 @@ tasks:
       - npm run build
 
   frontend:dev:
-    summary: Run the Vite dev server on port 9245
+    summary: Run the Vite dev server on port 9245 (proxies /api to Gin)
     dir: frontend
     cmds:
       - npm run dev
@@ -28,10 +30,10 @@ tasks:
     deps:
       - frontend:build
     cmds:
-      - go build -trimpath -ldflags="-s -w" -o "{{.BIN_DIR}}/{{.APP_NAME}}.exe" .
+      - go build -trimpath -ldflags="{{.LDFLAGS}}" -o "{{.BIN_DIR}}/{{.APP_NAME}}{{.BIN_EXT}}" .
 
   run:
-    summary: Run the desktop application (requires a built frontend/dist)
+    summary: Run the desktop application (requires frontend/dist)
     cmds:
       - go run .
 
