@@ -15,8 +15,13 @@ func (s *Server) registerStaticRoutes(r *gin.Engine) {
 	}
 
 	serveIndex := func(c *gin.Context) {
+		index, err := fs.ReadFile(s.assets, "index.html")
+		if err != nil {
+			c.String(http.StatusInternalServerError, "frontend is not built")
+			return
+		}
 		c.Header("Cache-Control", "no-cache")
-		c.FileFromFS("index.html", http.FS(s.assets))
+		c.Data(http.StatusOK, "text/html; charset=utf-8", index)
 	}
 
 	r.GET("/", serveIndex)
