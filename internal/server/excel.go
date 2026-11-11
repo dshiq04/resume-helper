@@ -180,7 +180,7 @@ func buildTemplate() (*excelize.File, error) {
 		{"1. Fill in the Applications sheet. One application per row."},
 		{"2. Category accepts spring / autumn / internship or 春招 / 秋招 / 实习 (and other supported languages)."},
 		{"3. Status accepts screening / written / interview / offer / rejected or 初筛 / 笔试 / 面试 / Offer / 淘汰."},
-		{"4. Company name is required. Link is optional; https:// is added automatically."},
+		{"4. Company name is required. Link is optional and is saved exactly as entered."},
 		{"5. Empty category defaults to spring; empty status defaults to screening."},
 		{""},
 		{"示例：", ""},
@@ -335,7 +335,7 @@ func (s *Server) parseAndImportWorkbook(file *excelize.File) (*importResult, err
 	}
 
 	if len(records) > 0 {
-		if err := s.db.CreateInBatches(&records, 200).Error; err != nil {
+		if err := s.database().CreateInBatches(&records, 200).Error; err != nil {
 			return nil, fmt.Errorf("save imported applications: %w", err)
 		}
 	}

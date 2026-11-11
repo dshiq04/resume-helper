@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useOutletContext } from "react-router-dom";
 import type { CategoryFilter } from "../api/types";
 import { useApplications } from "../hooks/useApplications";
+import { useApplicationDraft } from "../hooks/useApplicationDraft";
 import { useInlineEdit } from "../hooks/useInlineEdit";
 import { useMediaQuery } from "../hooks/useMediaQuery";
 import { useStatusOptions } from "../components/badges";
@@ -11,7 +12,6 @@ import { DashboardToolbar } from "../components/dashboard/DashboardToolbar";
 import { SelectionBar } from "../components/dashboard/SelectionBar";
 import { ApplicationTable } from "../components/applications/ApplicationTable";
 import { ApplicationCards } from "../components/applications/ApplicationCards";
-import { ApplicationModal } from "../components/ApplicationModal";
 import { ImportModal } from "../components/ImportModal";
 import type { WorkspaceOutletContext } from "../layouts/WorkspaceLayout";
 
@@ -23,13 +23,16 @@ export function Dashboard({ category }: DashboardProps) {
   const { stats, onDataChanged } =
     useOutletContext<WorkspaceOutletContext>();
   const board = useApplications({ category, onDataChanged });
+  const draft = useApplicationDraft({
+    category,
+    onCreated: board.afterCreated,
+  });
   const inlineEdit = useInlineEdit({
     items: board.items,
     onSave: board.updateField,
   });
   const statusOptions = useStatusOptions();
   const isCompactList = useMediaQuery("(max-width: 1199px)");
-  const [addOpen, setAddOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
 
   const sharedListProps = {
@@ -44,17 +47,23 @@ export function Dashboard({ category }: DashboardProps) {
     statusOptions,
     inline: inlineEdit,
     hasFilters: board.hasFilters,
+    draft: draft.draft,
+    draftSaving: draft.saving,
+    canChooseDraftCategory: draft.canChooseCategory,
+    onDraftChange: draft.update,
+    onDraftSave: draft.save,
+    onDraftCancel: draft.cancel,
     onStatusChange: board.updateStatus,
     onPin: board.togglePin,
     onDelete: board.deleteRecord,
-    onAdd: () => setAddOpen(true),
+    onAdd: draft.start,
   };
 
   return (
     <>
       <DashboardHeader
         category={category}
-        onAdd={() => setAddOpen(true)}
+        onAdd={draft.start}
         onImport={() => setImportOpen(true)}
       />
 
@@ -94,13 +103,6 @@ export function Dashboard({ category }: DashboardProps) {
           />
         )}
       </section>
-
-      <ApplicationModal
-        open={addOpen}
-        defaultCategory={category}
-        onClose={() => setAddOpen(false)}
-        onCreated={board.afterCreated}
-      />
 
       <ImportModal
         open={importOpen}

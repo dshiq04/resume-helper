@@ -8,9 +8,11 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"resume-helper/internal/config"
 	"resume-helper/internal/database"
@@ -121,7 +123,7 @@ func TestApplicationLifecycle(t *testing.T) {
 		t.Fatalf("create status = %d, body = %s", resp.StatusCode, body)
 	}
 	created := decodeJSON[models.Application](t, body)
-	if created.ID == 0 || created.Link != "https://jobs.example.com/1" {
+	if created.ID == 0 || created.Link != "jobs.example.com/1" {
 		t.Fatalf("unexpected created application: %+v", created)
 	}
 
@@ -376,6 +378,78 @@ func TestExcelTemplateAndImport(t *testing.T) {
 	if list.Total != 2 {
 		t.Fatalf("imported total = %d, want 2", list.Total)
 	}
+}
+
+func TestDatabaseSettingsAndHotSwap(t *testing.T) {
+	app := newTestApp(t)
+	defer func() {
+		if sqlDB, err := app.server.database().DB(); err == nil {
+			_ = sqlDB.Close()
+		}
+	}()
+
+	resp, body := app.request(t, http.MethodGet, "/api/system/database", nil, "")
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("database settings status = %d, body = %s", resp.StatusCode, body)
+	}
+	initial := decodeJSON[struct {
+		Settings struct {
+			Driver     string `json:"driver"`
+			SQLitePath string `json:"sqlitePath"`
+		} `json:"settings"`
+		ConfigPath string `json:"configPath"`
+	}](t, body)
+	if initial.Settings.Driver != "sqlite" || initial.Settings.SQLitePath != "test.db" {
+		t.Fatalf("unexpected initial settings: %+v", initial)
+	}
+	if initial.ConfigPath == "" {
+		t.Fatal("config path should be returned")
+	}
+
+	resp, body = app.request(t, http.MethodPost, "/api/system/database/test", map[string]any{
+		"driver":     "sqlite",
+		"sqlitePath": "test.db",
+		"useDsn":     false,
+	}, "")
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("test connection status = %d, body = %s", resp.StatusCode, body)
+	}
+
+	resp, body = app.request(t, http.MethodPut, "/api/system/database", map[string]any{
+		"driver":     "sqlite",
+		"sqlitePath": "second.db",
+		"useDsn":     false,
+	}, "")
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("update database status = %d, body = %s", resp.StatusCode, body)
+	}
+
+	raw, err := os.ReadFile(initial.ConfigPath)
+	if err != nil {
+		t.Fatalf("read config after update: %v", err)
+	}
+	if !strings.Contains(string(raw), "second.db") {
+		t.Fatalf("config should contain the relative sqlite path:\n%s", raw)
+	}
+	if strings.Contains(string(raw), app.server.cfg.DataDir) {
+		t.Fatalf("config must not embed the absolute data directory:\n%s", raw)
+	}
+
+	resp, body = app.request(t, http.MethodPost, "/api/applications", map[string]string{
+		"companyName": "After Swap",
+		"category":    "spring",
+		"link":        "no-protocol.example/job",
+	}, "")
+	if resp.StatusCode != http.StatusCreated {
+		t.Fatalf("create after swap status = %d, body = %s", resp.StatusCode, body)
+	}
+	created := decodeJSON[models.Application](t, body)
+	if created.Link != "no-protocol.example/job" {
+		t.Fatalf("link = %q, want the exact entered value", created.Link)
+	}
+
+	// Let the previous pool close before the temporary directory is removed.
+	time.Sleep(1200 * time.Millisecond)
 }
 
 // These types mirror the JSON response shapes used by the tests.

@@ -6,6 +6,10 @@ import type {
   ApplicationUpdate,
   AuthSession,
   AuthStatus,
+  DatabaseInput,
+  DatabaseSettingsResponse,
+  DatabaseTestResult,
+  DatabaseUpdateResult,
   ImportResult,
   ListParams,
   Stats,
@@ -210,5 +214,22 @@ export const api = {
   },
   systemInfo() {
     return request<SystemInfo>("/system/info");
+  },
+  databaseSettings() {
+    return request<DatabaseSettingsResponse>("/system/database");
+  },
+  testDatabase(input: DatabaseInput) {
+    return request<DatabaseTestResult>("/system/database/test", {
+      method: "POST",
+      data: input,
+      timeout: 15_000,
+    });
+  },
+  updateDatabase(input: DatabaseInput) {
+    return request<DatabaseUpdateResult>("/system/database", {
+      method: "PUT",
+      data: input,
+      timeout: 60_000,
+    });
   },
 };

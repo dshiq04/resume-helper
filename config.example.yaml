@@ -13,6 +13,10 @@
 # Copy this file to ./config.yaml next to the executable (or set
 # RESUME_HELPER_CONFIG to a custom path) and restart the application.
 #
+# Tip: you can configure SQLite / MySQL / PostgreSQL graphically from
+# Settings > Database inside the app, including a connection test. Saving
+# there updates this file and switches the connection without a restart.
+#
 # Application passwords are NOT configured here. Enable or disable the
 # optional password from Settings inside the app; it is stored as a bcrypt
 # hash in the database.

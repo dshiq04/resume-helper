@@ -6,6 +6,7 @@ import { ApiError, api } from "./api/client";
 import type { AuthSession, Stats } from "./api/types";
 import { LockScreen } from "./components/LockScreen";
 import { Logo } from "./components/Logo";
+import { ResizeHandles } from "./components/ResizeHandles";
 import { TitleBar } from "./components/TitleBar";
 import { I18nProvider, useI18n } from "./i18n";
 import { WorkspaceLayout } from "./layouts/WorkspaceLayout";
@@ -74,6 +75,20 @@ function AppRoot() {
     }
   }, [loadStats, stage]);
 
+  useEffect(() => {
+    const handleDatabaseChanged = () => {
+      void checkAuth();
+      void loadStats();
+    };
+    const refreshStats = () => void loadStats();
+    window.addEventListener("resumetrail:database-changed", handleDatabaseChanged);
+    window.addEventListener("resumetrail:data-changed", refreshStats);
+    return () => {
+      window.removeEventListener("resumetrail:database-changed", handleDatabaseChanged);
+      window.removeEventListener("resumetrail:data-changed", refreshStats);
+    };
+  }, [checkAuth, loadStats]);
+
   const handleAuthenticated = useCallback((_session: AuthSession) => {
     setStage("ready");
   }, []);
@@ -98,6 +113,7 @@ function AppRoot() {
               setThemeMode((current) => (current === "light" ? "dark" : "light"))
             }
           />
+          <ResizeHandles />
 
           <Watermark
             className="app-watermark"

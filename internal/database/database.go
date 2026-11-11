@@ -1,6 +1,7 @@
 package database
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"os"
@@ -19,6 +20,43 @@ import (
 
 // Open connects to the configured database and applies the schema migration.
 func Open(cfg config.DatabaseConfig) (*gorm.DB, error) {
+	db, err := connect(cfg)
+	if err != nil {
+		return nil, err
+	}
+	if err := db.AutoMigrate(
+		&models.Application{},
+		&models.Setting{},
+	); err != nil {
+		return nil, fmt.Errorf("migrate database: %w", err)
+	}
+	return db, nil
+}
+
+// TestConnection verifies that the given configuration can reach the database
+// without running migrations. It is used by the graphical database settings.
+func TestConnection(cfg config.DatabaseConfig) error {
+	db, err := connect(cfg)
+	if err != nil {
+		return err
+	}
+	sqlDB, err := db.DB()
+	if err != nil {
+		return fmt.Errorf("get database connection: %w", err)
+	}
+	defer func() {
+		_ = sqlDB.Close()
+	}()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 6*time.Second)
+	defer cancel()
+	if err := sqlDB.PingContext(ctx); err != nil {
+		return fmt.Errorf("ping %s: %w", cfg.Driver, err)
+	}
+	return nil
+}
+
+func connect(cfg config.DatabaseConfig) (*gorm.DB, error) {
 	var dialector gorm.Dialector
 
 	switch cfg.Driver {
@@ -75,13 +113,6 @@ func Open(cfg config.DatabaseConfig) (*gorm.DB, error) {
 		sqlDB.SetMaxOpenConns(10)
 		sqlDB.SetMaxIdleConns(5)
 		sqlDB.SetConnMaxLifetime(time.Hour)
-	}
-
-	if err := db.AutoMigrate(
-		&models.Application{},
-		&models.Setting{},
-	); err != nil {
-		return nil, fmt.Errorf("migrate database: %w", err)
 	}
 
 	return db, nil

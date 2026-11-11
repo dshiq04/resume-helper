@@ -1,18 +1,24 @@
-import { useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Dropdown, Tooltip } from "antd";
 import type { MenuProps } from "antd";
 import {
+  BorderOutlined,
   CloseOutlined,
+  CompressOutlined,
+  FullscreenExitOutlined,
   FullscreenOutlined,
   GlobalOutlined,
   MinusOutlined,
   MoonOutlined,
   SunOutlined,
 } from "@ant-design/icons";
+import { Events } from "@wailsio/runtime";
 import { localeOptions, useI18n, type Locale } from "../i18n";
 import {
   closeWindow,
+  getDesktopWindowState,
   minimiseWindow,
+  toggleFullscreenWindow,
   toggleMaximiseWindow,
 } from "../utils/desktop";
 import { Logo } from "./Logo";
@@ -24,6 +30,37 @@ interface TitleBarProps {
 
 export function TitleBar({ themeMode, onToggleTheme }: TitleBarProps) {
   const { t, locale, setLocale } = useI18n();
+  const [maximised, setMaximised] = useState(false);
+  const [fullscreen, setFullscreen] = useState(false);
+
+  const refreshWindowState = useCallback(() => {
+    void getDesktopWindowState().then((state) => {
+      setMaximised(state.maximised);
+      setFullscreen(state.fullscreen);
+    });
+  }, []);
+
+  useEffect(() => {
+    refreshWindowState();
+
+    const unsubscribers = [
+      Events.On("common:WindowMaximise", () => setMaximised(true)),
+      Events.On("common:WindowUnMaximise", () => setMaximised(false)),
+      Events.On("common:WindowFullscreen", () => setFullscreen(true)),
+      Events.On("common:WindowUnFullscreen", () => setFullscreen(false)),
+      Events.On("common:WindowRestore", () => {
+        setMaximised(false);
+        setFullscreen(false);
+      }),
+    ];
+    window.addEventListener("resize", refreshWindowState);
+    document.addEventListener("fullscreenchange", refreshWindowState);
+    return () => {
+      for (const unsubscribe of unsubscribers) unsubscribe();
+      window.removeEventListener("resize", refreshWindowState);
+      document.removeEventListener("fullscreenchange", refreshWindowState);
+    };
+  }, [refreshWindowState]);
 
   const languageItems = useMemo<MenuProps["items"]>(
     () =>
@@ -42,10 +79,20 @@ export function TitleBar({ themeMode, onToggleTheme }: TitleBarProps) {
   const currentLocale =
     localeOptions.find((option) => option.value === locale) ?? localeOptions[0];
 
+  const handleToggleMaximise = async () => {
+    await toggleMaximiseWindow();
+    refreshWindowState();
+  };
+
+  const handleToggleFullscreen = async () => {
+    await toggleFullscreenWindow();
+    refreshWindowState();
+  };
+
   return (
     <header className="titlebar">
       <div className="titlebar-brand">
-        <Logo size={28} />
+        <Logo size={18} />
         <div className="titlebar-brand-copy">
           <span className="titlebar-brand-name">{t("app.brand")}</span>
           <span className="titlebar-brand-tagline">{t("app.tagline")}</span>
@@ -95,11 +142,20 @@ export function TitleBar({ themeMode, onToggleTheme }: TitleBarProps) {
         <button
           className="window-button"
           type="button"
-          title={t("window.maximize")}
-          aria-label={t("window.maximize")}
-          onClick={() => void toggleMaximiseWindow()}
+          title={maximised ? t("window.restore") : t("window.maximize")}
+          aria-label={maximised ? t("window.restore") : t("window.maximize")}
+          onClick={() => void handleToggleMaximise()}
         >
-          <FullscreenOutlined />
+          {maximised ? <CompressOutlined /> : <BorderOutlined />}
+        </button>
+        <button
+          className="window-button"
+          type="button"
+          title={fullscreen ? t("window.exitFullscreen") : t("window.fullscreen")}
+          aria-label={fullscreen ? t("window.exitFullscreen") : t("window.fullscreen")}
+          onClick={() => void handleToggleFullscreen()}
+        >
+          {fullscreen ? <FullscreenExitOutlined /> : <FullscreenOutlined />}
         </button>
         <button
           className="window-button window-button-close"

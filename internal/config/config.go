@@ -100,39 +100,108 @@ func Load() (*Config, error) {
 
 	applyEnv(&cfg)
 
-	cfg.Database.Driver = strings.ToLower(strings.TrimSpace(cfg.Database.Driver))
-	switch cfg.Database.Driver {
-	case "", "sqlite", "sqlite3":
-		cfg.Database.Driver = "sqlite"
-	case "postgresql", "pg":
-		cfg.Database.Driver = "postgres"
-	case "mysql":
-		cfg.Database.Driver = "mysql"
-	default:
-		return nil, fmt.Errorf("unsupported database driver %q (use sqlite, mysql or postgres)", cfg.Database.Driver)
-	}
-
 	if cfg.Server.Port < 0 || cfg.Server.Port > 65535 {
 		return nil, fmt.Errorf("server.port must be between 0 and 65535")
 	}
 
-	if cfg.Database.Driver == "sqlite" {
-		dsn := strings.TrimSpace(cfg.Database.DSN)
-		switch {
-		case dsn == "":
-			cfg.Database.DSN = filepath.Join(cfg.DataDir, "resume-helper.db")
-		case dsn == ":memory:" || strings.HasPrefix(dsn, "file:"):
-			// Keep special SQLite DSNs untouched.
-		case !filepath.IsAbs(dsn):
-			cfg.Database.DSN = filepath.Join(cfg.DataDir, dsn)
-		}
+	driver, err := NormalizeDriver(cfg.Database.Driver)
+	if err != nil {
+		return nil, err
 	}
-
-	if cfg.Database.Driver != "sqlite" && strings.TrimSpace(cfg.Database.DSN) == "" {
-		return nil, fmt.Errorf("database.dsn is required when database.driver is %s", cfg.Database.Driver)
+	_, runtimeDB, err := NormalizeDatabase(cfg.DataDir, driver, cfg.Database.DSN)
+	if err != nil {
+		return nil, err
 	}
+	cfg.Database = runtimeDB
 
 	return &cfg, nil
+}
+
+// NormalizeDriver maps accepted driver aliases to their canonical names.
+func NormalizeDriver(driver string) (string, error) {
+	switch strings.ToLower(strings.TrimSpace(driver)) {
+	case "", "sqlite", "sqlite3":
+		return "sqlite", nil
+	case "postgresql", "pg", "postgres":
+		return "postgres", nil
+	case "mysql":
+		return "mysql", nil
+	default:
+		return "", fmt.Errorf("unsupported database driver %q (use sqlite, mysql or postgres)", driver)
+	}
+}
+
+// NormalizeDatabase returns two views of the same database configuration:
+//   - storage: the value that should be written to config.yaml. SQLite paths
+//     inside the portable data directory stay relative so the folder can move.
+//   - runtime: the value used to actually open the connection. SQLite paths
+//     are resolved against the data directory.
+func NormalizeDatabase(dataDir, driver, dsn string) (DatabaseConfig, DatabaseConfig, error) {
+	normalized, err := NormalizeDriver(driver)
+	if err != nil {
+		return DatabaseConfig{}, DatabaseConfig{}, err
+	}
+	raw := strings.TrimSpace(dsn)
+
+	if normalized == "sqlite" {
+		storage := DatabaseConfig{Driver: normalized}
+		runtime := DatabaseConfig{Driver: normalized}
+		switch {
+		case raw == "":
+			runtime.DSN = filepath.Join(dataDir, "resume-helper.db")
+		case raw == ":memory:" || strings.HasPrefix(raw, "file:"):
+			// Keep special SQLite DSNs untouched.
+			storage.DSN = raw
+			runtime.DSN = raw
+		case filepath.IsAbs(raw):
+			clean := filepath.Clean(raw)
+			runtime.DSN = clean
+			storage.DSN = clean
+			if rel, relErr := filepath.Rel(dataDir, clean); relErr == nil &&
+				rel != "." && rel != ".." &&
+				!strings.HasPrefix(rel, ".."+string(os.PathSeparator)) &&
+				!filepath.IsAbs(rel) {
+				storage.DSN = rel
+			}
+		default:
+			storage.DSN = raw
+			runtime.DSN = filepath.Join(dataDir, raw)
+		}
+		return storage, runtime, nil
+	}
+
+	if raw == "" {
+		return DatabaseConfig{}, DatabaseConfig{}, fmt.Errorf(
+			"database.dsn is required when database.driver is %s", normalized,
+		)
+	}
+	return DatabaseConfig{Driver: normalized, DSN: raw},
+		DatabaseConfig{Driver: normalized, DSN: raw}, nil
+}
+
+// Save writes the current server and database configuration back to the
+// portable config file. Credentials live in this local file; the UI warns
+// users to keep it private.
+func (c *Config) Save() error {
+	if strings.TrimSpace(c.SourcePath) == "" {
+		return fmt.Errorf("config path is not set")
+	}
+	payload := struct {
+		Server   ServerConfig   `yaml:"server"`
+		Database DatabaseConfig `yaml:"database"`
+	}{
+		Server:   c.Server,
+		Database: c.Database,
+	}
+	data, err := yaml.Marshal(&payload)
+	if err != nil {
+		return fmt.Errorf("encode config: %w", err)
+	}
+	header := "# ResumeTrail portable configuration\n" +
+		"# Updated from the Settings page. You can edit this file, but manual\n" +
+		"# changes only take effect after restarting the application.\n" +
+		"# Database credentials are stored in plain text in this local file.\n\n"
+	return os.WriteFile(c.SourcePath, append([]byte(header), data...), 0o644)
 }
 
 func applyEnv(cfg *Config) {
@@ -214,9 +283,10 @@ func defaultConfigFile(_ string) string {
 # inside the application folder and nothing is written to AppData or other
 # system directories.
 #
-# Edit this file and restart the application for changes to take effect.
-# The database password is never stored here; application passwords are
-# hashed with bcrypt inside the database.
+# Tip: Settings > Database in the app can configure SQLite / MySQL /
+# PostgreSQL graphically, test the connection and apply changes without a
+# restart. Manual edits to this file require a restart.
+# Database credentials are local to this file; keep it private.
 
 server:
   host: 127.0.0.1

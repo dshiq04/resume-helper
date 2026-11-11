@@ -73,14 +73,51 @@ export interface AuthSession {
   enabled: boolean;
 }
 
+export type DatabaseDriver = "sqlite" | "mysql" | "postgres";
+
 export interface SystemInfo {
   version: string;
   goVersion: string;
-  driver: "sqlite" | "mysql" | "postgres";
+  driver: DatabaseDriver;
   database: string;
   location: string;
   configPath: string;
   dataDir: string;
+}
+
+export interface DatabaseSettings {
+  driver: DatabaseDriver;
+  dsn: string;
+  sqlitePath: string;
+  host: string;
+  port: number;
+  user: string;
+  password: string;
+  database: string;
+  sslMode: string;
+  parseError?: string;
+}
+
+export interface DatabaseSettingsResponse {
+  settings: DatabaseSettings;
+  configPath: string;
+  dataDir: string;
+  location: string;
+  envOverride: boolean;
+}
+
+export interface DatabaseInput extends DatabaseSettings {
+  useDsn: boolean;
+}
+
+export interface DatabaseUpdateResult extends DatabaseSettingsResponse {
+  ok: boolean;
+  warning?: string;
+}
+
+export interface DatabaseTestResult {
+  ok: boolean;
+  message: string;
 }
 
 export interface ImportResult {

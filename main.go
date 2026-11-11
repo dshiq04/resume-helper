@@ -59,22 +59,26 @@ func main() {
 		return
 	}
 
+	// Serve the frontend through the Wails asset server instead of loading the
+	// Gin URL directly. This keeps window APIs (minimise / maximise /
+	// fullscreen / close) and resize handling on the Wails origin, while the
+	// Gin engine continues to handle both the static files and /api requests.
 	app := application.New(application.Options{
 		Name:        "ResumeTrail",
 		Description: "A beautiful resume application tracker",
 		Assets: application.AssetOptions{
-			Handler: application.AssetFileServerFS(dist),
+			Handler: httpServer.Handler(),
 		},
 	})
 
 	app.Window.NewWithOptions(application.WebviewWindowOptions{
 		Title:            "履途 ResumeTrail",
-		URL:              baseURL,
 		Width:            1360,
 		Height:           860,
-		MinWidth:         1024,
-		MinHeight:        680,
+		MinWidth:         360,
+		MinHeight:        480,
 		Frameless:        true,
+		DisableResize:    false,
 		BackgroundColour: application.NewRGB(15, 23, 42),
 	})
 

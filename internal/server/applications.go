@@ -77,8 +77,9 @@ func (s *Server) listApplications(c *gin.Context) {
 		return
 	}
 
+	db := s.database()
 	build := func() *gorm.DB {
-		query := s.db.Model(&models.Application{})
+		query := db.Model(&models.Application{})
 		if category != "" {
 			query = query.Where("category = ?", category)
 		}
@@ -132,7 +133,7 @@ func (s *Server) createApplication(c *gin.Context) {
 		return
 	}
 
-	if err := s.db.Create(record).Error; err != nil {
+	if err := s.database().Create(record).Error; err != nil {
 		apiError(c, http.StatusInternalServerError, "create_failed", "Failed to create the application.")
 		return
 	}
@@ -145,8 +146,9 @@ func (s *Server) updateApplication(c *gin.Context) {
 		return
 	}
 
+	db := s.database()
 	var record models.Application
-	if err := s.db.First(&record, id).Error; err != nil {
+	if err := db.First(&record, id).Error; err != nil {
 		if isRecordNotFound(err) {
 			apiError(c, http.StatusNotFound, "not_found", "Application not found.")
 			return
@@ -204,13 +206,13 @@ func (s *Server) updateApplication(c *gin.Context) {
 	}
 
 	if len(updates) > 0 {
-		if err := s.db.Model(&record).Updates(updates).Error; err != nil {
+		if err := db.Model(&record).Updates(updates).Error; err != nil {
 			apiError(c, http.StatusInternalServerError, "update_failed", "Failed to update the application.")
 			return
 		}
 	}
 
-	if err := s.db.First(&record, id).Error; err != nil {
+	if err := db.First(&record, id).Error; err != nil {
 		apiError(c, http.StatusInternalServerError, "query_failed", "Failed to reload the application.")
 		return
 	}
@@ -222,7 +224,7 @@ func (s *Server) deleteApplication(c *gin.Context) {
 	if !ok {
 		return
 	}
-	result := s.db.Delete(&models.Application{}, id)
+	result := s.database().Delete(&models.Application{}, id)
 	if result.Error != nil {
 		apiError(c, http.StatusInternalServerError, "delete_failed", "Failed to delete the application.")
 		return
@@ -250,7 +252,7 @@ func (s *Server) batchDeleteApplications(c *gin.Context) {
 		return
 	}
 
-	result := s.db.Where("id IN ?", ids).Delete(&models.Application{})
+	result := s.database().Where("id IN ?", ids).Delete(&models.Application{})
 	if result.Error != nil {
 		apiError(c, http.StatusInternalServerError, "delete_failed", "Failed to delete the selected applications.")
 		return
@@ -275,7 +277,7 @@ func (s *Server) batchUpdateStatus(c *gin.Context) {
 		return
 	}
 
-	result := s.db.Model(&models.Application{}).
+	result := s.database().Model(&models.Application{}).
 		Where("id IN ?", ids).
 		Update("status", status)
 	if result.Error != nil {
@@ -323,19 +325,11 @@ func validateApplicationInput(input applicationInput) (*models.Application, stri
 	}, "", ""
 }
 
+// normalizeLink intentionally only trims whitespace. Users may store any
+// identifier or partial URL, and the app must never silently rewrite links by
+// adding a protocol prefix.
 func normalizeLink(raw string) string {
-	link := strings.TrimSpace(raw)
-	if link == "" {
-		return ""
-	}
-	lower := strings.ToLower(link)
-	if strings.HasPrefix(lower, "http://") || strings.HasPrefix(lower, "https://") {
-		return link
-	}
-	if strings.HasPrefix(link, "//") {
-		return "https:" + link
-	}
-	return "https://" + link
+	return strings.TrimSpace(raw)
 }
 
 func uniqueIDs(ids []uint) []uint {
@@ -361,7 +355,7 @@ func (s *Server) stats(c *gin.Context) {
 		Count    int64
 	}
 	var rows []groupRow
-	if err := s.db.Model(&models.Application{}).
+	if err := s.database().Model(&models.Application{}).
 		Select("category, status, COUNT(*) AS count").
 		Group("category, status").
 		Scan(&rows).Error; err != nil {

@@ -1,6 +1,7 @@
 import { Checkbox, Pagination, Spin } from "antd";
 import { PushpinFilled } from "@ant-design/icons";
 import type { Application, Status, StatusOption } from "../../api/types";
+import type { ApplicationDraft } from "../../hooks/useApplicationDraft";
 import type { InlineEditController } from "../../hooks/useInlineEdit";
 import { useI18n } from "../../i18n";
 import { CompanyCell } from "./CompanyCell";
@@ -8,6 +9,7 @@ import { LinkCell } from "./LinkCell";
 import { ApplicationStatusSelect } from "./ApplicationStatusSelect";
 import { ApplicationActions } from "./ApplicationActions";
 import { ApplicationEmptyState } from "./ApplicationEmptyState";
+import { DraftCard } from "./ApplicationDraftFields";
 
 interface ApplicationCardsProps {
   items: Application[];
@@ -21,6 +23,12 @@ interface ApplicationCardsProps {
   statusOptions: StatusOption[];
   inline: InlineEditController;
   hasFilters: boolean;
+  draft: ApplicationDraft | null;
+  draftSaving: boolean;
+  canChooseDraftCategory: boolean;
+  onDraftChange: (patch: Partial<ApplicationDraft>) => void;
+  onDraftSave: () => Promise<void>;
+  onDraftCancel: () => void;
   onToggleSelection: (id: number, checked: boolean) => void;
   onPageChange: (page: number) => void;
   onStatusChange: (record: Application, status: Status) => void;
@@ -41,6 +49,12 @@ export function ApplicationCards({
   statusOptions,
   inline,
   hasFilters,
+  draft,
+  draftSaving,
+  canChooseDraftCategory,
+  onDraftChange,
+  onDraftSave,
+  onDraftCancel,
   onToggleSelection,
   onPageChange,
   onStatusChange,
@@ -50,7 +64,7 @@ export function ApplicationCards({
 }: ApplicationCardsProps) {
   const { t, formatDate } = useI18n();
 
-  if (loading && items.length === 0) {
+  if (loading && items.length === 0 && !draft) {
     return (
       <div className="mobile-loading">
         <Spin />
@@ -58,7 +72,7 @@ export function ApplicationCards({
     );
   }
 
-  if (items.length === 0) {
+  if (items.length === 0 && !draft) {
     return (
       <ApplicationEmptyState hasFilters={hasFilters} onAdd={onAdd} />
     );
@@ -66,6 +80,16 @@ export function ApplicationCards({
 
   return (
     <div className="mobile-app-list">
+      {draft && (
+        <DraftCard
+          draft={draft}
+          saving={draftSaving}
+          canChooseCategory={canChooseDraftCategory}
+          onChange={onDraftChange}
+          onSave={onDraftSave}
+          onCancel={onDraftCancel}
+        />
+      )}
       {items.map((record) => (
         <article
           key={record.id}

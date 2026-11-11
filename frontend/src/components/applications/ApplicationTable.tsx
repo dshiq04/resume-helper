@@ -1,6 +1,7 @@
 import { Table } from "antd";
 import type { TableColumnsType } from "antd";
 import type { Application, Status, StatusOption } from "../../api/types";
+import type { ApplicationDraft } from "../../hooks/useApplicationDraft";
 import type { InlineEditController } from "../../hooks/useInlineEdit";
 import { useI18n } from "../../i18n";
 import { CompanyCell } from "./CompanyCell";
@@ -8,6 +9,14 @@ import { LinkCell } from "./LinkCell";
 import { ApplicationStatusSelect } from "./ApplicationStatusSelect";
 import { ApplicationActions } from "./ApplicationActions";
 import { ApplicationEmptyState } from "./ApplicationEmptyState";
+import {
+  DraftActions,
+  DraftCompanyCell,
+  DraftLinkCell,
+  DraftStatusSelect,
+} from "./ApplicationDraftFields";
+
+const DRAFT_ID = -1;
 
 interface ApplicationTableProps {
   items: Application[];
@@ -21,6 +30,12 @@ interface ApplicationTableProps {
   statusOptions: StatusOption[];
   inline: InlineEditController;
   hasFilters: boolean;
+  draft: ApplicationDraft | null;
+  draftSaving: boolean;
+  canChooseDraftCategory: boolean;
+  onDraftChange: (patch: Partial<ApplicationDraft>) => void;
+  onDraftSave: () => Promise<void>;
+  onDraftCancel: () => void;
   onSelectionChange: (keys: number[]) => void;
   onPageChange: (page: number) => void;
   onPageSizeChange: (pageSize: number) => void;
@@ -42,6 +57,12 @@ export function ApplicationTable({
   statusOptions,
   inline,
   hasFilters,
+  draft,
+  draftSaving,
+  canChooseDraftCategory,
+  onDraftChange,
+  onDraftSave,
+  onDraftCancel,
   onSelectionChange,
   onPageChange,
   onPageSizeChange,
@@ -58,64 +79,118 @@ export function ApplicationTable({
       dataIndex: "companyName",
       key: "companyName",
       width: 280,
-      render: (_value, record) => (
-        <CompanyCell application={record} inline={inline} />
-      ),
+      render: (_value, record) =>
+        record.id === DRAFT_ID && draft ? (
+          <DraftCompanyCell
+            draft={draft}
+            saving={draftSaving}
+            canChooseCategory={canChooseDraftCategory}
+            onChange={onDraftChange}
+            onSave={onDraftSave}
+            onCancel={onDraftCancel}
+          />
+        ) : (
+          <CompanyCell application={record} inline={inline} />
+        ),
     },
     {
       title: t("table.link"),
       dataIndex: "link",
       key: "link",
       width: 230,
-      render: (_value, record) => (
-        <LinkCell application={record} inline={inline} />
-      ),
+      render: (_value, record) =>
+        record.id === DRAFT_ID && draft ? (
+          <DraftLinkCell
+            draft={draft}
+            saving={draftSaving}
+            canChooseCategory={canChooseDraftCategory}
+            onChange={onDraftChange}
+            onSave={onDraftSave}
+            onCancel={onDraftCancel}
+          />
+        ) : (
+          <LinkCell application={record} inline={inline} />
+        ),
     },
     {
       title: t("table.status"),
       dataIndex: "status",
       key: "status",
       width: 155,
-      render: (_value, record) => (
-        <ApplicationStatusSelect
-          application={record}
-          options={statusOptions}
-          saving={statusSavingId === record.id}
-          onChange={onStatusChange}
-        />
-      ),
+      render: (_value, record) =>
+        record.id === DRAFT_ID && draft ? (
+          <DraftStatusSelect
+            draft={draft}
+            saving={draftSaving}
+            canChooseCategory={canChooseDraftCategory}
+            onChange={onDraftChange}
+            onSave={onDraftSave}
+            onCancel={onDraftCancel}
+          />
+        ) : (
+          <ApplicationStatusSelect
+            application={record}
+            options={statusOptions}
+            saving={statusSavingId === record.id}
+            onChange={onStatusChange}
+          />
+        ),
     },
     {
       title: t("table.updatedAt"),
       dataIndex: "updatedAt",
       key: "updatedAt",
       width: 140,
-      render: (value: string) => (
-        <span className="updated-at">{formatDate(value)}</span>
-      ),
+      render: (value: string, record) =>
+        record.id === DRAFT_ID ? (
+          <span className="draft-unsaved">{t("draft.unsaved")}</span>
+        ) : (
+          <span className="updated-at">{formatDate(value)}</span>
+        ),
     },
     {
       title: t("table.actions"),
       key: "actions",
       width: 92,
       align: "right",
-      render: (_value, record) => (
-        <ApplicationActions
-          application={record}
-          pinSaving={pinSavingId === record.id}
-          onPin={onPin}
-          onDelete={onDelete}
-        />
-      ),
+      render: (_value, record) =>
+        record.id === DRAFT_ID ? (
+          <DraftActions
+            saving={draftSaving}
+            onSave={onDraftSave}
+            onCancel={onDraftCancel}
+          />
+        ) : (
+          <ApplicationActions
+            application={record}
+            pinSaving={pinSavingId === record.id}
+            onPin={onPin}
+            onDelete={onDelete}
+          />
+        ),
     },
   ];
+
+  const draftRecord: Application | null = draft
+    ? {
+        id: DRAFT_ID,
+        category: draft.category,
+        companyName: draft.companyName,
+        link: draft.link,
+        status: draft.status,
+        pinned: false,
+        createdAt: "",
+        updatedAt: "",
+      }
+    : null;
+  const dataSource = draftRecord ? [draftRecord, ...items] : items;
 
   return (
     <Table<Application>
       key={locale}
       rowKey="id"
       columns={columns}
-      dataSource={items}
+      dataSource={dataSource}
       loading={loading}
       className="applications-table"
       locale={{
@@ -124,9 +199,16 @@ export function ApplicationTable({
         ),
       }}
       scroll={{ x: 820 }}
-      rowClassName={(record) => (record.pinned ? "is-pinned-row" : "")}
+      rowClassName={(record) =>
+        record.id === DRAFT_ID
+          ? "is-draft-row"
+          : record.pinned
+            ? "is-pinned-row"
+            : ""
+      }
       rowSelection={{
         selectedRowKeys: selectedKeys,
+        getCheckboxProps: (record) => ({ disabled: record.id === DRAFT_ID }),
         onChange: (keys) => onSelectionChange(keys.map(Number)),
       }}
       pagination={{

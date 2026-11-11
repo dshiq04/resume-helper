@@ -11,6 +11,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"resume-helper/internal/config"
@@ -22,13 +23,16 @@ import (
 const Version = "1.0.0"
 
 type Server struct {
-	cfg      *config.Config
+	cfg    *config.Config
+	assets fs.FS
+	auth   *authManager
+	engine *gin.Engine
+	http   *http.Server
+
+	dbMu     sync.RWMutex
 	db       *gorm.DB
-	assets   fs.FS
-	auth     *authManager
-	engine   *gin.Engine
-	http     *http.Server
 	listener net.Listener
+	updateMu sync.Mutex
 }
 
 func New(cfg *config.Config, db *gorm.DB, assets fs.FS) *Server {
@@ -41,6 +45,20 @@ func New(cfg *config.Config, db *gorm.DB, assets fs.FS) *Server {
 	}
 	s.engine = s.newEngine()
 	return s
+}
+
+// Handler exposes the Gin engine so the Wails asset server can serve both the
+// embedded frontend and /api requests from the same origin. Keeping the
+// frontend on the Wails origin is required for /wails/runtime calls (window
+// minimise, maximise, fullscreen and close) to reach the desktop host.
+func (s *Server) Handler() http.Handler {
+	return s.engine
+}
+
+func (s *Server) database() *gorm.DB {
+	s.dbMu.RLock()
+	defer s.dbMu.RUnlock()
+	return s.db
 }
 
 func (s *Server) newEngine() *gin.Engine {
@@ -72,6 +90,9 @@ func (s *Server) newEngine() *gin.Engine {
 		protected.GET("/applications/template", s.downloadTemplate)
 		protected.GET("/stats", s.stats)
 		protected.GET("/system/info", s.systemInfo)
+		protected.GET("/system/database", s.getDatabaseSettings)
+		protected.POST("/system/database/test", s.testDatabaseSettings)
+		protected.PUT("/system/database", s.updateDatabaseSettings)
 	}
 
 	s.registerStaticRoutes(r)
@@ -135,18 +156,25 @@ func (s *Server) health(c *gin.Context) {
 }
 
 func (s *Server) systemInfo(c *gin.Context) {
+	s.dbMu.RLock()
+	driver := s.cfg.Database.Driver
+	dsn := s.cfg.Database.DSN
+	configPath := s.cfg.SourcePath
+	dataDir := s.cfg.DataDir
+	s.dbMu.RUnlock()
+
 	location := ""
-	if s.cfg.Database.Driver == "sqlite" {
-		location = s.cfg.Database.DSN
+	if driver == "sqlite" {
+		location = dsn
 	}
 	c.JSON(http.StatusOK, gin.H{
 		"version":     Version,
 		"goVersion":   runtime.Version(),
-		"driver":      s.cfg.Database.Driver,
-		"database":    databaseLabel(s.cfg.Database.Driver),
+		"driver":      driver,
+		"database":    databaseLabel(driver),
 		"location":    location,
-		"configPath":  s.cfg.SourcePath,
-		"dataDir":     s.cfg.DataDir,
+		"configPath":  configPath,
+		"dataDir":     dataDir,
 		"docsVersion": 1,
 	})
 }

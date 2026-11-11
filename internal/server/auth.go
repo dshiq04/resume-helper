@@ -25,6 +25,7 @@ const (
 )
 
 type authManager struct {
+	dbMu     sync.RWMutex
 	db       *gorm.DB
 	mu       sync.Mutex
 	sessions map[string]time.Time
@@ -37,9 +38,21 @@ func newAuthManager(db *gorm.DB) *authManager {
 	}
 }
 
+func (a *authManager) setDB(db *gorm.DB) {
+	a.dbMu.Lock()
+	defer a.dbMu.Unlock()
+	a.db = db
+}
+
+func (a *authManager) database() *gorm.DB {
+	a.dbMu.RLock()
+	defer a.dbMu.RUnlock()
+	return a.db
+}
+
 func (a *authManager) passwordHash() (string, error) {
 	var setting models.Setting
-	err := a.db.First(&setting, "key = ?", passwordSettingKey).Error
+	err := a.database().First(&setting, "key = ?", passwordSettingKey).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return "", nil
 	}
@@ -62,14 +75,14 @@ func (a *authManager) savePassword(password string) error {
 	if err != nil {
 		return err
 	}
-	return a.db.Save(&models.Setting{
+	return a.database().Save(&models.Setting{
 		Key:   passwordSettingKey,
 		Value: string(hash),
 	}).Error
 }
 
 func (a *authManager) clearPassword() error {
-	return a.db.Delete(&models.Setting{}, "key = ?", passwordSettingKey).Error
+	return a.database().Delete(&models.Setting{}, "key = ?", passwordSettingKey).Error
 }
 
 func (a *authManager) verifyPassword(password string) (bool, error) {
