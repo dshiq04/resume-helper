@@ -13,6 +13,7 @@ import { SelectionBar } from "../components/dashboard/SelectionBar";
 import { ApplicationTable } from "../components/applications/ApplicationTable";
 import { ApplicationCards } from "../components/applications/ApplicationCards";
 import { ImportModal } from "../components/ImportModal";
+import { QuickEntryModal } from "../components/QuickEntryModal";
 import type { WorkspaceOutletContext } from "../layouts/WorkspaceLayout";
 
 interface DashboardProps {
@@ -34,6 +35,7 @@ export function Dashboard({ category }: DashboardProps) {
   const statusOptions = useStatusOptions();
   const isCompactList = useMediaQuery("(max-width: 1199px)");
   const [importOpen, setImportOpen] = useState(false);
+  const [quickEntryOpen, setQuickEntryOpen] = useState(false);
 
   const sharedListProps = {
     items: board.items,
@@ -65,6 +67,7 @@ export function Dashboard({ category }: DashboardProps) {
         category={category}
         onAdd={draft.start}
         onImport={() => setImportOpen(true)}
+        onQuickAdd={() => setQuickEntryOpen(true)}
       />
 
       <StatsCards stats={stats} category={category} />
@@ -108,6 +111,13 @@ export function Dashboard({ category }: DashboardProps) {
         open={importOpen}
         onClose={() => setImportOpen(false)}
         onImported={board.afterImported}
+      />
+
+      <QuickEntryModal
+        open={quickEntryOpen}
+        category={category}
+        onClose={() => setQuickEntryOpen(false)}
+        onCreated={board.afterCreated}
       />
     </>
   );

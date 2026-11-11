@@ -132,7 +132,9 @@ export function ApplicationCards({
           </div>
 
           <div className="mobile-card-footer">
-            <span>{formatDate(record.updatedAt)}</span>
+            <span>
+              {t("table.appliedAt")}: {formatDate(record.appliedAt)}
+            </span>
             {record.pinned && (
               <span className="mobile-pinned-badge">
                 <PushpinFilled /> {t("action.pin")}

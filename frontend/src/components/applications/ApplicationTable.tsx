@@ -137,9 +137,9 @@ export function ApplicationTable({
         ),
     },
     {
-      title: t("table.updatedAt"),
-      dataIndex: "updatedAt",
-      key: "updatedAt",
+      title: t("table.appliedAt"),
+      dataIndex: "appliedAt",
+      key: "appliedAt",
       width: 125,
       render: (value: string, record) =>
         record.id === DRAFT_ID ? (
@@ -179,6 +179,7 @@ export function ApplicationTable({
         link: draft.link,
         status: draft.status,
         pinned: false,
+        appliedAt: "",
         createdAt: "",
         updatedAt: "",
       }

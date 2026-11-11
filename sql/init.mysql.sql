@@ -18,13 +18,15 @@ CREATE TABLE IF NOT EXISTS applications (
   link TEXT NULL,
   status VARCHAR(32) NOT NULL DEFAULT 'screening',
   pinned BOOLEAN NOT NULL DEFAULT FALSE,
+  applied_at DATETIME(3) NULL,
   created_at DATETIME(3) NULL,
   updated_at DATETIME(3) NULL,
   PRIMARY KEY (id),
   KEY idx_applications_category (category),
   KEY idx_applications_company_name (company_name),
   KEY idx_applications_status (status),
-  KEY idx_applications_pinned (pinned)
+  KEY idx_applications_pinned (pinned),
+  KEY idx_applications_applied_at (applied_at)
 ) ENGINE=InnoDB
   DEFAULT CHARSET=utf8mb4
   COLLATE=utf8mb4_unicode_ci;

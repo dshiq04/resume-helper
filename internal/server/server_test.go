@@ -380,6 +380,47 @@ func TestExcelTemplateAndImport(t *testing.T) {
 	}
 }
 
+func TestCreateApplicationUsesServerTimeAndPinned(t *testing.T) {
+	app := newTestApp(t)
+	before := time.Now().Add(-2 * time.Second)
+
+	resp, body := app.request(t, http.MethodPost, "/api/applications", map[string]any{
+		"companyName": "Pinned Corp",
+		"category":    "spring",
+		"link":        "pinned.example/job",
+		"pinned":      true,
+	}, "")
+	if resp.StatusCode != http.StatusCreated {
+		t.Fatalf("create status = %d, body = %s", resp.StatusCode, body)
+	}
+	created := decodeJSON[models.Application](t, body)
+	if !created.Pinned {
+		t.Fatal("created application should be pinned")
+	}
+	if created.AppliedAt.IsZero() ||
+		created.AppliedAt.Before(before) ||
+		created.AppliedAt.After(time.Now().Add(2*time.Second)) {
+		t.Fatalf("appliedAt = %v, want server time near now", created.AppliedAt)
+	}
+
+	resp, body = app.request(t, http.MethodPost, "/api/applications", map[string]any{
+		"companyName": "Normal Corp",
+		"category":    "spring",
+	}, "")
+	if resp.StatusCode != http.StatusCreated {
+		t.Fatalf("create second status = %d, body = %s", resp.StatusCode, body)
+	}
+
+	resp, body = app.request(t, http.MethodGet, "/api/applications?page=1&pageSize=10", nil, "")
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("list status = %d, body = %s", resp.StatusCode, body)
+	}
+	list := decodeJSON[ApplicationList](t, body)
+	if len(list.Items) != 2 || list.Items[0].ID != created.ID {
+		t.Fatalf("pinned application should be first: %+v", list.Items)
+	}
+}
+
 func TestDatabaseSettingsAndHotSwap(t *testing.T) {
 	app := newTestApp(t)
 	defer func() {

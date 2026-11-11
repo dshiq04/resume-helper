@@ -1,5 +1,9 @@
 import { Button } from "antd";
-import { FileExcelOutlined, PlusOutlined } from "@ant-design/icons";
+import {
+  FileExcelOutlined,
+  PlusOutlined,
+  ThunderboltOutlined,
+} from "@ant-design/icons";
 import type { CategoryFilter } from "../../api/types";
 import { useI18n, type MessageKey } from "../../i18n";
 
@@ -7,12 +11,14 @@ interface DashboardHeaderProps {
   category: CategoryFilter;
   onAdd: () => void;
   onImport: () => void;
+  onQuickAdd: () => void;
 }
 
 export function DashboardHeader({
   category,
   onAdd,
   onImport,
+  onQuickAdd,
 }: DashboardHeaderProps) {
   const { t } = useI18n();
   const titleKey = `dashboard.title.${category}` as MessageKey;
@@ -28,6 +34,14 @@ export function DashboardHeader({
         <p>{t(subtitleKey)}</p>
       </div>
       <div className="dashboard-actions">
+        <Button
+          className="soft-action-button"
+          size="large"
+          icon={<ThunderboltOutlined />}
+          onClick={onQuickAdd}
+        >
+          {t("action.quickAdd")}
+        </Button>
         <Button
           className="soft-action-button"
           size="large"

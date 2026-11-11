@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS applications (
   link TEXT NULL,
   status VARCHAR(32) NOT NULL DEFAULT 'screening',
   pinned BOOLEAN NOT NULL DEFAULT FALSE,
+  applied_at TIMESTAMPTZ NULL,
   created_at TIMESTAMPTZ NULL,
   updated_at TIMESTAMPTZ NULL
 );
@@ -25,6 +26,8 @@ CREATE INDEX IF NOT EXISTS idx_applications_status
   ON applications (status);
 CREATE INDEX IF NOT EXISTS idx_applications_pinned
   ON applications (pinned);
+CREATE INDEX IF NOT EXISTS idx_applications_applied_at
+  ON applications (applied_at);
 
 CREATE TABLE IF NOT EXISTS settings (
   key VARCHAR(64) NOT NULL,

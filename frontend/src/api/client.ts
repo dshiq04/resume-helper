@@ -12,6 +12,7 @@ import type {
   DatabaseUpdateResult,
   ImportResult,
   ListParams,
+  ShortcutStatus,
   Stats,
   SystemInfo,
 } from "./types";
@@ -230,6 +231,15 @@ export const api = {
       method: "PUT",
       data: input,
       timeout: 60_000,
+    });
+  },
+  shortcutStatus() {
+    return request<ShortcutStatus>("/system/shortcut");
+  },
+  createShortcut() {
+    return request<ShortcutStatus>("/system/shortcut", {
+      method: "POST",
+      timeout: 20_000,
     });
   },
 };

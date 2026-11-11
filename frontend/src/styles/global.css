@@ -1715,6 +1715,72 @@ textarea {
 }
 
 /* -------------------------------------------------------------------------- */
+/* Quick entry modal                                                          */
+/* -------------------------------------------------------------------------- */
+
+.quick-entry-modal .ant-modal-content {
+  padding: 12px 16px 14px;
+  border-radius: 16px;
+}
+
+.quick-entry-modal .ant-modal-header {
+  padding-right: 22px;
+  margin-bottom: 8px;
+  background: transparent;
+}
+
+.quick-entry-modal .ant-modal-title {
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.quick-entry-modal .ant-modal-close {
+  top: 10px;
+  right: 10px;
+}
+
+.quick-entry-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--accent-strong);
+}
+
+.quick-entry-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.quick-entry-body .ant-segmented {
+  padding: 2px;
+  background: var(--surface-muted);
+}
+
+.quick-entry-pin-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10.5px;
+}
+
+.quick-entry-body .ant-input-affix-wrapper {
+  border-radius: 8px;
+}
+
+.quick-entry-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 7px;
+  padding-top: 2px;
+}
+
+.quick-entry-actions .ant-btn {
+  border-radius: 8px;
+}
+
+/* -------------------------------------------------------------------------- */
 /* Import modal                                                               */
 /* -------------------------------------------------------------------------- */
 
@@ -2276,6 +2342,67 @@ textarea {
   white-space: nowrap;
   background: var(--surface-muted);
   border-radius: 5px;
+}
+
+.shortcut-card {
+  padding: 11px 12px;
+  background: var(--surface-soft);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.shortcut-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.shortcut-status-dot {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  background: var(--warning);
+  border-radius: 50%;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--warning) 14%, transparent);
+}
+
+.shortcut-status-dot.is-on {
+  background: var(--success);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--success) 14%, transparent);
+}
+
+.shortcut-status-copy {
+  display: flex;
+  flex: 1 1 140px;
+  flex-direction: column;
+  min-width: 0;
+  gap: 2px;
+}
+
+.shortcut-status-copy strong {
+  color: var(--text);
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.shortcut-status-copy span {
+  overflow: hidden;
+  color: var(--text-tertiary);
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.shortcut-status .ant-btn {
+  flex-shrink: 0;
+  border-radius: 8px;
+  font-size: 10.5px;
+}
+
+.shortcut-unsupported {
+  margin: 0;
 }
 
 .settings-db-form .ant-form-item {

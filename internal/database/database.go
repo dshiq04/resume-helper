@@ -30,6 +30,16 @@ func Open(cfg config.DatabaseConfig) (*gorm.DB, error) {
 	); err != nil {
 		return nil, fmt.Errorf("migrate database: %w", err)
 	}
+
+	// Existing installations gain the applied_at column through AutoMigrate.
+	// Backfill old rows with their creation time so the new column is never
+	// empty in the UI.
+	if err := db.Model(&models.Application{}).
+		Where("applied_at IS NULL").
+		UpdateColumn("applied_at", gorm.Expr("COALESCE(created_at, updated_at)")).Error; err != nil {
+		return nil, fmt.Errorf("backfill applied_at: %w", err)
+	}
+
 	return db, nil
 }
 

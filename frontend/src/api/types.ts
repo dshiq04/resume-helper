@@ -29,6 +29,7 @@ export interface Application {
   link: string;
   status: Status;
   pinned: boolean;
+  appliedAt: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -45,6 +46,7 @@ export interface ApplicationInput {
   companyName: string;
   link: string;
   status: Status;
+  pinned?: boolean;
 }
 
 export interface ApplicationUpdate {
@@ -118,6 +120,12 @@ export interface DatabaseUpdateResult extends DatabaseSettingsResponse {
 export interface DatabaseTestResult {
   ok: boolean;
   message: string;
+}
+
+export interface ShortcutStatus {
+  supported: boolean;
+  exists: boolean;
+  path: string;
 }
 
 export interface ImportResult {

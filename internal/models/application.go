@@ -30,6 +30,7 @@ type Application struct {
 	Link        string    `gorm:"type:text" json:"link"`
 	Status      string    `gorm:"type:varchar(32);not null;default:screening;index" json:"status"`
 	Pinned      bool      `gorm:"not null;default:false;index" json:"pinned"`
+	AppliedAt   time.Time `gorm:"index" json:"appliedAt"`
 	CreatedAt   time.Time `json:"createdAt"`
 	UpdatedAt   time.Time `json:"updatedAt"`
 }

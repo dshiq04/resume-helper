@@ -93,6 +93,8 @@ func (s *Server) newEngine() *gin.Engine {
 		protected.GET("/system/database", s.getDatabaseSettings)
 		protected.POST("/system/database/test", s.testDatabaseSettings)
 		protected.PUT("/system/database", s.updateDatabaseSettings)
+		protected.GET("/system/shortcut", s.getShortcutStatus)
+		protected.POST("/system/shortcut", s.createDesktopShortcut)
 	}
 
 	s.registerStaticRoutes(r)

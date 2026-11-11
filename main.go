@@ -9,14 +9,17 @@ import (
 	"os"
 	"os/signal"
 	"strings"
+	"sync/atomic"
 	"syscall"
 	"time"
 
 	"resume-helper/internal/config"
 	"resume-helper/internal/database"
+	"resume-helper/internal/desktop"
 	"resume-helper/internal/server"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
+	"github.com/wailsapp/wails/v3/pkg/events"
 )
 
 // The frontend is embedded so the production binary is fully self-contained.
@@ -25,11 +28,18 @@ import (
 //go:embed all:frontend/dist
 var embeddedAssets embed.FS
 
+//go:embed frontend/public/app-icon.png
+var appIconPNG []byte
+
+//go:embed frontend/public/app-icon.ico
+var appIconICO []byte
+
 func main() {
 	cfg, err := config.Load()
 	if err != nil {
 		log.Fatalf("load configuration: %v", err)
 	}
+	desktop.Configure(cfg.DataDir, appIconICO)
 
 	db, err := database.Open(cfg.Database)
 	if err != nil {
@@ -66,12 +76,13 @@ func main() {
 	app := application.New(application.Options{
 		Name:        "ResumeTrail",
 		Description: "A beautiful resume application tracker",
+		Icon:        appIconPNG,
 		Assets: application.AssetOptions{
 			Handler: httpServer.Handler(),
 		},
 	})
 
-	app.Window.NewWithOptions(application.WebviewWindowOptions{
+	mainWindow := app.Window.NewWithOptions(application.WebviewWindowOptions{
 		Title:            "履途 ResumeTrail",
 		Width:            1360,
 		Height:           860,
@@ -81,10 +92,67 @@ func main() {
 		DisableResize:    false,
 		BackgroundColour: application.NewRGB(15, 23, 42),
 	})
+	registerShortcutClosePrompt(app, mainWindow)
 
 	if err := app.Run(); err != nil {
 		log.Fatal(err)
 	}
+}
+
+func registerShortcutClosePrompt(app *application.App, window *application.WebviewWindow) {
+	if !desktop.ShortcutSupported() {
+		return
+	}
+
+	var allowClose atomic.Bool
+	var prompting atomic.Bool
+
+	window.RegisterHook(events.Common.WindowClosing, func(event *application.WindowEvent) {
+		if allowClose.Load() {
+			return
+		}
+		exists, err := desktop.ShortcutExists()
+		if err != nil || exists {
+			return
+		}
+
+		event.Cancel()
+		if !prompting.CompareAndSwap(false, true) {
+			return
+		}
+
+		application.InvokeAsync(func() {
+			dialog := app.Dialog.Question().
+				SetTitle("桌面快捷方式 / Desktop shortcut").
+				SetMessage("桌面没有 ResumeTrail 快捷方式，是否创建？\nNo ResumeTrail shortcut was found on the desktop. Create one?")
+			yes := dialog.AddButton("是，创建 / Yes")
+			no := dialog.AddButton("否，不创建 / No")
+			dialog.SetDefaultButton(yes)
+			dialog.SetCancelButton(no)
+
+			yes.OnClick(func() {
+				if err := desktop.CreateShortcut(); err != nil {
+					prompting.Store(false)
+					app.Dialog.Error().
+						SetTitle("创建失败 / Failed").
+						SetMessage(err.Error()).
+						AttachToWindow(window).
+						Show()
+					return
+				}
+				allowClose.Store(true)
+				prompting.Store(false)
+				window.Close()
+			})
+			no.OnClick(func() {
+				allowClose.Store(true)
+				prompting.Store(false)
+				window.Close()
+			})
+
+			dialog.AttachToWindow(window).Show()
+		})
+	})
 }
 
 func isHeadless() bool {

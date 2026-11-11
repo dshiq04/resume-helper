@@ -3,6 +3,7 @@ package server
 import (
 	"net/http"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"resume-helper/internal/models"
@@ -24,6 +25,7 @@ type applicationInput struct {
 	CompanyName string `json:"companyName"`
 	Link        string `json:"link"`
 	Status      string `json:"status"`
+	Pinned      bool   `json:"pinned"`
 }
 
 type applicationUpdateInput struct {
@@ -132,6 +134,9 @@ func (s *Server) createApplication(c *gin.Context) {
 		apiError(c, http.StatusBadRequest, code, message)
 		return
 	}
+	// The application timestamp always comes from the server clock, never
+	// from the client payload.
+	record.AppliedAt = time.Now()
 
 	if err := s.database().Create(record).Error; err != nil {
 		apiError(c, http.StatusInternalServerError, "create_failed", "Failed to create the application.")
@@ -322,6 +327,7 @@ func validateApplicationInput(input applicationInput) (*models.Application, stri
 		CompanyName: company,
 		Link:        link,
 		Status:      status,
+		Pinned:      input.Pinned,
 	}, "", ""
 }
 

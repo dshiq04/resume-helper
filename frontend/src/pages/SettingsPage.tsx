@@ -5,6 +5,7 @@ import { useI18n } from "../i18n";
 import { AppearanceSettings } from "../components/settings/AppearanceSettings";
 import { SecuritySettings } from "../components/settings/SecuritySettings";
 import { StorageSettings } from "../components/settings/StorageSettings";
+import { ShortcutSettings } from "../components/settings/ShortcutSettings";
 import { AboutSettings } from "../components/settings/AboutSettings";
 
 export function SettingsPage() {
@@ -41,6 +42,7 @@ export function SettingsPage() {
         </div>
         <div className="settings-page-column">
           <StorageSettings />
+          <ShortcutSettings />
           <AboutSettings />
         </div>
       </div>

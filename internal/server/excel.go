@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"resume-helper/internal/models"
@@ -278,6 +279,7 @@ func (s *Server) parseAndImportWorkbook(file *excelize.File) (*importResult, err
 
 	result := &importResult{Errors: []string{}}
 	records := make([]models.Application, 0, len(rows))
+	appliedAt := time.Now()
 	for index := headerRow + 1; index < len(rows); index++ {
 		row := rows[index]
 		rowNumber := index + 1
@@ -331,6 +333,7 @@ func (s *Server) parseAndImportWorkbook(file *excelize.File) (*importResult, err
 			CompanyName: company,
 			Link:        link,
 			Status:      status,
+			AppliedAt:   appliedAt,
 		})
 	}
 
