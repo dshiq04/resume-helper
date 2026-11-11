@@ -1945,6 +1945,49 @@ textarea {
   padding: 32px 24px !important;
 }
 
+.import-native-target {
+  display: block;
+}
+
+.import-native-drop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  padding: 32px 24px;
+  text-align: center;
+  cursor: pointer;
+  background: var(--surface-soft);
+  border: 1.5px dashed var(--border-strong);
+  border-radius: 16px;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.import-native-drop:hover,
+.import-native-drop:focus-visible {
+  background: color-mix(in srgb, var(--accent) 4%, var(--surface));
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+  outline: none;
+}
+
+.import-native-drop strong {
+  color: var(--text);
+  font-size: 13.5px;
+  font-weight: 650;
+}
+
+.import-native-drop span:not(.import-drop-icon) {
+  color: var(--text-tertiary);
+  font-size: 10.5px;
+}
+
+.import-native-file {
+  padding: 18px 20px;
+  background: var(--surface-soft);
+  border: 1.5px dashed var(--border-strong);
+  border-radius: 16px;
+}
+
 .import-drop-content {
   display: flex;
   flex-direction: column;
@@ -2546,7 +2589,7 @@ textarea {
 }
 
 .settings-card .settings-db-info {
-  margin-top: 16px;
+  margin-top: 10px;
 }
 
 .settings-db-warning {

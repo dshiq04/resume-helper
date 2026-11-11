@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -13,18 +15,28 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/xuri/excelize/v2"
+	"go.uber.org/zap"
 )
 
 const (
 	maxExcelSize = 10 << 20 // 10 MiB
 	maxExcelRows = 5000
+
+	// ExcelDropTarget is the value of the data-file-drop-target attribute that
+	// routes Wails native file drops to the Excel import dialog.
+	ExcelDropTarget = "excel-import"
 )
 
-type importResult struct {
+type ImportResult struct {
 	Imported int      `json:"imported"`
 	Skipped  int      `json:"skipped"`
 	Total    int      `json:"total"`
 	Errors   []string `json:"errors"`
+}
+
+type ExcelFileInfo struct {
+	FileName string `json:"fileName"`
+	FileSize int64  `json:"fileSize"`
 }
 
 type importColumns struct {
@@ -253,10 +265,79 @@ func (s *Server) importApplications(c *gin.Context) {
 		apiError(c, http.StatusBadRequest, "import_failed", err.Error())
 		return
 	}
+	s.logInfo("applications imported",
+		zap.String("file", fileHeader.Filename),
+		zap.Int("imported", result.Imported),
+		zap.Int("skipped", result.Skipped),
+	)
 	c.JSON(http.StatusOK, result)
 }
 
-func (s *Server) parseAndImportWorkbook(file *excelize.File) (*importResult, error) {
+// ProbeExcelFile validates a workbook path without importing it. It backs the
+// Wails file dialog / native drop flow on the desktop.
+func (s *Server) ProbeExcelFile(path string) (*ExcelFileInfo, error) {
+	info, err := excelFileInfoFromPath(path)
+	if err != nil {
+		s.logWarn("excel probe failed", zap.String("path", path), zap.Error(err))
+		return nil, err
+	}
+	s.logDebug("excel probed", zap.String("path", path), zap.String("file", info.FileName), zap.Int64("size", info.FileSize))
+	return info, nil
+}
+
+// ImportExcelFromPath imports a workbook from a local path. Desktop drag and
+// drop only exposes file paths, so parsing happens on the Go side.
+func (s *Server) ImportExcelFromPath(path string) (*ImportResult, error) {
+	info, err := excelFileInfoFromPath(path)
+	if err != nil {
+		return nil, err
+	}
+	file, err := excelize.OpenFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("The file is not a valid Excel workbook.")
+	}
+	defer func() {
+		_ = file.Close()
+	}()
+
+	result, err := s.parseAndImportWorkbook(file)
+	if err != nil {
+		return nil, err
+	}
+	s.logInfo("applications imported",
+		zap.String("file", info.FileName),
+		zap.Int("imported", result.Imported),
+		zap.Int("skipped", result.Skipped),
+	)
+	return result, nil
+}
+
+func excelFileInfoFromPath(path string) (*ExcelFileInfo, error) {
+	raw := strings.TrimSpace(path)
+	if raw == "" {
+		return nil, fmt.Errorf("Excel file path is required")
+	}
+	info, err := os.Stat(raw)
+	if err != nil {
+		return nil, fmt.Errorf("Excel file is not accessible")
+	}
+	if info.IsDir() {
+		return nil, fmt.Errorf("Excel file is a folder")
+	}
+	lower := strings.ToLower(info.Name())
+	if !strings.HasSuffix(lower, ".xlsx") && !strings.HasSuffix(lower, ".xlsm") {
+		return nil, fmt.Errorf("Only .xlsx and .xlsm files are supported")
+	}
+	if info.Size() > maxExcelSize {
+		return nil, fmt.Errorf("The Excel file is larger than 10 MB")
+	}
+	if info.Size() <= 0 {
+		return nil, fmt.Errorf("The Excel file is empty")
+	}
+	return &ExcelFileInfo{FileName: filepath.Base(raw), FileSize: info.Size()}, nil
+}
+
+func (s *Server) parseAndImportWorkbook(file *excelize.File) (*ImportResult, error) {
 	sheets := file.GetSheetList()
 	if len(sheets) == 0 {
 		return nil, fmt.Errorf("the workbook has no sheets")
@@ -277,7 +358,7 @@ func (s *Server) parseAndImportWorkbook(file *excelize.File) (*importResult, err
 		return nil, fmt.Errorf("the workbook contains more than %d data rows", maxExcelRows)
 	}
 
-	result := &importResult{Errors: []string{}}
+	result := &ImportResult{Errors: []string{}}
 	records := make([]models.Application, 0, len(rows))
 	appliedAt := time.Now()
 	for index := headerRow + 1; index < len(rows); index++ {
@@ -441,7 +522,7 @@ func rowIsEmpty(row []string) bool {
 	return true
 }
 
-func addImportError(result *importResult, row int, message string) {
+func addImportError(result *ImportResult, row int, message string) {
 	if len(result.Errors) >= 20 {
 		return
 	}

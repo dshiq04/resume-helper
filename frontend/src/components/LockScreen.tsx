@@ -1,6 +1,6 @@
 import { useCallback, useState } from "react";
 import { Alert, Button, Input } from "antd";
-import { ArrowRightOutlined, LockOutlined, SafetyCertificateOutlined } from "@ant-design/icons";
+import { ArrowRightOutlined, LockOutlined } from "@ant-design/icons";
 import { api, ApiError, setToken } from "../api/client";
 import type { AuthSession } from "../api/types";
 import { useI18n } from "../i18n";
@@ -101,11 +101,6 @@ export function LockScreen({ onAuthenticated }: LockScreenProps) {
             {!loading && <ArrowRightOutlined />}
           </Button>
         </form>
-
-        <div className="auth-hint">
-          <SafetyCertificateOutlined />
-          <span>{t("auth.hint")}</span>
-        </div>
       </div>
     </div>
   );

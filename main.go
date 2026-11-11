@@ -119,7 +119,7 @@ func main() {
 	})
 	shortcutPrompt := &shortcutPromptState{}
 	registerShortcutClosePrompt(app, mainWindow, shortcutPrompt)
-	registerResumeDropEvent(appLogger, mainWindow)
+	registerFileDropEvent(appLogger, mainWindow)
 	httpServer.SetShortcutPromptHandler(func(create bool) error {
 		return resolveShortcutPrompt(app, mainWindow, shortcutPrompt, create)
 	})
@@ -150,23 +150,39 @@ func (d *DropImporter) ImportResume(path string, name string, tags []string) (*m
 	return d.server.ImportResumeFromPath(path, name, tags)
 }
 
-// registerResumeDropEvent forwards file drops that land on the resume upload
-// area to the frontend. Wails native drops carry full paths, which the frontend
-// cannot read directly, so the import happens through a Wails binding.
-func registerResumeDropEvent(logger *zap.Logger, mainWindow *application.WebviewWindow) {
+func (d *DropImporter) ProbeExcelFile(path string) (*server.ExcelFileInfo, error) {
+	return d.server.ProbeExcelFile(path)
+}
+
+func (d *DropImporter) ImportExcel(path string) (*server.ImportResult, error) {
+	return d.server.ImportExcelFromPath(path)
+}
+
+// registerFileDropEvent forwards file drops that land on a known upload area
+// to the frontend. Wails native drops carry full paths, which the frontend
+// cannot read directly, so imports happen through Wails bindings.
+func registerFileDropEvent(logger *zap.Logger, mainWindow *application.WebviewWindow) {
 	mainWindow.OnWindowEvent(events.Common.WindowFilesDropped, func(event *application.WindowEvent) {
 		paths := event.Context().DroppedFiles()
 		if len(paths) == 0 {
 			return
 		}
 		details := event.Context().DropTargetDetails()
-		if details == nil || details.Attributes["data-file-drop-target"] != server.ResumeDropTarget {
+		if details == nil {
 			return
 		}
-
-		filtered := append([]string(nil), paths...)
-		mainWindow.EmitEvent("resumetrail:resume-files-dropped", filtered)
-		logger.Debug("resume files dropped", zap.Strings("files", filtered))
+		target := details.Attributes["data-file-drop-target"]
+		if target != server.ResumeDropTarget && target != server.ExcelDropTarget {
+			return
+		}
+		mainWindow.EmitEvent("resumetrail:file-dropped", map[string]any{
+			"target": target,
+			"files":  paths,
+		})
+		logger.Debug("files dropped",
+			zap.String("target", target),
+			zap.Strings("files", paths),
+		)
 	})
 }
 

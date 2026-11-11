@@ -186,6 +186,10 @@ func (s *Server) newEngine() *gin.Engine {
 		api.GET("/auth/status", s.authStatus)
 		api.POST("/auth/login", s.authLogin)
 		api.POST("/auth/setup", s.authSetup)
+		// The shortcut prompt is shown while the main window is closing, which
+		// can happen after the session has been locked. Both buttons must keep
+		// working without a valid session.
+		api.POST("/system/shortcut/prompt", s.resolveShortcutPrompt)
 	}
 
 	protected := api.Group("")
@@ -216,7 +220,6 @@ func (s *Server) newEngine() *gin.Engine {
 		protected.PUT("/system/database", s.updateDatabaseSettings)
 		protected.GET("/system/shortcut", s.getShortcutStatus)
 		protected.POST("/system/shortcut", s.createDesktopShortcut)
-		protected.POST("/system/shortcut/prompt", s.resolveShortcutPrompt)
 		protected.POST("/system/quick-entry", s.openQuickEntry)
 		protected.POST("/system/resume-preview", s.openResumePreview)
 	}

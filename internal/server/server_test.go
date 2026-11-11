@@ -365,7 +365,7 @@ func TestExcelTemplateAndImport(t *testing.T) {
 	if importResp.StatusCode != http.StatusOK {
 		t.Fatalf("import status = %d, body = %s", importResp.StatusCode, importBody)
 	}
-	result := decodeJSON[importResult](t, importBody)
+	result := decodeJSON[ImportResult](t, importBody)
 	if result.Imported != 2 || result.Skipped != 1 || result.Total != 3 || len(result.Errors) != 1 {
 		t.Fatalf("unexpected import result: %+v", result)
 	}
@@ -377,6 +377,56 @@ func TestExcelTemplateAndImport(t *testing.T) {
 	list := decodeJSON[ApplicationList](t, body)
 	if list.Total != 2 {
 		t.Fatalf("imported total = %d, want 2", list.Total)
+	}
+}
+
+func TestExcelPathImport(t *testing.T) {
+	app := newTestApp(t)
+
+	book := excelize.NewFile()
+	rows := [][]interface{}{
+		{"Category", "Company", "Link", "Status"},
+		{"秋招", "路径导入公司", "https://example.com/drop", "笔试"},
+	}
+	for rowIndex, row := range rows {
+		for colIndex, value := range row {
+			cell, _ := excelize.CoordinatesToCellName(colIndex+1, rowIndex+1)
+			_ = book.SetCellValue("Sheet1", cell, value)
+		}
+	}
+	buffer, err := book.WriteToBuffer()
+	if err != nil {
+		t.Fatalf("write workbook: %v", err)
+	}
+	_ = book.Close()
+
+	path := filepath.Join(t.TempDir(), "path-import.xlsx")
+	if err := os.WriteFile(path, buffer.Bytes(), 0o644); err != nil {
+		t.Fatalf("write workbook file: %v", err)
+	}
+
+	info, err := app.server.ProbeExcelFile(path)
+	if err != nil {
+		t.Fatalf("probe excel: %v", err)
+	}
+	if info.FileName != "path-import.xlsx" || info.FileSize != int64(len(buffer.Bytes())) {
+		t.Fatalf("unexpected excel info: %+v", info)
+	}
+
+	result, err := app.server.ImportExcelFromPath(path)
+	if err != nil {
+		t.Fatalf("import excel path: %v", err)
+	}
+	if result.Imported != 1 || result.Skipped != 0 || result.Total != 1 {
+		t.Fatalf("unexpected path import result: %+v", result)
+	}
+
+	invalidPath := filepath.Join(t.TempDir(), "broken.xlsx")
+	if err := os.WriteFile(invalidPath, []byte("not an excel workbook"), 0o644); err != nil {
+		t.Fatalf("write invalid workbook: %v", err)
+	}
+	if _, err := app.server.ImportExcelFromPath(invalidPath); err == nil {
+		t.Fatalf("invalid workbook should be rejected")
 	}
 }
 

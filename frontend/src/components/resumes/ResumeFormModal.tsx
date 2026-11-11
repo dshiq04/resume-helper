@@ -31,7 +31,8 @@ const ALLOWED_EXTENSIONS = [
   "md",
   "markdown",
 ];
-const RESUME_FILES_DROPPED_EVENT = "resumetrail:resume-files-dropped";
+const RESUME_FILES_DROPPED_EVENT = "resumetrail:file-dropped";
+const RESUME_DROP_TARGET = "resume-upload";
 const IMPORT_BINDING = "main.DropImporter.ImportResume";
 const PROBE_BINDING = "main.DropImporter.ProbeResumeFile";
 
@@ -169,8 +170,11 @@ export function ResumeFormModal({
     if (!open || !desktop) return;
 
     return Events.On(RESUME_FILES_DROPPED_EVENT, (event) => {
-      const payload = event.data as string[] | undefined;
-      const paths = Array.isArray(payload) ? payload : [];
+      const payload = event.data as
+        | { target?: string; files?: string[] }
+        | undefined;
+      if (payload?.target !== RESUME_DROP_TARGET) return;
+      const paths = Array.isArray(payload.files) ? payload.files : [];
       const path =
         paths.find((item) => ALLOWED_EXTENSIONS.includes(extensionOf(item))) ??
         paths[0];
