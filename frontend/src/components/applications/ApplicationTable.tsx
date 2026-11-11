@@ -216,6 +216,7 @@ export function ApplicationTable({
         pageSize,
         total,
         showSizeChanger: true,
+        showQuickJumper: true,
         pageSizeOptions: [10, 20, 50],
         showTotal: (count) => t("table.totalItems", { count }),
         onChange: (nextPage, nextPageSize) => {
