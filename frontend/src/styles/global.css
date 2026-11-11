@@ -214,13 +214,6 @@ textarea {
   opacity: 0.65;
 }
 
-.titlebar-brand {
-  display: flex;
-  flex-shrink: 0;
-  align-items: center;
-  gap: 6px;
-}
-
 .brand-logo {
   display: inline-flex;
   align-items: center;
@@ -230,24 +223,6 @@ textarea {
   background: linear-gradient(140deg, #6366f1 8%, #7c3aed 58%, #a855f7 100%);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28),
     0 6px 18px rgba(99, 102, 241, 0.4);
-}
-
-.titlebar-brand-copy {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  line-height: 1.15;
-}
-
-.titlebar-brand-name {
-  font-size: 11px;
-  font-weight: 720;
-  color: #f4f7ff;
-  letter-spacing: 0.02em;
-}
-
-.titlebar-brand-tagline {
-  display: none;
 }
 
 .titlebar-drag-space {
@@ -292,12 +267,6 @@ textarea {
   font-size: 11px;
 }
 
-.titlebar-tool-label {
-  font-size: 9px;
-  font-weight: 650;
-  letter-spacing: 0.04em;
-}
-
 .titlebar-divider {
   align-self: center;
   width: 1px;
@@ -329,32 +298,6 @@ textarea {
 .window-button-close:hover {
   color: #fff;
   background: #e81123;
-}
-
-.language-option {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 172px;
-  padding: 2px 0;
-}
-
-.language-option-short {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 26px;
-  height: 22px;
-  color: var(--text-secondary);
-  font-size: 10px;
-  font-weight: 700;
-  background: var(--surface-muted);
-  border-radius: 6px;
-}
-
-.language-option.is-active .language-option-short {
-  color: #fff;
-  background: var(--accent);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -458,6 +401,32 @@ textarea {
   pointer-events: none;
   content: "";
   background: radial-gradient(circle, rgba(99, 102, 241, 0.18), transparent 68%);
+}
+
+.sidebar-brand {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 10px;
+  padding: 0 8px 20px;
+  color: #f4f7ff;
+  text-decoration: none;
+  transition: color 0.18s ease, opacity 0.18s ease;
+}
+
+.sidebar-brand:hover {
+  color: #ffffff;
+  opacity: 0.92;
+}
+
+.sidebar-brand-name {
+  overflow: hidden;
+  color: inherit;
+  font-size: 16px;
+  font-weight: 760;
+  letter-spacing: 0.02em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .sidebar-section-label {
@@ -642,7 +611,9 @@ textarea {
   flex: 1;
   min-width: 0;
   padding: 30px 36px 44px;
+  overflow-x: hidden;
   overflow-y: auto;
+  scrollbar-gutter: stable;
   background:
     radial-gradient(circle at 12% -8%, rgba(99, 102, 241, 0.09), transparent 30%),
     radial-gradient(circle at 96% 2%, rgba(168, 85, 247, 0.06), transparent 26%),
@@ -1050,6 +1021,13 @@ textarea {
 
 .applications-table .ant-table {
   background: transparent;
+}
+
+/* The table columns are sized to fit the desktop content area. Hiding the
+   horizontal scroll container prevents WebView2 from oscillating between
+   "scrollbar visible / hidden" at fractional DPI scaling. */
+.applications-table .ant-table-content {
+  overflow-x: hidden !important;
 }
 
 .applications-table .ant-table-thead > tr > th {
@@ -2953,7 +2931,6 @@ textarea {
     font-size: 28px;
   }
 
-  .titlebar-brand-tagline,
   .edit-hint {
     display: none;
   }
@@ -2969,6 +2946,15 @@ textarea {
     align-items: stretch;
     width: 84px;
     padding: 20px 10px 16px;
+  }
+
+  .sidebar-brand {
+    justify-content: center;
+    padding: 0 0 16px;
+  }
+
+  .sidebar-brand-name {
+    display: none;
   }
 
   .sidebar::before {
@@ -3072,7 +3058,6 @@ textarea {
     padding: 0 7px;
   }
 
-  .titlebar-tool-label,
   .titlebar-divider {
     display: none;
   }
@@ -3105,6 +3090,7 @@ textarea {
     box-shadow: 0 -14px 34px rgba(2, 6, 23, 0.32);
   }
 
+  .sidebar-brand,
   .sidebar::before,
   .sidebar-section-label,
   .sidebar-spacer,
@@ -3396,10 +3382,6 @@ textarea {
 }
 
 @media (max-width: 380px) {
-  .titlebar-brand-name {
-    display: none;
-  }
-
   .stats-grid {
     grid-template-columns: 1fr;
   }

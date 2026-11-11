@@ -9,6 +9,7 @@ import { NavLink } from "react-router-dom";
 import type { Stats } from "../api/types";
 import { useI18n } from "../i18n";
 import type { MessageKey } from "../i18n";
+import { Logo } from "./Logo";
 
 interface SidebarProps {
   stats: Stats | null;
@@ -53,6 +54,17 @@ export function Sidebar({ stats, passwordEnabled }: SidebarProps) {
 
   return (
     <aside className="sidebar">
+      <NavLink
+        to="/"
+        end
+        className="sidebar-brand"
+        aria-label={t("app.brand")}
+        title={t("app.brand")}
+      >
+        <Logo size={30} />
+        <span className="sidebar-brand-name">{t("app.brand")}</span>
+      </NavLink>
+
       <div className="sidebar-section-label">{t("nav.workspace")}</div>
       <nav className="sidebar-nav" aria-label={t("nav.categories")}>
         {categories.map((item) => {

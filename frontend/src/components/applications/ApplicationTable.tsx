@@ -78,7 +78,7 @@ export function ApplicationTable({
       title: t("table.company"),
       dataIndex: "companyName",
       key: "companyName",
-      width: 280,
+      width: 260,
       render: (_value, record) =>
         record.id === DRAFT_ID && draft ? (
           <DraftCompanyCell
@@ -97,7 +97,7 @@ export function ApplicationTable({
       title: t("table.link"),
       dataIndex: "link",
       key: "link",
-      width: 230,
+      width: 210,
       render: (_value, record) =>
         record.id === DRAFT_ID && draft ? (
           <DraftLinkCell
@@ -116,7 +116,7 @@ export function ApplicationTable({
       title: t("table.status"),
       dataIndex: "status",
       key: "status",
-      width: 155,
+      width: 145,
       render: (_value, record) =>
         record.id === DRAFT_ID && draft ? (
           <DraftStatusSelect
@@ -140,7 +140,7 @@ export function ApplicationTable({
       title: t("table.updatedAt"),
       dataIndex: "updatedAt",
       key: "updatedAt",
-      width: 140,
+      width: 125,
       render: (value: string, record) =>
         record.id === DRAFT_ID ? (
           <span className="draft-unsaved">{t("draft.unsaved")}</span>
@@ -151,7 +151,7 @@ export function ApplicationTable({
     {
       title: t("table.actions"),
       key: "actions",
-      width: 92,
+      width: 86,
       align: "right",
       render: (_value, record) =>
         record.id === DRAFT_ID ? (
@@ -198,7 +198,6 @@ export function ApplicationTable({
           <ApplicationEmptyState hasFilters={hasFilters} onAdd={onAdd} />
         ),
       }}
-      scroll={{ x: 820 }}
       rowClassName={(record) =>
         record.id === DRAFT_ID
           ? "is-draft-row"
