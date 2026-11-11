@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { App as AntdApp, Button, Input, Segmented } from "antd";
+import { App as AntdApp, Button, Input } from "antd";
 import type { InputRef } from "antd";
 import {
   BankOutlined,
@@ -31,7 +31,6 @@ export function QuickEntryWindowPage() {
   const [category] = useState<Category>(readCategory);
   const [companyName, setCompanyName] = useState("");
   const [link, setLink] = useState("");
-  const [pinned, setPinned] = useState(false);
   const [saving, setSaving] = useState(false);
   const [windowPinned, setWindowPinned] = useState(true);
 
@@ -63,7 +62,6 @@ export function QuickEntryWindowPage() {
   const clear = () => {
     setCompanyName("");
     setLink("");
-    setPinned(false);
     companyRef.current?.focus();
   };
 
@@ -95,12 +93,10 @@ export function QuickEntryWindowPage() {
         companyName: company,
         link: link.trim(),
         status: "screening",
-        pinned,
       });
       message.success(t("quick.added"));
       setCompanyName("");
       setLink("");
-      setPinned(false);
       notifyDataChanged();
       companyRef.current?.focus();
     } catch (error) {
@@ -143,31 +139,6 @@ export function QuickEntryWindowPage() {
       </header>
 
       <div className="quick-window-body">
-        <Segmented
-          block
-          size="small"
-          value={pinned ? "pinned" : "normal"}
-          onChange={(value) => setPinned(value === "pinned")}
-          options={[
-            {
-              value: "normal",
-              label: (
-                <span className="quick-entry-pin-option">
-                  <PushpinOutlined /> {t("quick.unpinned")}
-                </span>
-              ),
-            },
-            {
-              value: "pinned",
-              label: (
-                <span className="quick-entry-pin-option">
-                  <PushpinFilled /> {t("quick.pin")}
-                </span>
-              ),
-            },
-          ]}
-        />
-
         <Input
           ref={companyRef}
           size="small"

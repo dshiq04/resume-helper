@@ -1840,25 +1840,16 @@ textarea {
   display: flex;
   flex: 1;
   flex-direction: column;
+  width: 100%;
+  box-sizing: border-box;
   gap: 6px;
   min-height: 0;
   padding: 9px 12px 11px;
   overflow: hidden;
 }
 
-.quick-window-body .ant-segmented {
-  padding: 2px;
-  background: var(--surface-muted);
-}
-
-.quick-entry-pin-option {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 10.5px;
-}
-
 .quick-window-body .ant-input-affix-wrapper {
+  width: 100%;
   border-radius: 8px;
   background: var(--surface);
 }
@@ -1866,6 +1857,7 @@ textarea {
 .quick-entry-actions {
   display: flex;
   justify-content: flex-end;
+  width: 100%;
   gap: 7px;
   padding-top: 2px;
 }
