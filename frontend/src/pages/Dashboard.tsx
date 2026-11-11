@@ -1,6 +1,10 @@
 import { useState } from "react";
+import { App as AntdApp } from "antd";
 import { useOutletContext } from "react-router-dom";
+import { api } from "../api/client";
 import type { CategoryFilter } from "../api/types";
+import { useI18n } from "../i18n";
+import { apiErrorMessage } from "../utils/errors";
 import { useApplications } from "../hooks/useApplications";
 import { useApplicationDraft } from "../hooks/useApplicationDraft";
 import { useInlineEdit } from "../hooks/useInlineEdit";
@@ -13,7 +17,6 @@ import { SelectionBar } from "../components/dashboard/SelectionBar";
 import { ApplicationTable } from "../components/applications/ApplicationTable";
 import { ApplicationCards } from "../components/applications/ApplicationCards";
 import { ImportModal } from "../components/ImportModal";
-import { QuickEntryModal } from "../components/QuickEntryModal";
 import type { WorkspaceOutletContext } from "../layouts/WorkspaceLayout";
 
 interface DashboardProps {
@@ -21,6 +24,8 @@ interface DashboardProps {
 }
 
 export function Dashboard({ category }: DashboardProps) {
+  const { t } = useI18n();
+  const { message } = AntdApp.useApp();
   const { stats, onDataChanged } =
     useOutletContext<WorkspaceOutletContext>();
   const board = useApplications({ category, onDataChanged });
@@ -35,7 +40,14 @@ export function Dashboard({ category }: DashboardProps) {
   const statusOptions = useStatusOptions();
   const isCompactList = useMediaQuery("(max-width: 1199px)");
   const [importOpen, setImportOpen] = useState(false);
-  const [quickEntryOpen, setQuickEntryOpen] = useState(false);
+
+  const handleQuickAdd = async () => {
+    try {
+      await api.openQuickEntry(category);
+    } catch (error) {
+      message.error(apiErrorMessage(error, t));
+    }
+  };
 
   const sharedListProps = {
     items: board.items,
@@ -67,7 +79,7 @@ export function Dashboard({ category }: DashboardProps) {
         category={category}
         onAdd={draft.start}
         onImport={() => setImportOpen(true)}
-        onQuickAdd={() => setQuickEntryOpen(true)}
+        onQuickAdd={() => void handleQuickAdd()}
       />
 
       <StatsCards stats={stats} category={category} />
@@ -111,13 +123,6 @@ export function Dashboard({ category }: DashboardProps) {
         open={importOpen}
         onClose={() => setImportOpen(false)}
         onImported={board.afterImported}
-      />
-
-      <QuickEntryModal
-        open={quickEntryOpen}
-        category={category}
-        onClose={() => setQuickEntryOpen(false)}
-        onCreated={board.afterCreated}
       />
     </>
   );

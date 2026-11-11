@@ -92,23 +92,64 @@ func main() {
 		DisableResize:    false,
 		BackgroundColour: application.NewRGB(15, 23, 42),
 	})
-	registerShortcutClosePrompt(app, mainWindow)
+	shortcutPrompt := &shortcutPromptState{}
+	registerShortcutClosePrompt(app, mainWindow, shortcutPrompt)
+	httpServer.SetShortcutPromptHandler(func(create bool) error {
+		return resolveShortcutPrompt(app, mainWindow, shortcutPrompt, create)
+	})
+	httpServer.SetQuickEntryOpener(func(category string) {
+		openQuickEntryWindow(app, category)
+	})
 
 	if err := app.Run(); err != nil {
 		log.Fatal(err)
 	}
 }
 
-func registerShortcutClosePrompt(app *application.App, window *application.WebviewWindow) {
+func openQuickEntryWindow(app *application.App, category string) {
+	application.InvokeAsync(func() {
+		if existing, ok := app.Window.Get("quick-entry"); ok {
+			existing.Show()
+			existing.Focus()
+			return
+		}
+
+		window := app.Window.NewWithOptions(application.WebviewWindowOptions{
+			Name:             "quick-entry",
+			Title:            "快速录入",
+			URL:              "/quick-entry?category=" + category,
+			Width:            400,
+			Height:           230,
+			MinWidth:         400,
+			MinHeight:        230,
+			MaxWidth:         400,
+			MaxHeight:        230,
+			Frameless:        true,
+			DisableResize:    true,
+			InitialPosition:  application.WindowCentered,
+			BackgroundColour: application.NewRGB(15, 23, 42),
+		})
+		window.Show()
+		window.Focus()
+	})
+}
+
+type shortcutPromptState struct {
+	allowClose atomic.Bool
+	prompting  atomic.Bool
+}
+
+func registerShortcutClosePrompt(
+	app *application.App,
+	window *application.WebviewWindow,
+	state *shortcutPromptState,
+) {
 	if !desktop.ShortcutSupported() {
 		return
 	}
 
-	var allowClose atomic.Bool
-	var prompting atomic.Bool
-
 	window.RegisterHook(events.Common.WindowClosing, func(event *application.WindowEvent) {
-		if allowClose.Load() {
+		if state.allowClose.Load() {
 			return
 		}
 		exists, err := desktop.ShortcutExists()
@@ -117,42 +158,71 @@ func registerShortcutClosePrompt(app *application.App, window *application.Webvi
 		}
 
 		event.Cancel()
-		if !prompting.CompareAndSwap(false, true) {
+		if !state.prompting.CompareAndSwap(false, true) {
+			application.InvokeAsync(func() {
+				if existing, ok := app.Window.Get("shortcut-prompt"); ok {
+					existing.Show()
+					existing.Focus()
+				}
+			})
+			return
+		}
+		openShortcutPromptWindow(app, state)
+	})
+}
+
+func openShortcutPromptWindow(app *application.App, state *shortcutPromptState) {
+	application.InvokeAsync(func() {
+		if existing, ok := app.Window.Get("shortcut-prompt"); ok {
+			existing.Show()
+			existing.Focus()
 			return
 		}
 
-		application.InvokeAsync(func() {
-			dialog := app.Dialog.Question().
-				SetTitle("桌面快捷方式 / Desktop shortcut").
-				SetMessage("桌面没有 ResumeTrail 快捷方式，是否创建？\nNo ResumeTrail shortcut was found on the desktop. Create one?")
-			yes := dialog.AddButton("是，创建 / Yes")
-			no := dialog.AddButton("否，不创建 / No")
-			dialog.SetDefaultButton(yes)
-			dialog.SetCancelButton(no)
-
-			yes.OnClick(func() {
-				if err := desktop.CreateShortcut(); err != nil {
-					prompting.Store(false)
-					app.Dialog.Error().
-						SetTitle("创建失败 / Failed").
-						SetMessage(err.Error()).
-						AttachToWindow(window).
-						Show()
-					return
-				}
-				allowClose.Store(true)
-				prompting.Store(false)
-				window.Close()
-			})
-			no.OnClick(func() {
-				allowClose.Store(true)
-				prompting.Store(false)
-				window.Close()
-			})
-
-			dialog.AttachToWindow(window).Show()
+		window := app.Window.NewWithOptions(application.WebviewWindowOptions{
+			Name:             "shortcut-prompt",
+			Title:            "桌面快捷方式",
+			URL:              "/shortcut-prompt",
+			Width:            440,
+			Height:           220,
+			MinWidth:         440,
+			MinHeight:        220,
+			MaxWidth:         440,
+			MaxHeight:        220,
+			Frameless:        true,
+			DisableResize:    true,
+			InitialPosition:  application.WindowCentered,
+			BackgroundColour: application.NewRGB(15, 23, 42),
 		})
+		window.OnWindowEvent(events.Common.WindowClosing, func(*application.WindowEvent) {
+			state.prompting.Store(false)
+		})
+		window.Show()
+		window.Focus()
 	})
+}
+
+func resolveShortcutPrompt(
+	app *application.App,
+	mainWindow *application.WebviewWindow,
+	state *shortcutPromptState,
+	create bool,
+) error {
+	if create {
+		if err := desktop.CreateShortcut(); err != nil {
+			return err
+		}
+	}
+
+	application.InvokeAsync(func() {
+		if promptWindow, ok := app.Window.Get("shortcut-prompt"); ok {
+			promptWindow.Close()
+		}
+		state.allowClose.Store(true)
+		state.prompting.Store(false)
+		mainWindow.Close()
+	})
+	return nil
 }
 
 func isHeadless() bool {

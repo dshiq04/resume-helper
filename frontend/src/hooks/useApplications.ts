@@ -6,6 +6,7 @@ import {
   type SetStateAction,
 } from "react";
 import { App as AntdApp } from "antd";
+import { Events } from "@wailsio/runtime";
 import { api, ApiError } from "../api/client";
 import type {
   Application,
@@ -133,6 +134,16 @@ export function useApplications({
   useEffect(() => {
     void load();
   }, [load, reloadToken]);
+
+  useEffect(() => {
+    const refreshFromQuickEntry = () => setReloadToken((value) => value + 1);
+    const unsubscribe = Events.On("resumetrail:data-changed", refreshFromQuickEntry);
+    window.addEventListener("resumetrail:data-changed", refreshFromQuickEntry);
+    return () => {
+      unsubscribe();
+      window.removeEventListener("resumetrail:data-changed", refreshFromQuickEntry);
+    };
+  }, []);
 
   const updateField = useCallback(
     async (id: number, patch: ApplicationUpdate) => {

@@ -33,6 +33,12 @@ type Server struct {
 	db       *gorm.DB
 	listener net.Listener
 	updateMu sync.Mutex
+
+	quickEntryMu     sync.RWMutex
+	quickEntryOpener func(category string)
+
+	shortcutPromptMu      sync.RWMutex
+	shortcutPromptHandler func(create bool) error
 }
 
 func New(cfg *config.Config, db *gorm.DB, assets fs.FS) *Server {
@@ -59,6 +65,22 @@ func (s *Server) database() *gorm.DB {
 	s.dbMu.RLock()
 	defer s.dbMu.RUnlock()
 	return s.db
+}
+
+// SetQuickEntryOpener wires the desktop window opener into the HTTP layer.
+// Headless/browser mode leaves it nil.
+func (s *Server) SetQuickEntryOpener(opener func(category string)) {
+	s.quickEntryMu.Lock()
+	defer s.quickEntryMu.Unlock()
+	s.quickEntryOpener = opener
+}
+
+// SetShortcutPromptHandler wires the shortcut-prompt window decision back
+// into the desktop layer.
+func (s *Server) SetShortcutPromptHandler(handler func(create bool) error) {
+	s.shortcutPromptMu.Lock()
+	defer s.shortcutPromptMu.Unlock()
+	s.shortcutPromptHandler = handler
 }
 
 func (s *Server) newEngine() *gin.Engine {
@@ -95,6 +117,8 @@ func (s *Server) newEngine() *gin.Engine {
 		protected.PUT("/system/database", s.updateDatabaseSettings)
 		protected.GET("/system/shortcut", s.getShortcutStatus)
 		protected.POST("/system/shortcut", s.createDesktopShortcut)
+		protected.POST("/system/shortcut/prompt", s.resolveShortcutPrompt)
+		protected.POST("/system/quick-entry", s.openQuickEntry)
 	}
 
 	s.registerStaticRoutes(r)

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { App as AntdApp, Button, ConfigProvider, Spin, Watermark } from "antd";
 import { CloudServerOutlined, ReloadOutlined } from "@ant-design/icons";
 import { Navigate, Route, Routes } from "react-router-dom";
+import { Events } from "@wailsio/runtime";
 import { ApiError, api } from "./api/client";
 import type { AuthSession, Stats } from "./api/types";
 import { LockScreen } from "./components/LockScreen";
@@ -11,7 +12,9 @@ import { TitleBar } from "./components/TitleBar";
 import { I18nProvider, useI18n } from "./i18n";
 import { WorkspaceLayout } from "./layouts/WorkspaceLayout";
 import { Dashboard } from "./pages/Dashboard";
+import { QuickEntryWindowPage } from "./pages/QuickEntryWindowPage";
 import { SettingsPage } from "./pages/SettingsPage";
+import { ShortcutPromptWindowPage } from "./pages/ShortcutPromptWindowPage";
 import { createTheme, type ThemeMode } from "./theme";
 
 const THEME_KEY = "resumetrail.theme";
@@ -81,9 +84,11 @@ function AppRoot() {
       void loadStats();
     };
     const refreshStats = () => void loadStats();
+    const unsubscribe = Events.On("resumetrail:data-changed", refreshStats);
     window.addEventListener("resumetrail:database-changed", handleDatabaseChanged);
     window.addEventListener("resumetrail:data-changed", refreshStats);
     return () => {
+      unsubscribe();
       window.removeEventListener("resumetrail:database-changed", handleDatabaseChanged);
       window.removeEventListener("resumetrail:data-changed", refreshStats);
     };
@@ -102,6 +107,26 @@ function AppRoot() {
   }, []);
 
   const themeConfig = useMemo(() => createTheme(themeMode), [themeMode]);
+
+  if (window.location.pathname === "/quick-entry") {
+    return (
+      <ConfigProvider locale={antdLocale} theme={themeConfig}>
+        <AntdApp>
+          <QuickEntryWindowPage />
+        </AntdApp>
+      </ConfigProvider>
+    );
+  }
+
+  if (window.location.pathname === "/shortcut-prompt") {
+    return (
+      <ConfigProvider locale={antdLocale} theme={themeConfig}>
+        <AntdApp>
+          <ShortcutPromptWindowPage />
+        </AntdApp>
+      </ConfigProvider>
+    );
+  }
 
   return (
     <ConfigProvider locale={antdLocale} theme={themeConfig}>

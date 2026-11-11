@@ -1715,45 +1715,107 @@ textarea {
 }
 
 /* -------------------------------------------------------------------------- */
-/* Quick entry modal                                                          */
+/* Quick entry window                                                         */
 /* -------------------------------------------------------------------------- */
 
-.quick-entry-modal .ant-modal-content {
-  padding: 12px 16px 14px;
-  border-radius: 16px;
+.quick-window-shell,
+.shortcut-prompt-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+  background: var(--bg);
 }
 
-.quick-entry-modal .ant-modal-header {
-  padding-right: 22px;
-  margin-bottom: 8px;
-  background: transparent;
+.shortcut-prompt-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  padding: 16px 24px;
+  text-align: center;
 }
 
-.quick-entry-modal .ant-modal-title {
-  color: var(--text);
-  font-size: 13px;
-  font-weight: 700;
+.shortcut-prompt-body p {
+  max-width: 360px;
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  line-height: 1.65;
 }
 
-.quick-entry-modal .ant-modal-close {
-  top: 10px;
-  right: 10px;
+.shortcut-prompt-actions {
+  display: flex;
+  gap: 10px;
 }
 
-.quick-entry-title {
+.shortcut-prompt-actions .ant-btn {
+  min-width: 96px;
+  border-radius: 8px;
+}
+
+.quick-window-bar {
+  --wails-draggable: drag;
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: space-between;
+  height: 30px;
+  padding: 0 6px 0 12px;
+  color: #dbe3f0;
+  background: linear-gradient(100deg, #090f1d 0%, #0e1729 100%);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+  user-select: none;
+}
+
+.quick-window-title {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  color: var(--accent-strong);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
 }
 
-.quick-entry-body {
+.quick-window-title .anticon {
+  color: #a5b4fc;
+  font-size: 12px;
+}
+
+.quick-window-close {
+  --wails-draggable: no-drag;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 22px;
+  padding: 0;
+  color: #94a3b8;
+  font-size: 10px;
+  background: transparent;
+  border: 0;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: color 0.16s ease, background 0.16s ease;
+}
+
+.quick-window-close:hover {
+  color: #fff;
+  background: #e81123;
+}
+
+.quick-window-body {
   display: flex;
+  flex: 1;
   flex-direction: column;
   gap: 6px;
+  min-height: 0;
+  padding: 9px 12px 11px;
 }
 
-.quick-entry-body .ant-segmented {
+.quick-window-body .ant-segmented {
   padding: 2px;
   background: var(--surface-muted);
 }
@@ -1765,8 +1827,9 @@ textarea {
   font-size: 10.5px;
 }
 
-.quick-entry-body .ant-input-affix-wrapper {
+.quick-window-body .ant-input-affix-wrapper {
   border-radius: 8px;
+  background: var(--surface);
 }
 
 .quick-entry-actions {

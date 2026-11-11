@@ -6,6 +6,7 @@ import type {
   ApplicationUpdate,
   AuthSession,
   AuthStatus,
+  CategoryFilter,
   DatabaseInput,
   DatabaseSettingsResponse,
   DatabaseTestResult,
@@ -240,6 +241,20 @@ export const api = {
     return request<ShortcutStatus>("/system/shortcut", {
       method: "POST",
       timeout: 20_000,
+    });
+  },
+  resolveShortcutPrompt(create: boolean) {
+    return request<{ resolved: boolean }>("/system/shortcut/prompt", {
+      method: "POST",
+      data: { create },
+      timeout: 20_000,
+    });
+  },
+  openQuickEntry(category: CategoryFilter) {
+    return request<{ opened: boolean }>("/system/quick-entry", {
+      method: "POST",
+      data: { category },
+      timeout: 10_000,
     });
   },
 };

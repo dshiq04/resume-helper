@@ -1,51 +1,61 @@
-import { useRef, useState } from "react";
-import {
-  App as AntdApp,
-  Button,
-  Input,
-  Modal,
-  Segmented,
-} from "antd";
+import { useEffect, useRef, useState } from "react";
+import { App as AntdApp, Button, Input, Segmented } from "antd";
 import type { InputRef } from "antd";
 import {
   BankOutlined,
   CheckOutlined,
   ClearOutlined,
+  CloseOutlined,
   LinkOutlined,
   PushpinFilled,
   PushpinOutlined,
   ThunderboltOutlined,
 } from "@ant-design/icons";
+import { Events } from "@wailsio/runtime";
 import { api } from "../api/client";
-import type { Application, CategoryFilter } from "../api/types";
+import type { Category } from "../api/types";
 import { useI18n } from "../i18n";
 import { apiErrorMessage } from "../utils/errors";
+import { closeWindow, isDesktopRuntime } from "../utils/desktop";
 
-interface QuickEntryModalProps {
-  open: boolean;
-  category: CategoryFilter;
-  onClose: () => void;
-  onCreated: (application: Application) => void;
+function readCategory(): Category {
+  const value = new URLSearchParams(window.location.search).get("category");
+  return value === "autumn" || value === "internship" ? value : "spring";
 }
 
-export function QuickEntryModal({
-  open,
-  category,
-  onClose,
-  onCreated,
-}: QuickEntryModalProps) {
+export function QuickEntryWindowPage() {
   const { t } = useI18n();
   const { message } = AntdApp.useApp();
   const companyRef = useRef<InputRef>(null);
+  const [category] = useState<Category>(readCategory);
   const [companyName, setCompanyName] = useState("");
   const [link, setLink] = useState("");
   const [pinned, setPinned] = useState(false);
   const [saving, setSaving] = useState(false);
 
+  useEffect(() => {
+    companyRef.current?.focus();
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") void closeWindow();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
   const clear = () => {
     setCompanyName("");
     setLink("");
     setPinned(false);
+    companyRef.current?.focus();
+  };
+
+  const notifyDataChanged = () => {
+    window.dispatchEvent(new Event("resumetrail:data-changed"));
+    if (isDesktopRuntime()) {
+      void Events.Emit("resumetrail:data-changed").catch(() => {
+        // Ignore: the main window may already be closing.
+      });
+    }
   };
 
   const handleAdd = async () => {
@@ -59,16 +69,18 @@ export function QuickEntryModal({
 
     setSaving(true);
     try {
-      const created = await api.createApplication({
-        category: category === "all" ? "spring" : category,
+      await api.createApplication({
+        category,
         companyName: company,
         link: link.trim(),
         status: "screening",
         pinned,
       });
       message.success(t("quick.added"));
-      clear();
-      onCreated(created);
+      setCompanyName("");
+      setLink("");
+      setPinned(false);
+      notifyDataChanged();
       companyRef.current?.focus();
     } catch (error) {
       message.error(apiErrorMessage(error, t));
@@ -78,24 +90,24 @@ export function QuickEntryModal({
   };
 
   return (
-    <Modal
-      open={open}
-      onCancel={onClose}
-      footer={null}
-      width={400}
-      centered
-      title={
-        <span className="quick-entry-title">
+    <div className="quick-window-shell">
+      <header className="quick-window-bar">
+        <span className="quick-window-title">
           <ThunderboltOutlined />
           {t("quick.title")}
         </span>
-      }
-      className="quick-entry-modal"
-      afterOpenChange={(visible) => {
-        if (visible) companyRef.current?.focus();
-      }}
-    >
-      <div className="quick-entry-body">
+        <button
+          className="quick-window-close"
+          type="button"
+          aria-label={t("window.close")}
+          title={t("window.close")}
+          onClick={() => void closeWindow()}
+        >
+          <CloseOutlined />
+        </button>
+      </header>
+
+      <div className="quick-window-body">
         <Segmented
           block
           size="small"
@@ -162,6 +174,6 @@ export function QuickEntryModal({
           </Button>
         </div>
       </div>
-    </Modal>
+    </div>
   );
 }
