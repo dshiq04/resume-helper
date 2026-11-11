@@ -15,7 +15,7 @@ import {
   FileTextOutlined,
   InboxOutlined,
 } from "@ant-design/icons";
-import { Call, Events } from "@wailsio/runtime";
+import { Call, Dialogs, Events } from "@wailsio/runtime";
 import { api } from "../../api/client";
 import type { Resume } from "../../api/types";
 import { useI18n } from "../../i18n";
@@ -88,6 +88,53 @@ export function ResumeFormModal({
   const [droppedFile, setDroppedFile] = useState<DroppedResumeFile | null>(null);
   const [nameTouched, setNameTouched] = useState(false);
   const [saving, setSaving] = useState(false);
+  const desktop = isDesktopRuntime();
+
+  const acceptNativePath = async (path: string) => {
+    try {
+      const info = (await Call.ByName(PROBE_BINDING, path)) as {
+        fileName: string;
+        fileType: string;
+        fileSize: number;
+      };
+      setDroppedFile({
+        path,
+        fileName: info.fileName,
+        fileType: info.fileType,
+        fileSize: info.fileSize,
+      });
+      setFileList([]);
+      const currentName =
+        (form.getFieldValue("name") as string | undefined) ?? "";
+      if (!nameTouched || !currentName.trim()) {
+        form.setFieldValue("name", baseName(info.fileName));
+      }
+    } catch (error) {
+      message.error(bindingErrorMessage(error));
+    }
+  };
+
+  const chooseNativeFile = async () => {
+    try {
+      const selected = await Dialogs.OpenFile({
+        Title: t("resumes.file"),
+        Message: t("resumes.fileHint"),
+        Filters: [
+          {
+            DisplayName: "DOCX / PDF / PPTX / PNG / Markdown",
+            Pattern: "*.docx;*.pdf;*.pptx;*.png;*.md;*.markdown",
+          },
+        ],
+        AllowsMultipleSelection: false,
+        CanChooseFiles: true,
+        CanChooseDirectories: false,
+      });
+      const path = Array.isArray(selected) ? selected[0] : selected;
+      if (path) await acceptNativePath(path);
+    } catch (error) {
+      message.error(bindingErrorMessage(error));
+    }
+  };
 
   useEffect(() => {
     if (!open) return;
@@ -102,7 +149,7 @@ export function ResumeFormModal({
   // Wails delivers operating-system file drops as full paths, so the file is
   // imported through a Go binding instead of an HTML file input.
   useEffect(() => {
-    if (!open || !isDesktopRuntime()) return;
+    if (!open || !desktop) return;
 
     return Events.On(RESUME_FILES_DROPPED_EVENT, (event) => {
       const payload = event.data as string[] | undefined;
@@ -111,32 +158,9 @@ export function ResumeFormModal({
         paths.find((item) => ALLOWED_EXTENSIONS.includes(extensionOf(item))) ??
         paths[0];
       if (!path) return;
-
-      void (async () => {
-        try {
-          const info = (await Call.ByName(PROBE_BINDING, path)) as {
-            fileName: string;
-            fileType: string;
-            fileSize: number;
-          };
-          setDroppedFile({
-            path,
-            fileName: info.fileName,
-            fileType: info.fileType,
-            fileSize: info.fileSize,
-          });
-          setFileList([]);
-          const currentName =
-            (form.getFieldValue("name") as string | undefined) ?? "";
-          if (!nameTouched || !currentName.trim()) {
-            form.setFieldValue("name", baseName(info.fileName));
-          }
-        } catch (error) {
-          message.error(bindingErrorMessage(error));
-        }
-      })();
+      void acceptNativePath(path);
     });
-  }, [form, message, nameTouched, open]);
+  }, [desktop, form, message, nameTouched, open]);
 
   const beforeUpload: UploadProps["beforeUpload"] = (file) => {
     const extension = extensionOf(file.name);
@@ -148,12 +172,9 @@ export function ResumeFormModal({
       message.error(t("resumes.fileTooLarge"));
       return Upload.LIST_IGNORE;
     }
-    // Wails desktop drops can hand the web view an empty File object even
-    // though the real file exists on disk; the native binding above imports it.
+    // Browser mode can receive a genuinely empty file; reject it clearly.
     if (file.size <= 0) {
-      if (!isDesktopRuntime()) {
-        message.error(t("resumes.fileEmpty"));
-      }
+      message.error(t("resumes.fileEmpty"));
       return Upload.LIST_IGNORE;
     }
     return false;
@@ -321,6 +342,23 @@ export function ResumeFormModal({
               >
                 {t("action.remove")}
               </Button>
+            </div>
+          ) : desktop ? (
+            <div
+              className="resume-native-drop"
+              data-file-drop-target="resume-upload"
+              role="button"
+              tabIndex={0}
+              onClick={() => void chooseNativeFile()}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  void chooseNativeFile();
+                }
+              }}
+            >
+              <InboxOutlined className="resume-native-drop-icon" />
+              <p>{t("resumes.fileHint")}</p>
             </div>
           ) : (
             <div data-file-drop-target="resume-upload" className="resume-drop-target">
