@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { App as AntdApp, Button } from "antd";
+import { App as AntdApp, Button, Switch } from "antd";
 import { DesktopOutlined, PlusOutlined } from "@ant-design/icons";
 import { api } from "../../api/client";
 import type { ShortcutStatus } from "../../api/types";
@@ -12,6 +12,7 @@ export function ShortcutSettings() {
   const { message } = AntdApp.useApp();
   const [status, setStatus] = useState<ShortcutStatus | null>(null);
   const [creating, setCreating] = useState(false);
+  const [savingPrompt, setSavingPrompt] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -38,6 +39,21 @@ export function ShortcutSettings() {
       message.error(apiErrorMessage(error, t));
     } finally {
       setCreating(false);
+    }
+  };
+
+  const handlePromptChange = async (enabled: boolean) => {
+    setSavingPrompt(true);
+    try {
+      await api.updateShortcutPromptSetting(enabled);
+      setStatus((current) =>
+        current ? { ...current, promptEnabled: enabled } : current,
+      );
+      message.success(t("settings.shortcutPromptSaved"));
+    } catch (error) {
+      message.error(apiErrorMessage(error, t));
+    } finally {
+      setSavingPrompt(false);
     }
   };
 
@@ -78,6 +94,21 @@ export function ShortcutSettings() {
                 : t("settings.shortcutCreate")}
             </Button>
           </div>
+        </div>
+      )}
+
+      {status?.supported && (
+        <div className="shortcut-prompt-setting">
+          <div className="shortcut-prompt-setting-copy">
+            <strong>{t("settings.shortcutPrompt")}</strong>
+            <span>{t("settings.shortcutPromptHint")}</span>
+          </div>
+          <Switch
+            checked={status.promptEnabled}
+            loading={savingPrompt}
+            disabled={savingPrompt}
+            onChange={(checked) => void handlePromptChange(checked)}
+          />
         </div>
       )}
     </SettingsCard>

@@ -118,7 +118,7 @@ func main() {
 		BackgroundColour: application.NewRGB(15, 23, 42),
 	})
 	shortcutPrompt := &shortcutPromptState{}
-	registerShortcutClosePrompt(app, mainWindow, shortcutPrompt)
+	registerShortcutClosePrompt(app, mainWindow, shortcutPrompt, httpServer.ShortcutPromptEnabled)
 	registerFileDropEvent(appLogger, mainWindow)
 	httpServer.SetShortcutPromptHandler(func(create bool) error {
 		return resolveShortcutPrompt(app, mainWindow, shortcutPrompt, create)
@@ -259,6 +259,7 @@ func registerShortcutClosePrompt(
 	app *application.App,
 	window *application.WebviewWindow,
 	state *shortcutPromptState,
+	promptEnabled func() bool,
 ) {
 	if !desktop.ShortcutSupported() {
 		return
@@ -266,6 +267,9 @@ func registerShortcutClosePrompt(
 
 	window.RegisterHook(events.Common.WindowClosing, func(event *application.WindowEvent) {
 		if state.allowClose.Load() {
+			return
+		}
+		if !promptEnabled() {
 			return
 		}
 		exists, err := desktop.ShortcutExists()
@@ -300,11 +304,11 @@ func openShortcutPromptWindow(app *application.App, state *shortcutPromptState) 
 			Title:            "桌面快捷方式",
 			URL:              "/shortcut-prompt",
 			Width:            440,
-			Height:           220,
+			Height:           300,
 			MinWidth:         440,
-			MinHeight:        220,
+			MinHeight:        300,
 			MaxWidth:         440,
-			MaxHeight:        220,
+			MaxHeight:        300,
 			Frameless:        true,
 			DisableResize:    true,
 			InitialPosition:  application.WindowCentered,

@@ -247,10 +247,17 @@ export const api = {
       timeout: 20_000,
     });
   },
-  resolveShortcutPrompt(create: boolean) {
+  updateShortcutPromptSetting(enabled: boolean) {
+    return request<{ promptEnabled: boolean }>("/system/shortcut/prompt-setting", {
+      method: "PUT",
+      data: { enabled },
+      timeout: 20_000,
+    });
+  },
+  resolveShortcutPrompt(create: boolean, remember = false) {
     return request<{ resolved: boolean }>("/system/shortcut/prompt", {
       method: "POST",
-      data: { create },
+      data: { create, remember },
       timeout: 20_000,
     });
   },

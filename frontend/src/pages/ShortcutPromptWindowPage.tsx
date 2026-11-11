@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { App as AntdApp, Button } from "antd";
+import { App as AntdApp, Button, Checkbox } from "antd";
 import { DesktopOutlined } from "@ant-design/icons";
 import { api } from "../api/client";
 import { useI18n } from "../i18n";
@@ -9,12 +9,13 @@ export function ShortcutPromptWindowPage() {
   const { t } = useI18n();
   const { message } = AntdApp.useApp();
   const [submitting, setSubmitting] = useState<"yes" | "no" | null>(null);
+  const [remember, setRemember] = useState(false);
 
   const resolve = async (create: boolean) => {
     if (submitting) return;
     setSubmitting(create ? "yes" : "no");
     try {
-      await api.resolveShortcutPrompt(create);
+      await api.resolveShortcutPrompt(create, remember);
     } catch (error) {
       message.error(apiErrorMessage(error, t));
       setSubmitting(null);
@@ -48,6 +49,17 @@ export function ShortcutPromptWindowPage() {
           >
             {t("shortcut.promptYes")}
           </Button>
+        </div>
+
+        <div className="shortcut-prompt-remember">
+          <Checkbox
+            checked={remember}
+            disabled={submitting !== null}
+            onChange={(event) => setRemember(event.target.checked)}
+          >
+            {t("shortcut.remember")}
+          </Checkbox>
+          <span>{t("shortcut.rememberHint")}</span>
         </div>
       </div>
     </div>

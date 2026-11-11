@@ -430,6 +430,26 @@ func TestExcelPathImport(t *testing.T) {
 	}
 }
 
+func TestShortcutPromptSetting(t *testing.T) {
+	app := newTestApp(t)
+
+	if !app.server.ShortcutPromptEnabled() {
+		t.Fatal("shortcut prompt should be enabled by default")
+	}
+	if err := app.server.SetShortcutPromptEnabled(false); err != nil {
+		t.Fatalf("disable shortcut prompt: %v", err)
+	}
+	if app.server.ShortcutPromptEnabled() {
+		t.Fatal("shortcut prompt should be disabled")
+	}
+	if err := app.server.SetShortcutPromptEnabled(true); err != nil {
+		t.Fatalf("enable shortcut prompt: %v", err)
+	}
+	if !app.server.ShortcutPromptEnabled() {
+		t.Fatal("shortcut prompt should be enabled again")
+	}
+}
+
 func TestCreateApplicationUsesServerTimeAndPinned(t *testing.T) {
 	app := newTestApp(t)
 	before := time.Now().Add(-2 * time.Second)

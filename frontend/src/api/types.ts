@@ -127,6 +127,7 @@ export interface ShortcutStatus {
   supported: boolean;
   exists: boolean;
   path: string;
+  promptEnabled: boolean;
 }
 
 export interface ImportResult {
