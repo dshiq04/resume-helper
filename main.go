@@ -120,6 +120,7 @@ func openResumePreviewWindow(app *application.App, id uint, title string) {
 
 		if existing, ok := app.Window.Get("resume-preview"); ok {
 			existing.SetTitle(windowTitle)
+			existing.SetAlwaysOnTop(false)
 			existing.SetURL(target)
 			existing.Show()
 			existing.Focus()
@@ -134,6 +135,8 @@ func openResumePreviewWindow(app *application.App, id uint, title string) {
 			Height:           840,
 			MinWidth:         520,
 			MinHeight:        420,
+			Frameless:        true,
+			DisableResize:    false,
 			InitialPosition:  application.WindowCentered,
 			BackgroundColour: application.NewRGB(15, 23, 42),
 		})

@@ -31,6 +31,7 @@ import type { Resume } from "../api/types";
 import { useI18n } from "../i18n";
 import type { WorkspaceOutletContext } from "../layouts/WorkspaceLayout";
 import { apiErrorMessage } from "../utils/errors";
+import { isDesktopRuntime } from "../utils/desktop";
 import { ResumeFormModal } from "../components/resumes/ResumeFormModal";
 
 const FILE_META: Record<
@@ -138,6 +139,15 @@ export function ResumeLibraryPage() {
   };
 
   const handleView = async (resume: Resume) => {
+    const target = `/resume-preview?id=${resume.id}`;
+
+    // Browser/headless mode has no native window host. Navigate in the same
+    // tab so the preview never depends on popup permissions.
+    if (!isDesktopRuntime()) {
+      window.location.assign(target);
+      return;
+    }
+
     setPreviewingId(resume.id);
     try {
       await api.openResumePreview(resume.id);
@@ -146,11 +156,7 @@ export function ResumeLibraryPage() {
         error instanceof ApiError &&
         (error.code === "desktop_only" || error.status === 503)
       ) {
-        window.open(
-          `/resume-preview?id=${resume.id}`,
-          "_blank",
-          "noopener,noreferrer",
-        );
+        window.location.assign(target);
       } else {
         message.error(apiErrorMessage(error, t));
       }
