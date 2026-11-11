@@ -1,6 +1,7 @@
 import {
   AppstoreOutlined,
   CloudOutlined,
+  FileTextOutlined,
   RocketOutlined,
   SettingOutlined,
   SunOutlined,
@@ -44,6 +45,7 @@ export function Sidebar({ stats, passwordEnabled }: SidebarProps) {
   const countFor = (path: string) => {
     if (!stats) return 0;
     if (path === "/") return stats.total;
+    if (path === "/resumes") return stats.resumes ?? 0;
     const key = path.slice(1);
     return stats.byCategory[key as keyof typeof stats.byCategory] ?? 0;
   };
@@ -87,6 +89,25 @@ export function Sidebar({ stats, passwordEnabled }: SidebarProps) {
             </NavLink>
           );
         })}
+      </nav>
+
+      <div className="sidebar-section-label sidebar-library-label">
+        {t("nav.library")}
+      </div>
+      <nav className="sidebar-nav" aria-label={t("nav.resumes")}>
+        <NavLink
+          to="/resumes"
+          className={({ isActive }) =>
+            `sidebar-nav-item ${isActive ? "is-active" : ""}`
+          }
+          title={t("nav.resumes")}
+        >
+          <span className="sidebar-nav-icon" style={{ color: "#f472b6" }}>
+            <FileTextOutlined />
+          </span>
+          <span className="sidebar-nav-label">{t("nav.resumes")}</span>
+          <span className="sidebar-nav-count">{countFor("/resumes")}</span>
+        </NavLink>
       </nav>
 
       <div className="sidebar-spacer" />

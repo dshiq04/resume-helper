@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from "react";
 import { App as AntdApp, Button, ConfigProvider, Spin, Watermark } from "antd";
 import { CloudServerOutlined, ReloadOutlined } from "@ant-design/icons";
 import { Navigate, Route, Routes } from "react-router-dom";
@@ -13,9 +13,16 @@ import { I18nProvider, useI18n } from "./i18n";
 import { WorkspaceLayout } from "./layouts/WorkspaceLayout";
 import { Dashboard } from "./pages/Dashboard";
 import { QuickEntryWindowPage } from "./pages/QuickEntryWindowPage";
+import { ResumeLibraryPage } from "./pages/ResumeLibraryPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { ShortcutPromptWindowPage } from "./pages/ShortcutPromptWindowPage";
 import { createTheme, type ThemeMode } from "./theme";
+
+const ResumePreviewWindowPage = lazy(() =>
+  import("./pages/ResumePreviewWindowPage").then((module) => ({
+    default: module.ResumePreviewWindowPage,
+  })),
+);
 
 const THEME_KEY = "resumetrail.theme";
 
@@ -128,6 +135,26 @@ function AppRoot() {
     );
   }
 
+  if (window.location.pathname === "/resume-preview") {
+    return (
+      <ConfigProvider locale={antdLocale} theme={themeConfig}>
+        <AntdApp>
+          <Suspense
+            fallback={
+              <div className="resume-preview-shell">
+                <div className="resume-preview-loading">
+                  <Spin size="large" />
+                </div>
+              </div>
+            }
+          >
+            <ResumePreviewWindowPage />
+          </Suspense>
+        </AntdApp>
+      </ConfigProvider>
+    );
+  }
+
   return (
     <ConfigProvider locale={antdLocale} theme={themeConfig}>
       <AntdApp>
@@ -209,6 +236,7 @@ function AppRoot() {
                   path="internship"
                   element={<Dashboard category="internship" />}
                 />
+                <Route path="resumes" element={<ResumeLibraryPage />} />
                 <Route path="settings" element={<SettingsPage />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Route>

@@ -35,3 +35,23 @@ CREATE TABLE IF NOT EXISTS settings (
   updated_at TIMESTAMPTZ NULL,
   PRIMARY KEY (key)
 );
+
+CREATE TABLE IF NOT EXISTS resumes (
+  id BIGSERIAL PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  tags TEXT NULL,
+  file_name VARCHAR(255) NOT NULL,
+  stored_name VARCHAR(255) NOT NULL,
+  file_type VARCHAR(16) NOT NULL,
+  file_size BIGINT NOT NULL DEFAULT 0,
+  pinned BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMPTZ NULL,
+  updated_at TIMESTAMPTZ NULL
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_resumes_stored_name
+  ON resumes (stored_name);
+CREATE INDEX IF NOT EXISTS idx_resumes_name
+  ON resumes (name);
+CREATE INDEX IF NOT EXISTS idx_resumes_pinned
+  ON resumes (pinned);

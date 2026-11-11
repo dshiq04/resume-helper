@@ -397,8 +397,15 @@ func (s *Server) stats(c *gin.Context) {
 		}
 	}
 
+	var resumeCount int64
+	if err := s.database().Model(&models.Resume{}).Count(&resumeCount).Error; err != nil {
+		apiError(c, http.StatusInternalServerError, "query_failed", "Failed to load statistics.")
+		return
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"total":            total,
+		"resumes":          resumeCount,
 		"byCategory":       byCategory,
 		"byStatus":         byStatus,
 		"byCategoryStatus": byCategoryStatus,

@@ -7,6 +7,10 @@
 ## 功能
 
 - **置顶**：重要的投递可固定在列表最上方，始终优先展示。
+- **卡片式简历库**：侧边栏独立入口，可保存多份简历；支持 DOCX、PDF、PPTX、PNG、Markdown，单文件最大 50 MB。
+- **简历元数据与置顶**：每份简历可填写名称、标签并置顶；拖入文件时自动用文件名补全简历名称，卡片按置顶和上传时间排序。
+- **独立简历预览窗口**：点击「查看」会打开新的 Wails 窗口，使用 `@eternalheart/react-file-preview` 渲染 PDF、Word、PowerPoint、图片与 Markdown，并内置本地 PDF.js 资源，离线可用。
+- **便携式简历文件**：上传的原始文件保存在程序目录下的 `resume/` 文件夹，名称、标签、文件信息与置顶状态写入数据库。
 - **三类投递看板**：春招、秋招、实习，侧边栏可快速切换并显示数量；分类使用 React Router 路由页面（`/spring`、`/autumn`、`/internship`）。
 - **完整投递字段**：企业名称、投递链接、状态、投递时间；状态默认「初筛」，投递时间由后端服务器在落库时生成。
 - **内联编辑**：点击企业名称或链接即可直接修改；状态下拉框即时更新。
@@ -50,6 +54,7 @@
 | 请求层 | Axios |
 | 前端路由 | React Router |
 | UI | Ant Design 5、Ant Design Icons |
+| 简历预览 | @eternalheart/react-file-preview |
 | 多语言 | 自研 i18n Context + Ant Design locale |
 
 ## 前端页面与路由
@@ -60,6 +65,8 @@
 | `/spring` | 春招投递 |
 | `/autumn` | 秋招投递 |
 | `/internship` | 实习投递 |
+| `/resumes` | 简历库 |
+| `/resume-preview` | 独立简历预览窗口（由应用自动打开） |
 | `/settings` | 设置页 |
 
 所有 API 请求统一通过 `src/api/client.ts` 中的 Axios 实例发送，自动附加 Bearer Token，并统一处理 401 会话过期。
@@ -129,7 +136,8 @@ ResumeTrail 默认**只使用程序自身目录**，不会在 C 盘的用户目�
 ResumeTrail/
 ├── resume-helper.exe
 ├── config.yaml          # 首次启动自动生成
-└── resume-helper.db     # 默认 SQLite 数据库
+├── resume-helper.db     # 默认 SQLite 数据库
+└── resume/              # 简历库上传的原始文件
 ```
 
 - 发布版：以可执行文件所在目录为数据目录。
@@ -189,8 +197,8 @@ psql -d resume_helper -f init.postgresql.sql
 
 项目根目录提供：
 
-- `init.mysql.sql`（项目根目录）：创建 `resume_helper` 数据库、`applications` 与 `settings` 表及索引。
-- `init.postgresql.sql`（项目根目录）：创建 `applications` 与 `settings` 表及索引（在目标数据库中执行）。
+- `init.mysql.sql`（项目根目录）：创建 `resume_helper` 数据库、`applications`、`resumes` 与 `settings` 表及索引。
+- `init.postgresql.sql`（项目根目录）：创建 `applications`、`resumes` 与 `settings` 表及索引（在目标数据库中执行）。
 
 > 应用启动时仍会自动执行 GORM `AutoMigrate`。初始化 SQL 主要用于手动建库、DBA 审核或查看实体结构。
 
@@ -257,7 +265,13 @@ psql -d resume_helper -f init.postgresql.sql
 | `PATCH` | `/api/applications/batch-status` | 批量修改状态 |
 | `POST` | `/api/applications/import` | 上传 Excel 导入 |
 | `GET` | `/api/applications/template` | 下载导入模板 |
-| `GET` | `/api/stats` | 分类 / 状态统计 |
+| `GET` | `/api/resumes` | 简历列表，置顶优先，支持 `search` |
+| `POST` | `/api/resumes` | 上传简历（multipart：`name`、`tags`、`file`） |
+| `GET` | `/api/resume/:id` | 单份简历元数据 |
+| `PUT` | `/api/resume/:id` | 更新名称 / 标签 / 置顶 |
+| `DELETE` | `/api/resume/:id` | 删除简历记录与文件 |
+| `GET` | `/api/resume/:id/file` | 读取原始文件（`download=1` 强制下载） |
+| `GET` | `/api/stats` | 分类 / 状态 / 简历数量统计 |
 | `GET` | `/api/system/info` | 数据库、配置文件、版本信息 |
 | `GET` | `/api/system/database` | 当前数据库的图形化配置字段 |
 | `POST` | `/api/system/database/test` | 测试数据库连接（不保存） |
@@ -266,6 +280,7 @@ psql -d resume_helper -f init.postgresql.sql
 | `POST` | `/api/system/shortcut` | 创建桌面快捷方式 |
 | `POST` | `/api/system/shortcut/prompt` | 处理关闭时的快捷方式提示窗口选择 |
 | `POST` | `/api/system/quick-entry` | 打开独立的快速录入窗口 |
+| `POST` | `/api/system/resume-preview` | 打开独立的简历预览窗口 |
 
 开启密码后，除健康检查、认证接口和静态资源外，其余 `/api` 请求需要携带：
 
@@ -306,7 +321,7 @@ Vite 默认运行在 `http://127.0.0.1:9245`，可通过 `RESUME_HELPER_API` 环
 go test ./...
 ```
 
-覆盖投递 CRUD、搜索、统计、批量操作、置顶、可选密码、Excel 模板与导入，以及便携式配置目录行为。
+覆盖投递 CRUD、搜索、统计、批量操作、置顶、可选密码、Excel 模板与导入、简历上传/预览/删除，以及便携式配置目录行为。
 
 ## 项目结构
 
@@ -320,19 +335,22 @@ go test ./...
 │   ├── config/                          # 便携式配置加载与环境变量
 │   ├── database/                        # 多数据库连接、DSN 解析/构建、测试连接、迁移
 │   ├── desktop/                         # Windows 桌面快捷方式检测与创建
-│   ├── models/                          # GORM 实体（Application、Setting）
-│   └── server/                          # Gin 路由、CRUD、认证、Excel、数据库设置
+│   ├── models/                          # GORM 实体（Application、Resume、Setting）
+│   └── server/                          # Gin 路由、CRUD、认证、Excel、简历、数据库设置
 ├── frontend/
 │   ├── src/
 │   │   ├── api/                         # Axios 客户端与类型
 │   │   ├── components/
 │   │   │   ├── applications/            # 表格、卡片、草稿新增行、单元格、状态与操作
 │   │   │   ├── dashboard/               # 页头、工具栏、批量操作栏
+│   │   │   ├── resumes/                 # 简历上传弹窗
 │   │   │   └── settings/                # 外观、安全、图形化数据库、关于
 │   │   ├── hooks/                       # useApplications、useApplicationDraft、useInlineEdit、useMediaQuery
 │   │   ├── layouts/WorkspaceLayout.tsx  # 路由嵌套布局与上下文
 │   │   ├── pages/
 │   │   │   ├── Dashboard.tsx            # 投递工作台
+│   │   │   ├── ResumeLibraryPage.tsx    # 简历库
+│   │   │   ├── ResumePreviewWindowPage.tsx # 独立简历预览窗口
 │   │   │   └── SettingsPage.tsx         # 设置页
 │   │   ├── i18n/                        # 五种语言
 │   │   └── styles/global.css            # 全局与三端响应式样式
@@ -346,6 +364,7 @@ go test ./...
 - 所有数据保存在本地数据库，不包含任何遥测或上传逻辑。
 - 密码只以 bcrypt 哈希存储。
 - 导入的 Excel 文件只在内存中解析，不保留临时副本。
+- 简历原始文件保存在程序目录的 `resume/` 文件夹；删除简历时会同时删除对应文件。
 - MySQL / PostgreSQL 的 DSN 会出现在用户自己的配置文件中，请妥善保管该文件。
 
 ## 已知说明

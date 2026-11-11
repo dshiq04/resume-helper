@@ -13,6 +13,10 @@ import type {
   DatabaseUpdateResult,
   ImportResult,
   ListParams,
+  Resume,
+  ResumeCreateInput,
+  ResumeList,
+  ResumeUpdate,
   ShortcutStatus,
   Stats,
   SystemInfo,
@@ -254,6 +258,49 @@ export const api = {
     return request<{ opened: boolean }>("/system/quick-entry", {
       method: "POST",
       data: { category },
+      timeout: 10_000,
+    });
+  },
+  listResumes(search?: string) {
+    return request<ResumeList>("/resumes", {
+      params: search ? { search } : undefined,
+    });
+  },
+  getResume(id: number) {
+    return request<Resume>(`/resume/${id}`);
+  },
+  createResume(input: ResumeCreateInput) {
+    const data = new FormData();
+    data.append("name", input.name);
+    data.append("tags", JSON.stringify(input.tags));
+    data.append("file", input.file);
+    return request<Resume>("/resumes", {
+      method: "POST",
+      data,
+      timeout: 120_000,
+    });
+  },
+  updateResume(id: number, input: ResumeUpdate) {
+    return request<Resume>(`/resume/${id}`, {
+      method: "PUT",
+      data: input,
+    });
+  },
+  deleteResume(id: number) {
+    return request<{ deleted: number }>(`/resume/${id}`, {
+      method: "DELETE",
+    });
+  },
+  async fetchResumeFile(id: number) {
+    return request<Blob>(`/resume/${id}/file`, {
+      responseType: "blob",
+      timeout: 120_000,
+    });
+  },
+  openResumePreview(id: number) {
+    return request<{ opened: boolean }>("/system/resume-preview", {
+      method: "POST",
+      data: { id },
       timeout: 10_000,
     });
   },

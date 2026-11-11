@@ -39,6 +39,9 @@ type Server struct {
 
 	shortcutPromptMu      sync.RWMutex
 	shortcutPromptHandler func(create bool) error
+
+	resumePreviewMu     sync.RWMutex
+	resumePreviewOpener func(id uint, title string)
 }
 
 func New(cfg *config.Config, db *gorm.DB, assets fs.FS) *Server {
@@ -83,6 +86,14 @@ func (s *Server) SetShortcutPromptHandler(handler func(create bool) error) {
 	s.shortcutPromptHandler = handler
 }
 
+// SetResumePreviewOpener wires the resume preview window opener into the HTTP
+// layer. Headless/browser mode leaves it nil.
+func (s *Server) SetResumePreviewOpener(opener func(id uint, title string)) {
+	s.resumePreviewMu.Lock()
+	defer s.resumePreviewMu.Unlock()
+	s.resumePreviewOpener = opener
+}
+
 func (s *Server) newEngine() *gin.Engine {
 	r := gin.New()
 	r.Use(gin.Logger(), gin.Recovery(), corsMiddleware(), securityHeaders())
@@ -110,6 +121,12 @@ func (s *Server) newEngine() *gin.Engine {
 		protected.DELETE("/application/:id", s.deleteApplication)
 		protected.POST("/applications/import", s.importApplications)
 		protected.GET("/applications/template", s.downloadTemplate)
+		protected.GET("/resumes", s.listResumes)
+		protected.POST("/resumes", s.createResume)
+		protected.GET("/resume/:id", s.getResume)
+		protected.PUT("/resume/:id", s.updateResume)
+		protected.DELETE("/resume/:id", s.deleteResume)
+		protected.GET("/resume/:id/file", s.serveResumeFile)
 		protected.GET("/stats", s.stats)
 		protected.GET("/system/info", s.systemInfo)
 		protected.GET("/system/database", s.getDatabaseSettings)
@@ -119,6 +136,7 @@ func (s *Server) newEngine() *gin.Engine {
 		protected.POST("/system/shortcut", s.createDesktopShortcut)
 		protected.POST("/system/shortcut/prompt", s.resolveShortcutPrompt)
 		protected.POST("/system/quick-entry", s.openQuickEntry)
+		protected.POST("/system/resume-preview", s.openResumePreview)
 	}
 
 	s.registerStaticRoutes(r)

@@ -501,7 +501,142 @@ type ApplicationList struct {
 
 type Stats struct {
 	Total      int64                       `json:"total"`
+	Resumes    int64                       `json:"resumes"`
 	ByCategory map[string]int64            `json:"byCategory"`
 	ByStatus   map[string]int64            `json:"byStatus"`
 	Matrix     map[string]map[string]int64 `json:"byCategoryStatus"`
+}
+
+func TestResumeLifecycle(t *testing.T) {
+	app := newTestApp(t)
+
+	resp, body := app.uploadResume(t, "Backend Resume", `["backend","go"]`, "Backend Resume.PDF", []byte("%PDF-1.4 test"))
+	if resp.StatusCode != http.StatusCreated {
+		t.Fatalf("create resume status = %d, body = %s", resp.StatusCode, body)
+	}
+	created := decodeJSON[models.Resume](t, body)
+	if created.ID == 0 || created.Name != "Backend Resume" || created.FileType != "pdf" {
+		t.Fatalf("unexpected created resume: %+v", created)
+	}
+	if len(created.Tags) != 2 || created.Tags[0] != "backend" || created.Tags[1] != "go" {
+		t.Fatalf("unexpected resume tags: %+v", created.Tags)
+	}
+	var stored models.Resume
+	if err := app.server.database().First(&stored, created.ID).Error; err != nil {
+		t.Fatalf("load stored resume: %v", err)
+	}
+	if stored.StoredName == "" {
+		t.Fatalf("stored name should not be empty")
+	}
+	storedPath := filepath.Join(app.server.resumeDirectory(), stored.StoredName)
+	if _, err := os.Stat(storedPath); err != nil {
+		t.Fatalf("resume file was not stored: %v", err)
+	}
+
+	resp, body = app.request(t, http.MethodGet, fmt.Sprintf("/api/resume/%d/file", created.ID), nil, "")
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("file status = %d, body = %s", resp.StatusCode, body)
+	}
+	if string(body) != "%PDF-1.4 test" {
+		t.Fatalf("file content = %q", string(body))
+	}
+	if contentType := resp.Header.Get("Content-Type"); !strings.HasPrefix(contentType, "application/pdf") {
+		t.Fatalf("content type = %q", contentType)
+	}
+
+	resp, body = app.request(t, http.MethodPut, fmt.Sprintf("/api/resume/%d", created.ID), map[string]any{
+		"pinned": true,
+	}, "")
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("pin status = %d, body = %s", resp.StatusCode, body)
+	}
+	pinned := decodeJSON[models.Resume](t, body)
+	if !pinned.Pinned {
+		t.Fatalf("resume should be pinned")
+	}
+
+	resp, body = app.request(t, http.MethodPut, fmt.Sprintf("/api/resume/%d", created.ID), map[string]any{
+		"tags": []string{"senior", "remote"},
+	}, "")
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("update tags status = %d, body = %s", resp.StatusCode, body)
+	}
+	retagged := decodeJSON[models.Resume](t, body)
+	if len(retagged.Tags) != 2 || retagged.Tags[0] != "senior" || retagged.Tags[1] != "remote" {
+		t.Fatalf("unexpected updated tags: %+v", retagged.Tags)
+	}
+
+	resp, body = app.request(t, http.MethodGet, "/api/resumes", nil, "")
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("list status = %d, body = %s", resp.StatusCode, body)
+	}
+	list := decodeJSON[ResumeList](t, body)
+	if list.Total != 1 || len(list.Items) != 1 || list.Items[0].ID != created.ID {
+		t.Fatalf("unexpected resume list: %+v", list)
+	}
+
+	resp, body = app.request(t, http.MethodGet, "/api/stats", nil, "")
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("stats status = %d, body = %s", resp.StatusCode, body)
+	}
+	stats := decodeJSON[Stats](t, body)
+	if stats.Resumes != 1 {
+		t.Fatalf("resume count = %d, want 1", stats.Resumes)
+	}
+
+	resp, body = app.uploadResume(t, "", "", "notes.txt", []byte("not allowed"))
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("unsupported type status = %d, body = %s", resp.StatusCode, body)
+	}
+
+	resp, body = app.request(t, http.MethodDelete, fmt.Sprintf("/api/resume/%d", created.ID), nil, "")
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("delete status = %d, body = %s", resp.StatusCode, body)
+	}
+	if _, err := os.Stat(storedPath); !os.IsNotExist(err) {
+		t.Fatalf("resume file should be removed, err = %v", err)
+	}
+}
+
+func (a *testApp) uploadResume(t *testing.T, name, tags, fileName string, content []byte) (*http.Response, []byte) {
+	t.Helper()
+	payload := new(bytes.Buffer)
+	writer := multipart.NewWriter(payload)
+	if name != "" {
+		_ = writer.WriteField("name", name)
+	}
+	if tags != "" {
+		_ = writer.WriteField("tags", tags)
+	}
+	part, err := writer.CreateFormFile("file", fileName)
+	if err != nil {
+		t.Fatalf("create multipart file: %v", err)
+	}
+	if _, err := part.Write(content); err != nil {
+		t.Fatalf("write multipart file: %v", err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatalf("close multipart writer: %v", err)
+	}
+
+	req, err := http.NewRequest(http.MethodPost, a.http.URL+"/api/resumes", payload)
+	if err != nil {
+		t.Fatalf("create resume request: %v", err)
+	}
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("perform resume request: %v", err)
+	}
+	defer resp.Body.Close()
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("read resume response: %v", err)
+	}
+	return resp, data
+}
+
+type ResumeList struct {
+	Items []models.Resume `json:"items"`
+	Total int64           `json:"total"`
 }

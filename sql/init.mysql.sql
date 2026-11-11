@@ -39,3 +39,22 @@ CREATE TABLE IF NOT EXISTS settings (
 ) ENGINE=InnoDB
   DEFAULT CHARSET=utf8mb4
   COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS resumes (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  name VARCHAR(255) NOT NULL,
+  tags TEXT NULL,
+  file_name VARCHAR(255) NOT NULL,
+  stored_name VARCHAR(255) NOT NULL,
+  file_type VARCHAR(16) NOT NULL,
+  file_size BIGINT NOT NULL DEFAULT 0,
+  pinned BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at DATETIME(3) NULL,
+  updated_at DATETIME(3) NULL,
+  PRIMARY KEY (id),
+  UNIQUE KEY idx_resumes_stored_name (stored_name),
+  KEY idx_resumes_name (name),
+  KEY idx_resumes_pinned (pinned)
+) ENGINE=InnoDB
+  DEFAULT CHARSET=utf8mb4
+  COLLATE=utf8mb4_unicode_ci;

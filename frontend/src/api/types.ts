@@ -59,6 +59,7 @@ export interface ApplicationUpdate {
 
 export interface Stats {
   total: number;
+  resumes: number;
   byCategory: Record<Category, number>;
   byStatus: Record<Status, number>;
   byCategoryStatus: Record<Category, Record<Status, number>>;
@@ -141,4 +142,41 @@ export interface ListParams {
   status?: Status | "all";
   page?: number;
   pageSize?: number;
+}
+
+export type ResumeFileType =
+  | "docx"
+  | "pdf"
+  | "pptx"
+  | "png"
+  | "md"
+  | "markdown";
+
+export interface Resume {
+  id: number;
+  name: string;
+  tags: string[];
+  fileName: string;
+  fileType: ResumeFileType;
+  fileSize: number;
+  pinned: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ResumeList {
+  items: Resume[];
+  total: number;
+}
+
+export interface ResumeUpdate {
+  name?: string;
+  tags?: string[];
+  pinned?: boolean;
+}
+
+export interface ResumeCreateInput {
+  name: string;
+  tags: string[];
+  file: File;
 }

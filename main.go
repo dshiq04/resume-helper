@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"syscall"
@@ -100,10 +101,45 @@ func main() {
 	httpServer.SetQuickEntryOpener(func(category string) {
 		openQuickEntryWindow(app, category)
 	})
+	httpServer.SetResumePreviewOpener(func(id uint, title string) {
+		openResumePreviewWindow(app, id, title)
+	})
 
 	if err := app.Run(); err != nil {
 		log.Fatal(err)
 	}
+}
+
+func openResumePreviewWindow(app *application.App, id uint, title string) {
+	application.InvokeAsync(func() {
+		target := "/resume-preview?id=" + strconv.FormatUint(uint64(id), 10)
+		windowTitle := "简历预览"
+		if trimmed := strings.TrimSpace(title); trimmed != "" {
+			windowTitle += " · " + trimmed
+		}
+
+		if existing, ok := app.Window.Get("resume-preview"); ok {
+			existing.SetTitle(windowTitle)
+			existing.SetURL(target)
+			existing.Show()
+			existing.Focus()
+			return
+		}
+
+		window := app.Window.NewWithOptions(application.WebviewWindowOptions{
+			Name:             "resume-preview",
+			Title:            windowTitle,
+			URL:              target,
+			Width:            1120,
+			Height:           840,
+			MinWidth:         520,
+			MinHeight:        420,
+			InitialPosition:  application.WindowCentered,
+			BackgroundColour: application.NewRGB(15, 23, 42),
+		})
+		window.Show()
+		window.Focus()
+	})
 }
 
 func openQuickEntryWindow(app *application.App, category string) {
