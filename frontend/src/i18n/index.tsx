@@ -1407,12 +1407,19 @@ export const localeOptions: Array<{
   { value: "ko", label: "한국어", short: "한" },
 ];
 
+function resolveAntdLocale<T extends object>(locale: T): T {
+  // Vite/Rolldown can hand back the CommonJS module wrapper instead of its
+  // default export. Unwrap it so ConfigProvider always receives locale data.
+  const module = locale as T & { default?: T };
+  return (module.default ?? locale) as T;
+}
+
 const antdLocales = {
-  "zh-CN": zhCN,
-  "zh-TW": zhTW,
-  en: enUS,
-  ja: jaJP,
-  ko: koKR,
+  "zh-CN": resolveAntdLocale(zhCN),
+  "zh-TW": resolveAntdLocale(zhTW),
+  en: resolveAntdLocale(enUS),
+  ja: resolveAntdLocale(jaJP),
+  ko: resolveAntdLocale(koKR),
 } as const;
 
 const LOCALE_KEY = "resumetrail.locale";
