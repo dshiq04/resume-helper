@@ -1,5 +1,5 @@
 :root {
-  --titlebar-height: 24px;
+  --titlebar-height: 29px;
   --sidebar-width: 252px;
   --bg: #f4f5fb;
   --bg-soft: #eef0f8;
@@ -57,6 +57,18 @@ body,
 #root {
   height: 100%;
   margin: 0;
+  overflow: hidden;
+}
+
+html,
+body {
+  scrollbar-width: none;
+}
+
+html::-webkit-scrollbar,
+body::-webkit-scrollbar {
+  width: 0;
+  height: 0;
 }
 
 body {
@@ -1784,6 +1796,14 @@ textarea {
   font-size: 12px;
 }
 
+.quick-window-actions {
+  --wails-draggable: no-drag;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.quick-window-pin,
 .quick-window-close {
   --wails-draggable: no-drag;
   display: inline-flex;
@@ -1801,6 +1821,16 @@ textarea {
   transition: color 0.16s ease, background 0.16s ease;
 }
 
+.quick-window-pin:hover {
+  color: #f8fafc;
+  background: rgba(148, 163, 184, 0.14);
+}
+
+.quick-window-pin.is-on {
+  color: #a5b4fc;
+  background: rgba(99, 102, 241, 0.16);
+}
+
 .quick-window-close:hover {
   color: #fff;
   background: #e81123;
@@ -1813,6 +1843,7 @@ textarea {
   gap: 6px;
   min-height: 0;
   padding: 9px 12px 11px;
+  overflow: hidden;
 }
 
 .quick-window-body .ant-segmented {

@@ -126,6 +126,7 @@ func openQuickEntryWindow(app *application.App, category string) {
 			MaxHeight:        230,
 			Frameless:        true,
 			DisableResize:    true,
+			AlwaysOnTop:      true,
 			InitialPosition:  application.WindowCentered,
 			BackgroundColour: application.NewRGB(15, 23, 42),
 		})

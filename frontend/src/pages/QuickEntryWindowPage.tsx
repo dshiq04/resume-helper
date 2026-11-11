@@ -11,7 +11,7 @@ import {
   PushpinOutlined,
   ThunderboltOutlined,
 } from "@ant-design/icons";
-import { Events } from "@wailsio/runtime";
+import { Events, Window } from "@wailsio/runtime";
 import { api } from "../api/client";
 import type { Category } from "../api/types";
 import { useI18n } from "../i18n";
@@ -27,20 +27,38 @@ export function QuickEntryWindowPage() {
   const { t } = useI18n();
   const { message } = AntdApp.useApp();
   const companyRef = useRef<InputRef>(null);
+  const savingRef = useRef(false);
   const [category] = useState<Category>(readCategory);
   const [companyName, setCompanyName] = useState("");
   const [link, setLink] = useState("");
   const [pinned, setPinned] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [windowPinned, setWindowPinned] = useState(true);
 
   useEffect(() => {
     companyRef.current?.focus();
+    if (isDesktopRuntime()) {
+      void Window.SetAlwaysOnTop(true).catch(() => {
+        // Ignore: window pinning is a desktop-only convenience.
+      });
+    }
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") void closeWindow();
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
+
+  const toggleWindowPin = async () => {
+    const next = !windowPinned;
+    setWindowPinned(next);
+    if (!isDesktopRuntime()) return;
+    try {
+      await Window.SetAlwaysOnTop(next);
+    } catch {
+      setWindowPinned(!next);
+    }
+  };
 
   const clear = () => {
     setCompanyName("");
@@ -65,7 +83,10 @@ export function QuickEntryWindowPage() {
       companyRef.current?.focus();
       return;
     }
-    if (saving) return;
+    // Guard against synchronous double clicks / repeated Enter presses before
+    // React has a chance to re-render the loading state.
+    if (savingRef.current) return;
+    savingRef.current = true;
 
     setSaving(true);
     try {
@@ -85,6 +106,7 @@ export function QuickEntryWindowPage() {
     } catch (error) {
       message.error(apiErrorMessage(error, t));
     } finally {
+      savingRef.current = false;
       setSaving(false);
     }
   };
@@ -96,15 +118,28 @@ export function QuickEntryWindowPage() {
           <ThunderboltOutlined />
           {t("quick.title")}
         </span>
-        <button
-          className="quick-window-close"
-          type="button"
-          aria-label={t("window.close")}
-          title={t("window.close")}
-          onClick={() => void closeWindow()}
-        >
-          <CloseOutlined />
-        </button>
+        <div className="quick-window-actions">
+          <button
+            className={`quick-window-pin ${windowPinned ? "is-on" : ""}`}
+            type="button"
+            aria-label={
+              windowPinned ? t("quick.windowUnpin") : t("quick.windowPin")
+            }
+            title={windowPinned ? t("quick.windowUnpin") : t("quick.windowPin")}
+            onClick={() => void toggleWindowPin()}
+          >
+            {windowPinned ? <PushpinFilled /> : <PushpinOutlined />}
+          </button>
+          <button
+            className="quick-window-close"
+            type="button"
+            aria-label={t("window.close")}
+            title={t("window.close")}
+            onClick={() => void closeWindow()}
+          >
+            <CloseOutlined />
+          </button>
+        </div>
       </header>
 
       <div className="quick-window-body">
