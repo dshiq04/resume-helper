@@ -3,7 +3,7 @@ import { theme as antdTheme, type ThemeConfig } from "antd";
 export type ThemeMode = "light" | "dark";
 
 const FONT_STACK =
-  '-apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", "Noto Sans JP", "Noto Sans KR", sans-serif';
+  '"HarmonyOS Sans", "HarmonyOS Sans SC", -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", "Noto Sans JP", "Noto Sans KR", sans-serif';
 
 export function createTheme(mode: ThemeMode): ThemeConfig {
   const dark = mode === "dark";
