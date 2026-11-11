@@ -78,6 +78,10 @@ export function ResumeFormModal({
       message.error(t("resumes.fileTooLarge"));
       return Upload.LIST_IGNORE;
     }
+    if (file.size <= 0) {
+      message.error(t("resumes.fileEmpty"));
+      return Upload.LIST_IGNORE;
+    }
     return false;
   };
 
@@ -96,6 +100,10 @@ export function ResumeFormModal({
     const raw = fileList[0]?.originFileObj as File | undefined;
     if (!raw) {
       message.warning(t("resumes.fileRequired"));
+      return;
+    }
+    if (raw.size <= 0) {
+      message.error(t("resumes.fileEmpty"));
       return;
     }
 

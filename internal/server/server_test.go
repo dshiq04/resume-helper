@@ -584,6 +584,11 @@ func TestResumeLifecycle(t *testing.T) {
 		t.Fatalf("resume count = %d, want 1", stats.Resumes)
 	}
 
+	resp, body = app.uploadResume(t, "", "", "empty.pdf", nil)
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("empty file status = %d, body = %s", resp.StatusCode, body)
+	}
+
 	resp, body = app.uploadResume(t, "", "", "notes.txt", []byte("not allowed"))
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("unsupported type status = %d, body = %s", resp.StatusCode, body)

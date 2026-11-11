@@ -91,6 +91,7 @@ func main() {
 		MinHeight:        480,
 		Frameless:        true,
 		DisableResize:    false,
+		EnableFileDrop:   true,
 		BackgroundColour: application.NewRGB(15, 23, 42),
 	})
 	shortcutPrompt := &shortcutPromptState{}

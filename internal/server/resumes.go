@@ -113,6 +113,10 @@ func (s *Server) createResume(c *gin.Context) {
 		apiError(c, http.StatusBadRequest, "file_too_large", "The file is larger than 50 MB.")
 		return
 	}
+	if header.Size <= 0 {
+		apiError(c, http.StatusBadRequest, "file_empty", "The selected file is empty.")
+		return
+	}
 
 	fileName := sanitizeUploadFileName(header.Filename)
 	extension := strings.ToLower(strings.TrimPrefix(filepath.Ext(fileName), "."))
