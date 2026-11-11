@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import {
   App as AntdApp,
+  Button,
   Form,
   Input,
   Modal,
@@ -9,11 +10,17 @@ import {
   type UploadFile,
   type UploadProps,
 } from "antd";
-import { InboxOutlined } from "@ant-design/icons";
+import {
+  DeleteOutlined,
+  FileTextOutlined,
+  InboxOutlined,
+} from "@ant-design/icons";
+import { Call, Events } from "@wailsio/runtime";
 import { api } from "../../api/client";
 import type { Resume } from "../../api/types";
 import { useI18n } from "../../i18n";
 import { apiErrorMessage } from "../../utils/errors";
+import { isDesktopRuntime } from "../../utils/desktop";
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024;
 const ALLOWED_EXTENSIONS = [
@@ -24,10 +31,20 @@ const ALLOWED_EXTENSIONS = [
   "md",
   "markdown",
 ];
+const RESUME_FILES_DROPPED_EVENT = "resumetrail:resume-files-dropped";
+const IMPORT_BINDING = "main.DropImporter.ImportResume";
+const PROBE_BINDING = "main.DropImporter.ProbeResumeFile";
 
 interface ResumeFormValues {
   name: string;
   tags?: string[];
+}
+
+interface DroppedResumeFile {
+  path: string;
+  fileName: string;
+  fileType: string;
+  fileSize: number;
 }
 
 interface ResumeFormModalProps {
@@ -47,6 +64,18 @@ function baseName(fileName: string): string {
   return (index > 0 ? fileName.slice(0, index) : fileName).trim();
 }
 
+function formatFileSize(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes <= 0) return "0 KB";
+  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function bindingErrorMessage(error: unknown): string {
+  if (error instanceof Error && error.message) return error.message;
+  if (typeof error === "string" && error) return error;
+  return "未知错误";
+}
+
 export function ResumeFormModal({
   open,
   onClose,
@@ -56,6 +85,7 @@ export function ResumeFormModal({
   const { message } = AntdApp.useApp();
   const [form] = Form.useForm<ResumeFormValues>();
   const [fileList, setFileList] = useState<UploadFile[]>([]);
+  const [droppedFile, setDroppedFile] = useState<DroppedResumeFile | null>(null);
   const [nameTouched, setNameTouched] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -64,9 +94,49 @@ export function ResumeFormModal({
     form.resetFields();
     form.setFieldsValue({ tags: [] });
     setFileList([]);
+    setDroppedFile(null);
     setNameTouched(false);
     setSaving(false);
   }, [form, open]);
+
+  // Wails delivers operating-system file drops as full paths, so the file is
+  // imported through a Go binding instead of an HTML file input.
+  useEffect(() => {
+    if (!open || !isDesktopRuntime()) return;
+
+    return Events.On(RESUME_FILES_DROPPED_EVENT, (event) => {
+      const payload = event.data as string[] | undefined;
+      const paths = Array.isArray(payload) ? payload : [];
+      const path =
+        paths.find((item) => ALLOWED_EXTENSIONS.includes(extensionOf(item))) ??
+        paths[0];
+      if (!path) return;
+
+      void (async () => {
+        try {
+          const info = (await Call.ByName(PROBE_BINDING, path)) as {
+            fileName: string;
+            fileType: string;
+            fileSize: number;
+          };
+          setDroppedFile({
+            path,
+            fileName: info.fileName,
+            fileType: info.fileType,
+            fileSize: info.fileSize,
+          });
+          setFileList([]);
+          const currentName =
+            (form.getFieldValue("name") as string | undefined) ?? "";
+          if (!nameTouched || !currentName.trim()) {
+            form.setFieldValue("name", baseName(info.fileName));
+          }
+        } catch (error) {
+          message.error(bindingErrorMessage(error));
+        }
+      })();
+    });
+  }, [form, message, nameTouched, open]);
 
   const beforeUpload: UploadProps["beforeUpload"] = (file) => {
     const extension = extensionOf(file.name);
@@ -78,8 +148,12 @@ export function ResumeFormModal({
       message.error(t("resumes.fileTooLarge"));
       return Upload.LIST_IGNORE;
     }
+    // Wails desktop drops can hand the web view an empty File object even
+    // though the real file exists on disk; the native binding above imports it.
     if (file.size <= 0) {
-      message.error(t("resumes.fileEmpty"));
+      if (!isDesktopRuntime()) {
+        message.error(t("resumes.fileEmpty"));
+      }
       return Upload.LIST_IGNORE;
     }
     return false;
@@ -88,6 +162,7 @@ export function ResumeFormModal({
   const handleUploadChange: UploadProps["onChange"] = ({ fileList: next }) => {
     const limited = next.slice(-1);
     setFileList(limited);
+    setDroppedFile(null);
     const raw = limited[0]?.originFileObj;
     if (!raw) return;
     const currentName = (form.getFieldValue("name") as string | undefined) ?? "";
@@ -96,7 +171,49 @@ export function ResumeFormModal({
     }
   };
 
+  const clearDroppedFile = () => {
+    setDroppedFile(null);
+  };
+
+  const importDroppedFile = async (
+    values: ResumeFormValues,
+    dropped: DroppedResumeFile,
+  ) => {
+    const tags = (values.tags ?? [])
+      .map((tag) => tag.trim())
+      .filter((tag, index, list) => tag.length > 0 && list.indexOf(tag) === index);
+
+    const created = (await Call.ByName(
+      IMPORT_BINDING,
+      dropped.path,
+      values.name.trim(),
+      tags,
+    )) as Resume;
+    message.success(t("resumes.created"));
+    onCreated(created);
+    onClose();
+  };
+
   const handleSubmit = async () => {
+    let values: ResumeFormValues;
+    try {
+      values = await form.validateFields();
+    } catch {
+      return;
+    }
+
+    if (droppedFile) {
+      setSaving(true);
+      try {
+        await importDroppedFile(values, droppedFile);
+      } catch (error) {
+        message.error(bindingErrorMessage(error));
+      } finally {
+        setSaving(false);
+      }
+      return;
+    }
+
     const raw = fileList[0]?.originFileObj as File | undefined;
     if (!raw) {
       message.warning(t("resumes.fileRequired"));
@@ -104,13 +221,6 @@ export function ResumeFormModal({
     }
     if (raw.size <= 0) {
       message.error(t("resumes.fileEmpty"));
-      return;
-    }
-
-    let values: ResumeFormValues;
-    try {
-      values = await form.validateFields();
-    } catch {
       return;
     }
 
@@ -189,23 +299,50 @@ export function ResumeFormModal({
         </Form.Item>
 
         <Form.Item label={t("resumes.file")} required>
-          <Upload.Dragger
-            accept=".docx,.pdf,.pptx,.png,.md,.markdown"
-            maxCount={1}
-            multiple={false}
-            fileList={fileList}
-            beforeUpload={beforeUpload}
-            onChange={handleUploadChange}
-            onRemove={() => {
-              setFileList([]);
-              return true;
-            }}
-          >
-            <p className="ant-upload-drag-icon">
-              <InboxOutlined />
-            </p>
-            <p className="ant-upload-text">{t("resumes.fileHint")}</p>
-          </Upload.Dragger>
+          {droppedFile ? (
+            <div className="resume-drop-file">
+              <span className={`resume-drop-file-icon is-${droppedFile.fileType}`}>
+                <FileTextOutlined />
+              </span>
+              <div className="resume-drop-file-info">
+                <strong title={droppedFile.fileName}>{droppedFile.fileName}</strong>
+                <span>
+                  {droppedFile.fileType.toUpperCase()} ·{" "}
+                  {formatFileSize(droppedFile.fileSize)}
+                </span>
+              </div>
+              <Button
+                type="text"
+                danger
+                size="small"
+                icon={<DeleteOutlined />}
+                aria-label={t("action.remove")}
+                onClick={clearDroppedFile}
+              >
+                {t("action.remove")}
+              </Button>
+            </div>
+          ) : (
+            <div data-file-drop-target="resume-upload" className="resume-drop-target">
+              <Upload.Dragger
+                accept=".docx,.pdf,.pptx,.png,.md,.markdown"
+                maxCount={1}
+                multiple={false}
+                fileList={fileList}
+                beforeUpload={beforeUpload}
+                onChange={handleUploadChange}
+                onRemove={() => {
+                  setFileList([]);
+                  return true;
+                }}
+              >
+                <p className="ant-upload-drag-icon">
+                  <InboxOutlined />
+                </p>
+                <p className="ant-upload-text">{t("resumes.fileHint")}</p>
+              </Upload.Dragger>
+            </div>
+          )}
         </Form.Item>
       </Form>
     </Modal>

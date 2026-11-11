@@ -11,6 +11,7 @@
 - **简历元数据与置顶**：每份简历可填写名称、标签并置顶；拖入文件时自动用文件名补全简历名称，卡片按置顶和上传时间排序。
 - **独立简历预览窗口**：点击「查看」会打开新的 Wails 窗口，使用 `@eternalheart/react-file-preview` 渲染 PDF、Word、PowerPoint、图片与 Markdown，并内置本地 PDF.js 资源，离线可用；窗口顶部是与主窗口一致的 29px 自定义标题栏，仅保留窗口置顶、最小化、全屏 / 还原和关闭。
 - **便携式简历文件**：上传的原始文件保存在程序目录下的 `resume/` 文件夹，名称、标签、文件信息与置顶状态写入数据库。
+- **Zap 日志**：使用 `go.uber.org/zap` 记录启动、数据库、HTTP 请求与错误信息，日志按天写入程序目录下的 `logs/` 文件夹。
 - **三类投递看板**：春招、秋招、实习，侧边栏可快速切换并显示数量；分类使用 React Router 路由页面（`/spring`、`/autumn`、`/internship`）。
 - **完整投递字段**：企业名称、投递链接、状态、投递时间；状态默认「初筛」，投递时间由后端服务器在落库时生成。
 - **内联编辑**：点击企业名称或链接即可直接修改；状态下拉框即时更新。
@@ -50,6 +51,7 @@
 | 数据库 | SQLite（纯 Go 驱动）、MySQL、PostgreSQL |
 | 密码 | bcrypt |
 | Excel | excelize |
+| 日志 | Zap |
 | 前端 | React 18、TypeScript、Vite |
 | 请求层 | Axios |
 | 前端路由 | React Router |
@@ -137,7 +139,8 @@ ResumeTrail/
 ├── resume-helper.exe
 ├── config.yaml          # 首次启动自动生成
 ├── resume-helper.db     # 默认 SQLite 数据库
-└── resume/              # 简历库上传的原始文件
+├── resume/              # 简历库上传的原始文件
+└── logs/                # Zap 日志（按天生成）
 ```
 
 - 发布版：以可执行文件所在目录为数据目录。
@@ -321,7 +324,7 @@ Vite 默认运行在 `http://127.0.0.1:9245`，可通过 `RESUME_HELPER_API` 环
 go test ./...
 ```
 
-覆盖投递 CRUD、搜索、统计、批量操作、置顶、可选密码、Excel 模板与导入、简历上传/预览/删除，以及便携式配置目录行为。
+覆盖投递 CRUD、搜索、统计、批量操作、置顶、可选密码、Excel 模板与导入、简历上传/拖拽路径导入/预览/删除，以及便携式配置目录行为。
 
 ## 项目结构
 
@@ -335,6 +338,7 @@ go test ./...
 │   ├── config/                          # 便携式配置加载与环境变量
 │   ├── database/                        # 多数据库连接、DSN 解析/构建、测试连接、迁移
 │   ├── desktop/                         # Windows 桌面快捷方式检测与创建
+│   ├── logging/                         # Zap 日志初始化（logs 目录）
 │   ├── models/                          # GORM 实体（Application、Resume、Setting）
 │   └── server/                          # Gin 路由、CRUD、认证、Excel、简历、数据库设置
 ├── frontend/
@@ -365,6 +369,7 @@ go test ./...
 - 密码只以 bcrypt 哈希存储。
 - 导入的 Excel 文件只在内存中解析，不保留临时副本。
 - 简历原始文件保存在程序目录的 `resume/` 文件夹；删除简历时会同时删除对应文件。
+- 运行日志保存在程序目录的 `logs/` 文件夹，不包含简历文件内容或密码明文。
 - MySQL / PostgreSQL 的 DSN 会出现在用户自己的配置文件中，请妥善保管该文件。
 
 ## 已知说明

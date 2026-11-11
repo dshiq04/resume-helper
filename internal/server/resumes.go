@@ -27,6 +27,9 @@ const (
 	maxResumeTags     = 12
 	maxResumeTagRunes = 32
 	resumeFolderName  = "resume"
+	// ResumeDropTarget is the value of the data-file-drop-target attribute that
+	// routes Wails native file drops to the resume upload area.
+	ResumeDropTarget = "resume-upload"
 )
 
 // supportedResumeTypes maps the accepted lowercase extensions to the MIME type
@@ -38,6 +41,14 @@ var supportedResumeTypes = map[string]string{
 	"png":      "image/png",
 	"md":       "text/markdown; charset=utf-8",
 	"markdown": "text/markdown; charset=utf-8",
+}
+
+// IsSupportedResumeType reports whether the extension (with or without a dot)
+// belongs to the set of files the resume library can store and preview.
+func IsSupportedResumeType(extension string) bool {
+	extension = strings.ToLower(strings.TrimPrefix(strings.TrimSpace(extension), "."))
+	_, ok := supportedResumeTypes[extension]
+	return ok
 }
 
 type resumeUpdateInput struct {
@@ -408,22 +419,131 @@ func saveMultipartFile(header *multipart.FileHeader, target string) error {
 	}
 	defer source.Close()
 
+	_, err = copyResumeFile(source, target, maxResumeFileSize)
+	return err
+}
+
+func copyResumeFile(source io.Reader, target string, maxBytes int64) (int64, error) {
 	destination, err := os.OpenFile(target, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	defer destination.Close()
 
-	written, err := io.Copy(destination, io.LimitReader(source, maxResumeFileSize+1))
+	written, err := io.Copy(destination, io.LimitReader(source, maxBytes+1))
 	if err != nil {
 		_ = os.Remove(target)
-		return err
+		return 0, err
 	}
-	if written > maxResumeFileSize {
+	if written > maxBytes {
 		_ = os.Remove(target)
-		return fmt.Errorf("resume file exceeds %d bytes", maxResumeFileSize)
+		return written, fmt.Errorf("resume file exceeds %d bytes", maxBytes)
 	}
-	return nil
+	return written, nil
+}
+
+type ResumeFileInfo struct {
+	FileName string `json:"fileName"`
+	FileType string `json:"fileType"`
+	FileSize int64  `json:"fileSize"`
+}
+
+// ProbeResumeFile validates a local resume file without storing it. It backs
+// the Wails file-drop binding so the UI can show file details before saving.
+func (s *Server) ProbeResumeFile(path string) (*ResumeFileInfo, error) {
+	return resumeFileInfoFromPath(path)
+}
+
+// ImportResumeFromPath stores a resume picked through the operating system
+// (Wails drag-and-drop) instead of an HTML file input.
+func (s *Server) ImportResumeFromPath(path string, name string, tags []string) (*models.Resume, error) {
+	info, err := resumeFileInfoFromPath(path)
+	if err != nil {
+		return nil, err
+	}
+
+	resumeName := strings.TrimSpace(name)
+	if resumeName == "" {
+		resumeName = strings.TrimSuffix(info.FileName, filepath.Ext(info.FileName))
+	}
+	if utf8.RuneCountInString(resumeName) > 255 {
+		return nil, fmt.Errorf("resume name is too long")
+	}
+
+	normalisedTags, code, message := normalizeResumeTags(tags)
+	if code != "" {
+		return nil, fmt.Errorf("%s", message)
+	}
+
+	dir := s.resumeDirectory()
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return nil, fmt.Errorf("failed to create the resume folder")
+	}
+
+	storedName, err := generateStoredName(info.FileType)
+	if err != nil {
+		return nil, fmt.Errorf("failed to prepare the resume file")
+	}
+
+	source, err := os.Open(path)
+	if err != nil {
+		return nil, fmt.Errorf("resume file is not readable")
+	}
+	defer source.Close()
+
+	target := filepath.Join(dir, storedName)
+	written, err := copyResumeFile(source, target, maxResumeFileSize)
+	if err != nil {
+		return nil, fmt.Errorf("failed to save the resume file")
+	}
+	if written != info.FileSize {
+		_ = os.Remove(target)
+		return nil, fmt.Errorf("resume file changed while uploading")
+	}
+
+	record := &models.Resume{
+		Name:       resumeName,
+		Tags:       normalisedTags,
+		FileName:   info.FileName,
+		StoredName: storedName,
+		FileType:   info.FileType,
+		FileSize:   written,
+	}
+	if err := s.database().Create(record).Error; err != nil {
+		_ = os.Remove(target)
+		return nil, fmt.Errorf("failed to create the resume")
+	}
+	return record, nil
+}
+
+func resumeFileInfoFromPath(path string) (*ResumeFileInfo, error) {
+	raw := strings.TrimSpace(path)
+	if raw == "" {
+		return nil, fmt.Errorf("resume file path is required")
+	}
+	info, err := os.Stat(raw)
+	if err != nil {
+		return nil, fmt.Errorf("resume file is not accessible")
+	}
+	if info.IsDir() {
+		return nil, fmt.Errorf("resume file is a folder")
+	}
+	extension := strings.ToLower(strings.TrimPrefix(filepath.Ext(raw), "."))
+	if !IsSupportedResumeType(extension) {
+		return nil, fmt.Errorf("only DOCX, PDF, PPTX, PNG and Markdown files are supported")
+	}
+	if info.Size() <= 0 {
+		return nil, fmt.Errorf("the selected file is empty")
+	}
+	if info.Size() > maxResumeFileSize {
+		return nil, fmt.Errorf("the file is larger than 50 MB")
+	}
+
+	fileName := sanitizeUploadFileName(filepath.Base(raw))
+	if fileName == "" {
+		fileName = "resume." + extension
+	}
+	return &ResumeFileInfo{FileName: fileName, FileType: extension, FileSize: info.Size()}, nil
 }
 
 func contentDisposition(mode, fileName string) string {

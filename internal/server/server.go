@@ -17,6 +17,7 @@ import (
 	"resume-helper/internal/config"
 
 	"github.com/gin-gonic/gin"
+	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
 
@@ -28,6 +29,9 @@ type Server struct {
 	auth   *authManager
 	engine *gin.Engine
 	http   *http.Server
+
+	loggerMu sync.RWMutex
+	logger   *zap.Logger
 
 	dbMu     sync.RWMutex
 	db       *gorm.DB
@@ -94,9 +98,64 @@ func (s *Server) SetResumePreviewOpener(opener func(id uint, title string)) {
 	s.resumePreviewOpener = opener
 }
 
+// SetLogger wires a zap logger into the HTTP layer. Without it the server
+// falls back to the standard library logger, which keeps tests quiet.
+func (s *Server) SetLogger(logger *zap.Logger) {
+	s.loggerMu.Lock()
+	defer s.loggerMu.Unlock()
+	s.logger = logger
+}
+
+func (s *Server) logInfo(message string, fields ...zap.Field) {
+	s.loggerMu.RLock()
+	logger := s.logger
+	s.loggerMu.RUnlock()
+	if logger != nil {
+		logger.Info(message, fields...)
+		return
+	}
+	log.Println(message)
+}
+
+func (s *Server) logWarn(message string, fields ...zap.Field) {
+	s.loggerMu.RLock()
+	logger := s.logger
+	s.loggerMu.RUnlock()
+	if logger != nil {
+		logger.Warn(message, fields...)
+		return
+	}
+	log.Println(message)
+}
+
+func (s *Server) requestLogger() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		start := time.Now()
+		c.Next()
+
+		path := c.Request.URL.Path
+		if !strings.HasPrefix(path, "/api/") {
+			return
+		}
+
+		fields := []zap.Field{
+			zap.String("method", c.Request.Method),
+			zap.String("path", path),
+			zap.Int("status", c.Writer.Status()),
+			zap.Duration("latency", time.Since(start)),
+			zap.String("ip", c.ClientIP()),
+		}
+		if c.Writer.Status() >= 500 {
+			s.logWarn("http request failed", fields...)
+			return
+		}
+		s.logInfo("http request", fields...)
+	}
+}
+
 func (s *Server) newEngine() *gin.Engine {
 	r := gin.New()
-	r.Use(gin.Logger(), gin.Recovery(), corsMiddleware(), securityHeaders())
+	r.Use(s.requestLogger(), gin.Recovery(), corsMiddleware(), securityHeaders())
 
 	api := r.Group("/api")
 	{
@@ -158,7 +217,8 @@ func (s *Server) Start() (string, error) {
 
 	listener, err := listen(s.cfg.Server.Port)
 	if err != nil && s.cfg.Server.Port != 0 {
-		log.Printf("port %d is unavailable (%v); falling back to an ephemeral port", s.cfg.Server.Port, err)
+		s.logWarn("port is unavailable; falling back to an ephemeral port",
+			zap.Int("port", s.cfg.Server.Port), zap.Error(err))
 		listener, err = listen(0)
 	}
 	if err != nil {
@@ -172,7 +232,7 @@ func (s *Server) Start() (string, error) {
 
 	go func() {
 		if err := s.http.Serve(listener); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			log.Printf("http server stopped: %v", err)
+			s.logWarn("http server stopped", zap.Error(err))
 		}
 	}()
 

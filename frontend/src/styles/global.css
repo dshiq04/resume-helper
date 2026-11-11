@@ -3902,6 +3902,55 @@ textarea {
   border-color: var(--accent);
 }
 
+.resume-drop-target {
+  display: block;
+}
+
+.resume-drop-file {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 14px;
+  background: var(--surface-soft);
+  border: 1px dashed var(--border-strong);
+  border-radius: 14px;
+}
+
+.resume-drop-file-icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  font-size: 19px;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-radius: 12px;
+}
+
+.resume-drop-file-info {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.resume-drop-file-info strong {
+  overflow: hidden;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.resume-drop-file-info span {
+  color: var(--text-tertiary);
+  font-size: 10.5px;
+}
+
 .resume-form .ant-upload-text {
   padding: 0 16px;
   color: var(--text-secondary) !important;

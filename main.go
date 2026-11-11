@@ -17,10 +17,13 @@ import (
 	"resume-helper/internal/config"
 	"resume-helper/internal/database"
 	"resume-helper/internal/desktop"
+	"resume-helper/internal/logging"
+	"resume-helper/internal/models"
 	"resume-helper/internal/server"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/events"
+	"go.uber.org/zap"
 )
 
 // The frontend is embedded so the production binary is fully self-contained.
@@ -42,27 +45,35 @@ func main() {
 	}
 	desktop.Configure(cfg.DataDir, appIconICO)
 
+	appLogger, logPath, closeLog, err := logging.Setup(cfg.DataDir)
+	if err != nil {
+		log.Fatalf("setup logging: %v", err)
+	}
+	defer closeLog()
+	appLogger.Info("ResumeTrail starting", zap.String("logFile", logPath))
+
 	db, err := database.Open(cfg.Database)
 	if err != nil {
-		log.Fatalf("open database: %v", err)
+		appLogger.Fatal("open database", zap.Error(err))
 	}
 
 	dist, err := fs.Sub(embeddedAssets, "frontend/dist")
 	if err != nil {
-		log.Fatalf("load embedded frontend: %v", err)
+		appLogger.Fatal("load embedded frontend", zap.Error(err))
 	}
 
 	httpServer := server.New(cfg, db, dist)
+	httpServer.SetLogger(appLogger)
 	baseURL, err := httpServer.Start()
 	if err != nil {
-		log.Fatalf("start HTTP server: %v", err)
+		appLogger.Fatal("start HTTP server", zap.Error(err))
 	}
-	log.Printf("ResumeTrail %s is serving at %s", server.Version, baseURL)
-	log.Printf(
-		"database: %s %s (config: %s)",
-		database.DatabaseLabel(cfg.Database.Driver),
-		database.SafeDSN(cfg.Database.Driver, cfg.Database.DSN),
-		cfg.SourcePath,
+	appLogger.Info("ResumeTrail is serving",
+		zap.String("version", server.Version),
+		zap.String("url", baseURL),
+		zap.String("database", database.DatabaseLabel(cfg.Database.Driver)),
+		zap.String("dsn", database.SafeDSN(cfg.Database.Driver, cfg.Database.DSN)),
+		zap.String("config", cfg.SourcePath),
 	)
 
 	if isHeadless() {
@@ -78,6 +89,9 @@ func main() {
 		Name:        "ResumeTrail",
 		Description: "A beautiful resume application tracker",
 		Icon:        appIconPNG,
+		Services: []application.Service{
+			application.NewService(&DropImporter{server: httpServer}),
+		},
 		Assets: application.AssetOptions{
 			Handler: httpServer.Handler(),
 		},
@@ -96,6 +110,7 @@ func main() {
 	})
 	shortcutPrompt := &shortcutPromptState{}
 	registerShortcutClosePrompt(app, mainWindow, shortcutPrompt)
+	registerResumeDropEvent(appLogger, mainWindow)
 	httpServer.SetShortcutPromptHandler(func(create bool) error {
 		return resolveShortcutPrompt(app, mainWindow, shortcutPrompt, create)
 	})
@@ -107,8 +122,43 @@ func main() {
 	})
 
 	if err := app.Run(); err != nil {
-		log.Fatal(err)
+		appLogger.Fatal("application stopped", zap.Error(err))
 	}
+}
+
+// DropImporter exposes resume import helpers to the frontend through Wails
+// bindings. Drag-and-drop from the operating system only provides file paths,
+// so the file has to be copied on the Go side.
+type DropImporter struct {
+	server *server.Server
+}
+
+func (d *DropImporter) ProbeResumeFile(path string) (*server.ResumeFileInfo, error) {
+	return d.server.ProbeResumeFile(path)
+}
+
+func (d *DropImporter) ImportResume(path string, name string, tags []string) (*models.Resume, error) {
+	return d.server.ImportResumeFromPath(path, name, tags)
+}
+
+// registerResumeDropEvent forwards file drops that land on the resume upload
+// area to the frontend. Wails native drops carry full paths, which the frontend
+// cannot read directly, so the import happens through a Wails binding.
+func registerResumeDropEvent(logger *zap.Logger, mainWindow *application.WebviewWindow) {
+	mainWindow.OnWindowEvent(events.Common.WindowFilesDropped, func(event *application.WindowEvent) {
+		paths := event.Context().DroppedFiles()
+		if len(paths) == 0 {
+			return
+		}
+		details := event.Context().DropTargetDetails()
+		if details == nil || details.Attributes["data-file-drop-target"] != server.ResumeDropTarget {
+			return
+		}
+
+		filtered := append([]string(nil), paths...)
+		mainWindow.EmitEvent("resumetrail:resume-files-dropped", filtered)
+		logger.Debug("resume files dropped", zap.Strings("files", filtered))
+	})
 }
 
 func openResumePreviewWindow(app *application.App, id uint, title string) {

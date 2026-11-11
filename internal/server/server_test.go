@@ -645,3 +645,54 @@ type ResumeList struct {
 	Items []models.Resume `json:"items"`
 	Total int64           `json:"total"`
 }
+
+func TestResumePathImport(t *testing.T) {
+	app := newTestApp(t)
+
+	resumePath := filepath.Join(t.TempDir(), "Drop Resume.pdf")
+	if err := os.WriteFile(resumePath, []byte("%PDF-1.4 drop"), 0o644); err != nil {
+		t.Fatalf("write drop resume: %v", err)
+	}
+
+	info, err := app.server.ProbeResumeFile(resumePath)
+	if err != nil {
+		t.Fatalf("probe resume: %v", err)
+	}
+	if info.FileName != "Drop Resume.pdf" || info.FileType != "pdf" || info.FileSize != int64(len("%PDF-1.4 drop")) {
+		t.Fatalf("unexpected probe info: %+v", info)
+	}
+
+	created, err := app.server.ImportResumeFromPath(resumePath, "", []string{"drop"})
+	if err != nil {
+		t.Fatalf("import resume: %v", err)
+	}
+	if created.Name != "Drop Resume" || created.FileType != "pdf" || len(created.Tags) != 1 || created.Tags[0] != "drop" {
+		t.Fatalf("unexpected imported resume: %+v", created)
+	}
+	storedPath := filepath.Join(app.server.resumeDirectory(), created.StoredName)
+	data, err := os.ReadFile(storedPath)
+	if err != nil || string(data) != "%PDF-1.4 drop" {
+		t.Fatalf("imported file mismatch: err = %v, data = %q", err, string(data))
+	}
+
+	var count int64
+	if err := app.server.database().Model(&models.Resume{}).Count(&count).Error; err != nil || count != 1 {
+		t.Fatalf("resume count = %d, err = %v", count, err)
+	}
+
+	emptyPath := filepath.Join(t.TempDir(), "empty.pdf")
+	if err := os.WriteFile(emptyPath, nil, 0o644); err != nil {
+		t.Fatalf("write empty resume: %v", err)
+	}
+	if _, err := app.server.ProbeResumeFile(emptyPath); err == nil {
+		t.Fatalf("empty file should be rejected")
+	}
+
+	txtPath := filepath.Join(t.TempDir(), "notes.txt")
+	if err := os.WriteFile(txtPath, []byte("nope"), 0o644); err != nil {
+		t.Fatalf("write txt resume: %v", err)
+	}
+	if _, err := app.server.ImportResumeFromPath(txtPath, "Bad", nil); err == nil {
+		t.Fatalf("unsupported extension should be rejected")
+	}
+}
