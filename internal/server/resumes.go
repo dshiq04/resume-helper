@@ -19,6 +19,7 @@ import (
 	"resume-helper/internal/models"
 
 	"github.com/gin-gonic/gin"
+	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
 
@@ -189,6 +190,13 @@ func (s *Server) createResume(c *gin.Context) {
 		return
 	}
 
+	s.logInfo("resume uploaded",
+		zap.Uint("id", record.ID),
+		zap.String("name", record.Name),
+		zap.String("file", record.FileName),
+		zap.String("type", record.FileType),
+		zap.Int64("size", record.FileSize),
+	)
 	c.JSON(http.StatusCreated, record)
 }
 
@@ -252,6 +260,7 @@ func (s *Server) updateResume(c *gin.Context) {
 	if record.Tags == nil {
 		record.Tags = []string{}
 	}
+	s.logDebug("resume updated", zap.Uint("id", record.ID), zap.Bool("pinned", record.Pinned))
 	c.JSON(http.StatusOK, record)
 }
 
@@ -270,6 +279,7 @@ func (s *Server) deleteResume(c *gin.Context) {
 		return
 	}
 	_ = os.Remove(filepath.Join(s.resumeDirectory(), record.StoredName))
+	s.logInfo("resume deleted", zap.Uint("id", record.ID), zap.String("name", record.Name))
 	c.JSON(http.StatusOK, gin.H{"deleted": 1})
 }
 
@@ -289,6 +299,11 @@ func (s *Server) serveResumeFile(c *gin.Context) {
 	}
 	filePath := filepath.Join(s.resumeDirectory(), record.StoredName)
 	if info, err := os.Stat(filePath); err != nil || info.IsDir() {
+		s.logWarn("resume file is missing",
+			zap.Uint("id", record.ID),
+			zap.String("file", record.FileName),
+			zap.String("stored", record.StoredName),
+		)
 		apiError(c, http.StatusNotFound, "file_missing", "The resume file is missing.")
 		return
 	}
@@ -451,7 +466,18 @@ type ResumeFileInfo struct {
 // ProbeResumeFile validates a local resume file without storing it. It backs
 // the Wails file-drop binding so the UI can show file details before saving.
 func (s *Server) ProbeResumeFile(path string) (*ResumeFileInfo, error) {
-	return resumeFileInfoFromPath(path)
+	info, err := resumeFileInfoFromPath(path)
+	if err != nil {
+		s.logWarn("resume probe failed", zap.String("path", path), zap.Error(err))
+		return nil, err
+	}
+	s.logDebug("resume probed",
+		zap.String("path", path),
+		zap.String("file", info.FileName),
+		zap.String("type", info.FileType),
+		zap.Int64("size", info.FileSize),
+	)
+	return info, nil
 }
 
 // ImportResumeFromPath stores a resume picked through the operating system
@@ -513,6 +539,13 @@ func (s *Server) ImportResumeFromPath(path string, name string, tags []string) (
 		_ = os.Remove(target)
 		return nil, fmt.Errorf("failed to create the resume")
 	}
+	s.logInfo("resume imported",
+		zap.Uint("id", record.ID),
+		zap.String("name", record.Name),
+		zap.String("file", record.FileName),
+		zap.String("type", record.FileType),
+		zap.Int64("size", record.FileSize),
+	)
 	return record, nil
 }
 

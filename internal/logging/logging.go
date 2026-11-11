@@ -38,12 +38,12 @@ func Setup(dataDir string) (*zap.Logger, string, func(), error) {
 	fileCore := zapcore.NewCore(
 		zapcore.NewJSONEncoder(encoderConfig),
 		zapcore.AddSync(file),
-		zap.InfoLevel,
+		zap.DebugLevel,
 	)
 	consoleCore := zapcore.NewCore(
 		zapcore.NewConsoleEncoder(encoderConfig),
 		zapcore.AddSync(os.Stdout),
-		zap.InfoLevel,
+		zap.DebugLevel,
 	)
 
 	logger := zap.New(zapcore.NewTee(fileCore, consoleCore), zap.AddCaller(), zap.AddStacktrace(zapcore.ErrorLevel))

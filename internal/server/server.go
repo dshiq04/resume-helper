@@ -106,6 +106,15 @@ func (s *Server) SetLogger(logger *zap.Logger) {
 	s.logger = logger
 }
 
+func (s *Server) logDebug(message string, fields ...zap.Field) {
+	s.loggerMu.RLock()
+	logger := s.logger
+	s.loggerMu.RUnlock()
+	if logger != nil {
+		logger.Debug(message, fields...)
+	}
+}
+
 func (s *Server) logInfo(message string, fields ...zap.Field) {
 	s.loggerMu.RLock()
 	logger := s.logger
@@ -128,6 +137,17 @@ func (s *Server) logWarn(message string, fields ...zap.Field) {
 	log.Println(message)
 }
 
+func (s *Server) logError(message string, fields ...zap.Field) {
+	s.loggerMu.RLock()
+	logger := s.logger
+	s.loggerMu.RUnlock()
+	if logger != nil {
+		logger.Error(message, fields...)
+		return
+	}
+	log.Println(message)
+}
+
 func (s *Server) requestLogger() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()
@@ -145,11 +165,14 @@ func (s *Server) requestLogger() gin.HandlerFunc {
 			zap.Duration("latency", time.Since(start)),
 			zap.String("ip", c.ClientIP()),
 		}
-		if c.Writer.Status() >= 500 {
-			s.logWarn("http request failed", fields...)
-			return
+		switch {
+		case c.Writer.Status() >= 500:
+			s.logError("http request failed", fields...)
+		case c.Writer.Status() >= 400:
+			s.logWarn("http request rejected", fields...)
+		default:
+			s.logInfo("http request", fields...)
 		}
-		s.logInfo("http request", fields...)
 	}
 }
 

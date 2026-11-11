@@ -16,6 +16,7 @@ func TestSetupCreatesLogFile(t *testing.T) {
 	}
 	defer closeLog()
 	logger.Info("hello from test", zap.String("source", "unit-test"))
+	logger.Debug("debug from test")
 	if err := logger.Sync(); err != nil && !strings.Contains(err.Error(), "invalid argument") {
 		t.Fatalf("sync logger: %v", err)
 	}
@@ -25,7 +26,11 @@ func TestSetupCreatesLogFile(t *testing.T) {
 		t.Fatalf("read log file: %v", err)
 	}
 	content := string(data)
-	if !strings.Contains(content, `"msg":"hello from test"`) || !strings.Contains(content, `"source":"unit-test"`) {
+	if !strings.Contains(content, `"level":"INFO"`) ||
+		!strings.Contains(content, `"level":"DEBUG"`) ||
+		!strings.Contains(content, `"msg":"hello from test"`) ||
+		!strings.Contains(content, `"msg":"debug from test"`) ||
+		!strings.Contains(content, `"source":"unit-test"`) {
 		t.Fatalf("unexpected log content: %s", content)
 	}
 }

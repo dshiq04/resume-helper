@@ -73,7 +73,21 @@ function formatFileSize(bytes: number): string {
 function bindingErrorMessage(error: unknown): string {
   if (error instanceof Error && error.message) return error.message;
   if (typeof error === "string" && error) return error;
+  if (error && typeof error === "object") {
+    const message = (error as { message?: unknown }).message;
+    if (typeof message === "string" && message) return message;
+    try {
+      return JSON.stringify(error);
+    } catch {
+      // Fall through to the generic message.
+    }
+  }
   return "未知错误";
+}
+
+function isDialogCancelled(error: unknown): boolean {
+  const message = bindingErrorMessage(error).toLowerCase();
+  return message.includes("cancel");
 }
 
 export function ResumeFormModal({
@@ -132,6 +146,9 @@ export function ResumeFormModal({
       const path = Array.isArray(selected) ? selected[0] : selected;
       if (path) await acceptNativePath(path);
     } catch (error) {
+      // Wails rejects with "cancelled by user" when the native dialog is
+      // dismissed. That is a normal action, not an error.
+      if (isDialogCancelled(error)) return;
       message.error(bindingErrorMessage(error));
     }
   };

@@ -51,11 +51,20 @@ func main() {
 	}
 	defer closeLog()
 	appLogger.Info("ResumeTrail starting", zap.String("logFile", logPath))
+	appLogger.Debug("configuration loaded",
+		zap.String("dataDir", cfg.DataDir),
+		zap.String("config", cfg.SourcePath),
+		zap.String("driver", cfg.Database.Driver),
+	)
 
 	db, err := database.Open(cfg.Database)
 	if err != nil {
 		appLogger.Fatal("open database", zap.Error(err))
 	}
+	appLogger.Debug("database connection ready",
+		zap.String("driver", cfg.Database.Driver),
+		zap.String("dsn", database.SafeDSN(cfg.Database.Driver, cfg.Database.DSN)),
+	)
 
 	dist, err := fs.Sub(embeddedAssets, "frontend/dist")
 	if err != nil {
