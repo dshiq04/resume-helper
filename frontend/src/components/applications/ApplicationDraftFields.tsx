@@ -7,7 +7,7 @@ import {
 import type { Status } from "../../api/types";
 import type { ApplicationDraft } from "../../hooks/useApplicationDraft";
 import { useI18n } from "../../i18n";
-import { CategoryBadge, StatusBadge, useCategoryOptions } from "../badges";
+import { CategoryBadge, StatusBadge, useCategoryOptions, useStatusOptions } from "../badges";
 
 interface DraftFieldProps {
   draft: ApplicationDraft;
@@ -103,14 +103,7 @@ export function DraftStatusSelect({
   saving,
   onChange,
 }: DraftFieldProps) {
-  const { t } = useI18n();
-  const statusOptions = [
-    { value: "screening" as Status, label: t("status.screening") },
-    { value: "written" as Status, label: t("status.written") },
-    { value: "interview" as Status, label: t("status.interview") },
-    { value: "offer" as Status, label: t("status.offer") },
-    { value: "rejected" as Status, label: t("status.rejected") },
-  ];
+  const statusOptions = useStatusOptions();
 
   return (
     <Select
