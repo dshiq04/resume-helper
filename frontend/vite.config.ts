@@ -8,28 +8,28 @@ import { viteStaticCopy } from "vite-plugin-static-copy";
 export default defineConfig({
   logLevel: "error",
   plugins: [
-    // @eternalheart/react-file-preview uses PDF.js. Ship its worker, CMaps,
-    // standard fonts and WASM files with the app so PDF previews work offline.
+    // Anyview bundles its own PDF.js worker. Ship its CMaps, standard fonts,
+    // WASM and ICC assets with the app so PDF previews work offline.
     viteStaticCopy({
       targets: [
         {
-          src: "node_modules/pdfjs-dist/legacy/build/pdf.worker.min.mjs",
-          dest: "pdfjs",
-          rename: { stripBase: true },
-        },
-        {
-          src: "node_modules/pdfjs-dist/cmaps",
+          src: "node_modules/anyview/dist/pdfjs/cmaps",
           dest: "pdfjs/cmaps",
           rename: { stripBase: true },
         },
         {
-          src: "node_modules/pdfjs-dist/standard_fonts",
+          src: "node_modules/anyview/dist/pdfjs/standard_fonts",
           dest: "pdfjs/standard_fonts",
           rename: { stripBase: true },
         },
         {
-          src: "node_modules/pdfjs-dist/wasm",
+          src: "node_modules/anyview/dist/pdfjs/wasm",
           dest: "pdfjs/wasm",
+          rename: { stripBase: true },
+        },
+        {
+          src: "node_modules/anyview/dist/pdfjs/iccs",
+          dest: "pdfjs/iccs",
           rename: { stripBase: true },
         },
       ],

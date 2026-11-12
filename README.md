@@ -9,7 +9,7 @@
 - **置顶**：重要的投递可固定在列表最上方，始终优先展示。
 - **卡片式简历库**：侧边栏独立入口，可保存多份简历；支持 DOCX、PDF、PPTX、PNG、Markdown，单文件最大 50 MB。
 - **简历元数据与置顶**：每份简历可填写名称、标签并置顶；拖入文件时自动用文件名补全简历名称，卡片按置顶和上传时间排序。
-- **独立简历预览窗口**：点击「查看」会打开新的 Wails 窗口，使用 `@eternalheart/react-file-preview` 渲染 PDF、Word、PowerPoint、图片与 Markdown，并内置本地 PDF.js 资源，离线可用；窗口顶部是与主窗口一致的 29px 自定义标题栏，仅保留窗口置顶、最小化、全屏 / 还原和关闭。
+- **独立简历预览窗口**：点击「查看」会打开新的 Wails 窗口，使用 [Anyview](https://github.com/harshpreet931/anyview) 原生渲染 PDF、Word、PowerPoint、图片与 Markdown（无需 iframe 或在线转换服务）；支持文本选择、全文搜索、缩略图、大纲、缩放与打印，并内置本地 PDF.js 字体 / CMap / WASM / ICC 资源，离线可用；窗口顶部是与主窗口一致的 29px 自定义标题栏，仅保留窗口置顶、最小化、全屏 / 还原和关闭。
 - **便携式简历文件**：上传的原始文件保存在程序目录下的 `resume/` 文件夹，名称、标签、文件信息与置顶状态写入数据库。
 - **Zap 日志**：使用 `go.uber.org/zap` 记录启动、数据库、HTTP 请求与错误信息，日志按天写入程序目录下的 `logs/` 文件夹。日志级别包含 DEBUG（调试）、INFO（常规操作）、WARN（可恢复异常）与 ERROR（需要关注的错误）。
 - **三类投递看板**：春招、秋招、实习，侧边栏可快速切换并显示数量；分类使用 React Router 路由页面（`/spring`、`/autumn`、`/internship`）。
@@ -56,7 +56,7 @@
 | 请求层 | Axios |
 | 前端路由 | React Router |
 | UI | Ant Design 5、Ant Design Icons |
-| 简历预览 | @eternalheart/react-file-preview |
+| 简历预览 | Anyview（PDF / DOCX / PPTX / 图片 / Markdown） |
 | 多语言 | 自研 i18n Context + Ant Design locale |
 
 ## 前端页面与路由

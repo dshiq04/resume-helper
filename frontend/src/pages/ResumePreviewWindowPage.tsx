@@ -16,14 +16,13 @@ import {
   PushpinOutlined,
 } from "@ant-design/icons";
 import { Events, Window } from "@wailsio/runtime";
-import {
-  FilePreviewEmbed,
-  configurePdfjs,
-} from "@eternalheart/react-file-preview";
-import "@eternalheart/react-file-preview/style.css";
+import { DocViewer } from "anyview";
+import { PdfAdapter } from "anyview/pdf";
+import "anyview/styles";
 import { ApiError, api } from "../api/client";
 import type { Resume } from "../api/types";
 import { useI18n } from "../i18n";
+import "../i18n/anyview";
 import { apiErrorMessage } from "../utils/errors";
 import { ResizeHandles } from "../components/ResizeHandles";
 import {
@@ -34,15 +33,10 @@ import {
   toggleFullscreenWindow,
 } from "../utils/desktop";
 
-// Bundle PDF.js assets with the frontend so the desktop app can preview PDFs
-// offline. These files are copied into dist/pdfjs by vite-plugin-static-copy.
-configurePdfjs({
-  workerSrc: "/pdfjs/pdf.worker.min.mjs",
-  cMapUrl: "/pdfjs/cmaps/",
-  cMapPacked: true,
-  standardFontDataUrl: "/pdfjs/standard_fonts/",
-  wasmUrl: "/pdfjs/wasm/",
-});
+// Anyview bundles its own PDF.js worker. Its CMaps, standard fonts, WASM and
+// ICC profiles are copied into dist/pdfjs by vite-plugin-static-copy so PDF
+// previews keep working offline.
+PdfAdapter.configureAssets("/pdfjs/");
 
 const MIME_TYPES: Record<string, string> = {
   docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -205,7 +199,6 @@ export function ResumePreviewWindowPage() {
     window.location.assign("/resumes");
   };
 
-  const libraryLocale = locale.startsWith("zh") ? "zh-CN" : "en-US";
   const title = resume?.name || t("resumes.previewTitle");
 
   return (
@@ -304,12 +297,14 @@ export function ResumePreviewWindowPage() {
               />
             )}
           >
-            <FilePreviewEmbed
+            <DocViewer
               key={resume?.id}
-              files={[file]}
-              currentIndex={0}
+              source={{ kind: "file", file }}
               theme={theme}
-              locale={libraryLocale}
+              locale={locale}
+              persistKey="resumetrail.resumePreview"
+              showToolbar
+              showSidebar
             />
           </PreviewErrorBoundary>
         ) : (

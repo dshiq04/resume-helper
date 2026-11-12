@@ -4161,6 +4161,16 @@ textarea {
   overflow: hidden;
 }
 
+.resume-preview-content .dv-root {
+  --dv-font-family: "HarmonyOS Sans", "HarmonyOS Sans SC", -apple-system,
+    BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB",
+    "Microsoft YaHei", "Noto Sans SC", "Noto Sans JP", "Noto Sans KR",
+    sans-serif;
+  --dv-font-mono: "Cascadia Code", Consolas, monospace;
+  --dv-loading-color: var(--accent);
+  --dv-progress-bar-color: var(--accent);
+}
+
 .resume-preview-shell {
   width: 100%;
   height: 100%;
