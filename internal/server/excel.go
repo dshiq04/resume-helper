@@ -97,6 +97,12 @@ var statusAliases = map[string]string{
 	"面試":          models.StatusInterview,
 	"面接":          models.StatusInterview,
 	"면접":          models.StatusInterview,
+	"pending":     models.StatusPending,
+	"hold":        models.StatusPending,
+	"待定":          models.StatusPending,
+	"保留":          models.StatusPending,
+	"未定":          models.StatusPending,
+	"보류":          models.StatusPending,
 	"offer":       models.StatusOffer,
 	"offered":     models.StatusOffer,
 	"录用":          models.StatusOffer,
@@ -173,7 +179,7 @@ func buildTemplate() (*excelize.File, error) {
 	})
 
 	categoryList := "spring,autumn,internship,春招,秋招,实习"
-	statusList := "screening,written,interview,offer,rejected,初筛,笔试,面试,Offer,淘汰"
+	statusList := "screening,written,interview,pending,offer,rejected,初筛,笔试,面试,待定,Offer,淘汰"
 	_ = file.AddDataValidation(dataSheet, &excelize.DataValidation{
 		Sqref:      "A2:A5000",
 		Type:       "list",
@@ -192,7 +198,7 @@ func buildTemplate() (*excelize.File, error) {
 		{""},
 		{"1. Fill in the Applications sheet. One application per row."},
 		{"2. Category accepts spring / autumn / internship or 春招 / 秋招 / 实习 (and other supported languages)."},
-		{"3. Status accepts screening / written / interview / offer / rejected or 初筛 / 笔试 / 面试 / Offer / 淘汰."},
+		{"3. Status accepts screening / written / interview / pending / offer / rejected or 初筛 / 笔试 / 面试 / 待定 / Offer / 淘汰."},
 		{"4. Company name is required. Link is optional and is saved exactly as entered."},
 		{"5. Empty category defaults to spring; empty status defaults to screening."},
 		{""},

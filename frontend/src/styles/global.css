@@ -1,6 +1,14 @@
 @font-face {
-  font-family: "Source Han Serif SC";
-  src: url("/fonts/SourceHanSerifSC-Light.otf") format("opentype");
+  font-family: "HarmonyOS Sans";
+  src: url("/fonts/HarmonyOS_Sans_Light.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 300;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "HarmonyOS Sans SC";
+  src: url("/fonts/HarmonyOS_Sans_SC_Light.ttf") format("truetype");
   font-style: normal;
   font-weight: 300;
   font-display: swap;
@@ -83,7 +91,10 @@ body {
   overflow: hidden;
   background: var(--bg);
   color: var(--text);
-  font-family: "Source Han Serif SC", "Songti SC", SimSun, serif;
+  font-family: "HarmonyOS Sans", "HarmonyOS Sans SC", -apple-system,
+    BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB",
+    "Microsoft YaHei", "Noto Sans SC", "Noto Sans JP", "Noto Sans KR",
+    sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -1410,6 +1421,11 @@ textarea {
   --status-bg: rgba(14, 165, 233, 0.12);
 }
 
+.status-badge-pending {
+  --status-color: #64748b;
+  --status-bg: rgba(100, 116, 139, 0.12);
+}
+
 .status-badge-offer {
   --status-color: #059669;
   --status-bg: rgba(16, 185, 129, 0.12);
@@ -1433,6 +1449,11 @@ textarea {
 :root[data-theme="dark"] .status-badge-interview {
   --status-color: #7dd3fc;
   --status-bg: rgba(14, 165, 233, 0.17);
+}
+
+:root[data-theme="dark"] .status-badge-pending {
+  --status-color: #cbd5e1;
+  --status-bg: rgba(148, 163, 184, 0.16);
 }
 
 :root[data-theme="dark"] .status-badge-offer {
@@ -4151,7 +4172,10 @@ textarea {
 }
 
 .resume-preview-content .dv-root {
-  --dv-font-family: "Source Han Serif SC", "Songti SC", SimSun, serif;
+  --dv-font-family: "HarmonyOS Sans", "HarmonyOS Sans SC", -apple-system,
+    BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB",
+    "Microsoft YaHei", "Noto Sans SC", "Noto Sans JP", "Noto Sans KR",
+    sans-serif;
   --dv-font-mono: "Cascadia Code", Consolas, monospace;
   --dv-loading-color: var(--accent);
   --dv-progress-bar-color: var(--accent);

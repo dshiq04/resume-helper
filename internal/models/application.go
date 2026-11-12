@@ -13,13 +13,14 @@ const (
 	StatusScreening = "screening"
 	StatusWritten   = "written"
 	StatusInterview = "interview"
+	StatusPending   = "pending"
 	StatusOffer     = "offer"
 	StatusRejected  = "rejected"
 )
 
 var (
 	Categories = []string{CategorySpring, CategoryAutumn, CategoryInternship}
-	Statuses   = []string{StatusScreening, StatusWritten, StatusInterview, StatusOffer, StatusRejected}
+	Statuses   = []string{StatusScreening, StatusWritten, StatusInterview, StatusPending, StatusOffer, StatusRejected}
 )
 
 // Application is one resume submission.

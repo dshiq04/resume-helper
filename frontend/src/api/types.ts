@@ -3,6 +3,7 @@ export type Status =
   | "screening"
   | "written"
   | "interview"
+  | "pending"
   | "offer"
   | "rejected";
 
@@ -11,6 +12,7 @@ export const STATUSES: Status[] = [
   "screening",
   "written",
   "interview",
+  "pending",
   "offer",
   "rejected",
 ];
