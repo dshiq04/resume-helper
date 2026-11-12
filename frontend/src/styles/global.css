@@ -1,16 +1,8 @@
 @font-face {
-  font-family: "HarmonyOS Sans";
-  src: url("/fonts/HarmonyOS_Sans_Medium.ttf") format("truetype");
+  font-family: "Source Han Serif SC";
+  src: url("/fonts/SourceHanSerifSC-Light.otf") format("opentype");
   font-style: normal;
-  font-weight: 500;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "HarmonyOS Sans SC";
-  src: url("/fonts/HarmonyOS_Sans_SC_Medium.ttf") format("truetype");
-  font-style: normal;
-  font-weight: 500;
+  font-weight: 300;
   font-display: swap;
 }
 
@@ -91,10 +83,7 @@ body {
   overflow: hidden;
   background: var(--bg);
   color: var(--text);
-  font-family: "HarmonyOS Sans", "HarmonyOS Sans SC", -apple-system,
-    BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB",
-    "Microsoft YaHei", "Noto Sans SC", "Noto Sans JP", "Noto Sans KR",
-    sans-serif;
+  font-family: "Source Han Serif SC", "Songti SC", SimSun, serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -4162,10 +4151,7 @@ textarea {
 }
 
 .resume-preview-content .dv-root {
-  --dv-font-family: "HarmonyOS Sans", "HarmonyOS Sans SC", -apple-system,
-    BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB",
-    "Microsoft YaHei", "Noto Sans SC", "Noto Sans JP", "Noto Sans KR",
-    sans-serif;
+  --dv-font-family: "Source Han Serif SC", "Songti SC", SimSun, serif;
   --dv-font-mono: "Cascadia Code", Consolas, monospace;
   --dv-loading-color: var(--accent);
   --dv-progress-bar-color: var(--accent);
