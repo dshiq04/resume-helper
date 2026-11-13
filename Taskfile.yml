@@ -1,0 +1,48 @@
+version: '3'
+
+vars:
+  APP_NAME: "resume-helper"
+  BIN_DIR: "bin"
+  BIN_EXT: '{{if eq OS "windows"}}.exe{{end}}'
+  LDFLAGS: '{{if eq OS "windows"}}-s -w -H windowsgui{{else}}-s -w{{end}}'
+
+tasks:
+  install:
+    summary: Install frontend dependencies
+    dir: frontend
+    cmds:
+      - npm install
+
+  frontend:build:
+    summary: Type-check and build the React frontend
+    dir: frontend
+    cmds:
+      - npm run build
+
+  frontend:dev:
+    summary: Run the Vite dev server on port 9245 (proxies /api to Gin)
+    dir: frontend
+    cmds:
+      - npm run dev
+
+  build:
+    summary: Build the self-contained desktop binary
+    deps:
+      - frontend:build
+    cmds:
+      - go build -trimpath -ldflags="{{.LDFLAGS}}" -o "{{.BIN_DIR}}/{{.APP_NAME}}{{.BIN_EXT}}" .
+
+  run:
+    summary: Run the desktop application (requires frontend/dist)
+    cmds:
+      - go run .
+
+  server:
+    summary: Run only the Gin server for browser preview (headless)
+    cmds:
+      - go run . --headless
+
+  test:
+    summary: Run Go tests
+    cmds:
+      - go test ./...
