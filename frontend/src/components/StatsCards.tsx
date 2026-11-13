@@ -41,7 +41,6 @@ export function StatsCards({ stats, category }: StatsCardsProps) {
     {
       key: "total",
       label: t("stats.total"),
-      hint: t("stats.totalHint"),
       value: counts.total,
       icon: <FileTextOutlined />,
       accent: "#6366f1",
@@ -49,7 +48,6 @@ export function StatsCards({ stats, category }: StatsCardsProps) {
     {
       key: "active",
       label: t("stats.active"),
-      hint: t("stats.activeHint"),
       value: counts.active,
       icon: <ClockCircleOutlined />,
       accent: "#f59e0b",
@@ -57,7 +55,6 @@ export function StatsCards({ stats, category }: StatsCardsProps) {
     {
       key: "interview",
       label: t("stats.interview"),
-      hint: t("stats.interviewHint"),
       value: counts.interview,
       icon: <TeamOutlined />,
       accent: "#0ea5e9",
@@ -65,7 +62,6 @@ export function StatsCards({ stats, category }: StatsCardsProps) {
     {
       key: "offer",
       label: t("stats.offer"),
-      hint: t("stats.offerHint"),
       value: counts.offer,
       icon: <TrophyOutlined />,
       accent: "#10b981",
@@ -82,11 +78,9 @@ export function StatsCards({ stats, category }: StatsCardsProps) {
         >
           <div className="stat-card-top">
             <span className="stat-card-icon">{card.icon}</span>
-            <span className="stat-card-dot" />
+            <span className="stat-card-label">{card.label}</span>
           </div>
           <div className="stat-card-value">{card.value}</div>
-          <div className="stat-card-label">{card.label}</div>
-          <div className="stat-card-hint">{card.hint}</div>
         </div>
       ))}
     </div>
