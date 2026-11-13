@@ -4,7 +4,7 @@ import type { Application } from "../../api/types";
 import type { InlineEditController } from "../../hooks/useInlineEdit";
 import { useI18n } from "../../i18n";
 import { openExternal } from "../../utils/desktop";
-import { prettyLink } from "../../utils/display";
+import { isWebLink, prettyLink, withProtocol } from "../../utils/display";
 
 interface LinkCellProps {
   application: Application;
@@ -61,19 +61,21 @@ export function LinkCell({ application, inline, mobile = false }: LinkCellProps)
       >
         {prettyLink(application.link)}
       </button>
-      <Tooltip title={t("action.openLink")}>
-        <button
-          type="button"
-          className="link-open-button"
-          aria-label={t("action.openLink")}
-          onClick={(event) => {
-            event.stopPropagation();
-            void openExternal(application.link);
-          }}
-        >
-          <ExportOutlined />
-        </button>
-      </Tooltip>
+      {isWebLink(application.link) && (
+        <Tooltip title={t("action.openLink")}>
+          <button
+            type="button"
+            className="link-open-button"
+            aria-label={t("action.openLink")}
+            onClick={(event) => {
+              event.stopPropagation();
+              void openExternal(withProtocol(application.link));
+            }}
+          >
+            <ExportOutlined />
+          </button>
+        </Tooltip>
+      )}
     </div>
   );
 }

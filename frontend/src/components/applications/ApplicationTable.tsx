@@ -116,7 +116,7 @@ export function ApplicationTable({
       title: t("table.status"),
       dataIndex: "status",
       key: "status",
-      width: 145,
+      width: 170,
       render: (_value, record) =>
         record.id === DRAFT_ID && draft ? (
           <DraftStatusSelect
@@ -140,7 +140,7 @@ export function ApplicationTable({
       title: t("table.appliedAt"),
       dataIndex: "appliedAt",
       key: "appliedAt",
-      width: 125,
+      width: 170,
       render: (value: string, record) =>
         record.id === DRAFT_ID ? (
           <span className="draft-unsaved">{t("draft.unsaved")}</span>

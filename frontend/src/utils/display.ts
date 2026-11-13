@@ -21,3 +21,26 @@ export function prettyLink(link: string): string {
     return link;
   }
 }
+
+/** Returns true when the value points to an openable web page. */
+export function isWebLink(link: string): boolean {
+  const trimmed = link.trim();
+  if (!trimmed || /\s/.test(trimmed)) {
+    return false;
+  }
+  if (/^[a-z][a-z\d+.-]*:/i.test(trimmed)) {
+    try {
+      const url = new URL(trimmed);
+      return url.protocol === "http:" || url.protocol === "https:";
+    } catch {
+      return false;
+    }
+  }
+  return /^(?:[\w-]+\.)+[a-z]{2,}(?::\d+)?(?:[/?#].*)?$/i.test(trimmed);
+}
+
+/** Adds https:// to bare domains so they can be opened externally. */
+export function withProtocol(link: string): string {
+  const trimmed = link.trim();
+  return /^[a-z][a-z\d+.-]*:/i.test(trimmed) ? trimmed : `https://${trimmed}`;
+}
