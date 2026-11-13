@@ -199,13 +199,6 @@ textarea {
   cursor: se-resize;
 }
 
-.app-watermark {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  min-height: 0;
-}
-
 .app-content {
   display: flex;
   flex: 1;
@@ -971,7 +964,7 @@ textarea {
   align-items: center;
   gap: 6px;
   color: var(--text-tertiary);
-  font-size: 10.5px;
+  font-size: 15.5px;
   white-space: nowrap;
 }
 
@@ -1037,18 +1030,29 @@ textarea {
   background: transparent;
 }
 
-/* The table columns are sized to fit the desktop content area. Hiding the
-   horizontal scroll container prevents WebView2 from oscillating between
-   "scrollbar visible / hidden" at fractional DPI scaling. */
+/* Keep the columns at their content-based widths. When the window is too
+   narrow to fit them, let the table scroll horizontally instead of clipping
+   the rightmost columns. */
 .applications-table .ant-table-content {
-  overflow-x: hidden !important;
+  overflow-x: auto !important;
+}
+
+.applications-table .ant-table-content::-webkit-scrollbar {
+  height: 8px;
+}
+
+.applications-table .ant-table-content::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background-clip: padding-box;
 }
 
 .applications-table .ant-table-thead > tr > th {
   padding-top: 11px !important;
   padding-bottom: 11px !important;
   color: var(--text-tertiary) !important;
-  font-size: 9.5px !important;
+  font-size: 14.5px !important;
   font-weight: 750 !important;
   letter-spacing: 0.09em;
   text-transform: uppercase;
@@ -1106,7 +1110,7 @@ textarea {
 .applications-table .ant-pagination-total-text {
   margin-right: auto;
   color: var(--text-tertiary);
-  font-size: 11px;
+  font-size: 14px;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -1286,7 +1290,7 @@ textarea {
   padding: 0;
   overflow: hidden;
   color: var(--text-secondary);
-  font-size: 11.5px;
+  font-size: 16.5px;
   text-align: left;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1338,7 +1342,7 @@ textarea {
   gap: 6px;
   padding: 0;
   color: var(--text-tertiary);
-  font-size: 11.5px;
+  font-size: 16.5px;
   background: transparent;
   border: 0;
   cursor: text;
@@ -1352,7 +1356,7 @@ textarea {
 }
 
 .status-select {
-  width: 145px;
+  width: 100%;
 }
 
 .status-select .ant-select-selector {
@@ -1375,7 +1379,7 @@ textarea {
   gap: 6px;
   padding: 3px 9px;
   color: var(--status-color);
-  font-size: 10.5px;
+  font-size: 15.5px;
   font-weight: 650;
   white-space: nowrap;
   background: var(--status-bg);
@@ -1453,8 +1457,9 @@ textarea {
 
 .updated-at {
   color: var(--text-tertiary);
-  font-size: 10.5px;
+  font-size: 15.5px;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .row-delete-button {
@@ -3200,7 +3205,7 @@ textarea {
   padding-top: 9px;
   margin-top: 9px;
   color: var(--text-tertiary);
-  font-size: 9.5px;
+  font-size: 12.5px;
 }
 
 .mobile-pinned-badge {

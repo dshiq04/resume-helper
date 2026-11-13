@@ -1,5 +1,5 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from "react";
-import { App as AntdApp, Button, ConfigProvider, Spin, Watermark } from "antd";
+import { App as AntdApp, Button, ConfigProvider, Spin } from "antd";
 import { CloudServerOutlined, ReloadOutlined } from "@ant-design/icons";
 import { Navigate, Route, Routes } from "react-router-dom";
 import { Events } from "@wailsio/runtime";
@@ -167,83 +167,66 @@ function AppRoot() {
           />
           <ResizeHandles />
 
-          <Watermark
-            className="app-watermark"
-            content="开发中品质，请谅解"
-            gap={[140, 140]}
-            offset={[24, 24]}
-            rotate={-24}
-            zIndex={4}
-            font={{
-              color:
-                themeMode === "dark"
-                  ? "rgba(226, 232, 240, 0.09)"
-                  : "rgba(71, 85, 105, 0.11)",
-              fontSize: 14,
-              fontWeight: 600,
-            }}
-          >
-            <div className="app-content">
-              {stage === "checking" && (
-            <div className="boot-screen">
-              <div className="boot-logo">
-                <Logo size={58} />
+          <div className="app-content">
+            {stage === "checking" && (
+              <div className="boot-screen">
+                <div className="boot-logo">
+                  <Logo size={58} />
+                </div>
+                <Spin size="large" />
+                <p>{t("common.loading")}</p>
               </div>
-              <Spin size="large" />
-              <p>{t("common.loading")}</p>
-            </div>
-          )}
+            )}
 
-          {stage === "error" && (
-            <div className="boot-screen boot-error">
-              <div className="boot-error-icon">
-                <CloudServerOutlined />
+            {stage === "error" && (
+              <div className="boot-screen boot-error">
+                <div className="boot-error-icon">
+                  <CloudServerOutlined />
+                </div>
+                <h2>{t("error.network")}</h2>
+                <Button
+                  type="primary"
+                  icon={<ReloadOutlined />}
+                  onClick={() => void checkAuth()}
+                >
+                  {t("common.retry")}
+                </Button>
               </div>
-              <h2>{t("error.network")}</h2>
-              <Button
-                type="primary"
-                icon={<ReloadOutlined />}
-                onClick={() => void checkAuth()}
-              >
-                {t("common.retry")}
-              </Button>
-            </div>
-          )}
+            )}
 
-          {stage === "locked" && (
-            <LockScreen onAuthenticated={handleAuthenticated} />
-          )}
+            {stage === "locked" && (
+              <LockScreen onAuthenticated={handleAuthenticated} />
+            )}
 
-          {stage === "ready" && (
-            <Routes>
-              <Route
-                element={
-                  <WorkspaceLayout
-                    stats={stats}
-                    onDataChanged={handleDataChanged}
-                    themeMode={themeMode}
-                    onThemeChange={setThemeMode}
-                    passwordEnabled={passwordEnabled}
-                    onPasswordEnabledChange={setPasswordEnabled}
-                    onLock={handleLock}
-                  />
-                }
-              >
-                <Route index element={<Dashboard category="all" />} />
-                <Route path="spring" element={<Dashboard category="spring" />} />
-                <Route path="autumn" element={<Dashboard category="autumn" />} />
+            {stage === "ready" && (
+              <Routes>
                 <Route
-                  path="internship"
-                  element={<Dashboard category="internship" />}
-                />
-                <Route path="resumes" element={<ResumeLibraryPage />} />
-                <Route path="settings" element={<SettingsPage />} />
-                <Route path="*" element={<Navigate to="/" replace />} />
-              </Route>
-            </Routes>
-          )}
-            </div>
-          </Watermark>
+                  element={
+                    <WorkspaceLayout
+                      stats={stats}
+                      onDataChanged={handleDataChanged}
+                      themeMode={themeMode}
+                      onThemeChange={setThemeMode}
+                      passwordEnabled={passwordEnabled}
+                      onPasswordEnabledChange={setPasswordEnabled}
+                      onLock={handleLock}
+                    />
+                  }
+                >
+                  <Route index element={<Dashboard category="all" />} />
+                  <Route path="spring" element={<Dashboard category="spring" />} />
+                  <Route path="autumn" element={<Dashboard category="autumn" />} />
+                  <Route
+                    path="internship"
+                    element={<Dashboard category="internship" />}
+                  />
+                  <Route path="resumes" element={<ResumeLibraryPage />} />
+                  <Route path="settings" element={<SettingsPage />} />
+                  <Route path="*" element={<Navigate to="/" replace />} />
+                </Route>
+              </Routes>
+            )}
+          </div>
         </div>
       </AntdApp>
     </ConfigProvider>

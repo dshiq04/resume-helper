@@ -130,6 +130,50 @@ go build -trimpath -ldflags="-s -w -H windowsgui" -o bin/resume-helper.exe .
 
 Linux / macOS 构建时请去掉 `-H windowsgui`。Taskfile 已按操作系统自动处理。
 
+### 一键构建脚本（Windows / macOS / Linux）
+
+根目录提供三个构建脚本，分别在对应操作系统上完成依赖安装、前端构建和桌面程序编译：
+
+| 平台 | 运行方式 | 产物 |
+| --- | --- | --- |
+| Windows | 双击 `build-windows.bat`，或在命令行执行 `build-windows.bat` | `bin/resume-helper.exe`（arm64 为 `bin/resume-helper-arm64.exe`） |
+| macOS | `./build-macos.sh` | `bin/resume-helper-macos-<arch>` |
+| Linux | `./build-linux.sh` | `bin/resume-helper-linux-<arch>` |
+
+脚本支持可选的架构参数，默认使用当前系统架构：
+
+```bash
+build-windows.bat arm64
+./build-macos.sh amd64
+./build-linux.sh arm64
+```
+
+脚本会自动执行以下步骤：
+
+1. 检查 `go` 与 `npm` 是否可用；
+2. `frontend/node_modules` 不存在时执行 `npm install --prefix frontend`；
+3. 执行 `npm run build --prefix frontend` 生成 `frontend/dist`；
+4. 使用平台对应的参数编译程序并输出到 `bin/`。
+
+> Wails 3 的 macOS / Linux 桌面构建依赖本地 cgo 系统库，**不支持在 Windows 上直接交叉编译**。请在各自系统或对应的 CI Runner 上运行脚本。
+
+平台依赖：
+
+- **Windows**：Go 1.26+、Node.js 20+、WebView2 Runtime（Windows 10/11 通常已自带）。
+- **macOS**：Go 1.26+、Node.js 20+、Xcode Command Line Tools（`xcode-select --install`）。
+- **Linux（Ubuntu 24.04+ / Debian 13+）**：
+
+  ```bash
+  sudo apt install build-essential pkg-config libgtk-4-dev libwebkitgtk-6.0-dev
+  ```
+
+  较老的发行版使用 GTK3 / WebKit2GTK 4.1：
+
+  ```bash
+  sudo apt install build-essential pkg-config libgtk-3-dev libwebkit2gtk-4.1-dev
+  WAILS_TAGS=gtk3 ./build-linux.sh
+  ```
+
 ## 便携式数据目录
 
 ResumeTrail 默认**只使用程序自身目录**，不会在 C 盘的用户目录、AppData、Documents 等位置创建配置文件或数据库：
