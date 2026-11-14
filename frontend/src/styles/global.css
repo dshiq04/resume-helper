@@ -1126,13 +1126,23 @@ textarea {
 .search-input {
   width: min(345px, 100%);
   height: 35px;
+  padding: 0 11px !important;
+  align-items: center;
+  font-size: 14px;
   background: var(--surface-soft);
   border-color: var(--border);
   border-radius: 11px;
 }
 
 .search-input .ant-input {
+  padding: 0;
+  font-size: 14px;
+  line-height: 24px;
   background: transparent;
+}
+
+.search-input .ant-input::placeholder {
+  font-size: 14px;
 }
 
 .search-input .ant-input-prefix {
@@ -1145,7 +1155,8 @@ textarea {
 
 .status-filter {
   width: 165px;
-  height: 35px;
+  height: 35px !important;
+  font-size: 14px;
 }
 
 .status-filter .ant-select-selector,
@@ -1158,7 +1169,20 @@ textarea {
 
 .status-filter .ant-select-selection-item,
 .status-filter .ant-select-selection-placeholder {
+  font-size: 14px;
   line-height: 33px !important;
+}
+
+.status-filter .ant-select-selection-search-input,
+.status-filter .ant-select-selection-wrap::after {
+  height: 33px !important;
+  line-height: 33px !important;
+}
+
+.status-filter .ant-select-arrow {
+  top: 50%;
+  right: 11px;
+  margin-top: -6px;
 }
 
 .table-toolbar-spacer {
@@ -1460,6 +1484,11 @@ textarea {
   background: rgba(14, 165, 233, 0.1);
 }
 
+.category-badge-social {
+  color: #be123c;
+  background: rgba(251, 113, 133, 0.12);
+}
+
 :root[data-theme="dark"] .category-badge-spring {
   color: #6ee7b7;
   background: rgba(16, 185, 129, 0.16);
@@ -1473,6 +1502,11 @@ textarea {
 :root[data-theme="dark"] .category-badge-internship {
   color: #7dd3fc;
   background: rgba(14, 165, 233, 0.16);
+}
+
+:root[data-theme="dark"] .category-badge-social {
+  color: #fda4af;
+  background: rgba(251, 113, 133, 0.16);
 }
 
 .inline-edit-input {
