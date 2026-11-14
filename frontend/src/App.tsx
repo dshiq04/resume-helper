@@ -12,10 +12,12 @@ import { TitleBar } from "./components/TitleBar";
 import { I18nProvider, useI18n } from "./i18n";
 import { WorkspaceLayout } from "./layouts/WorkspaceLayout";
 import { Dashboard } from "./pages/Dashboard";
+import { ApplicationEditWindowPage } from "./pages/ApplicationEditWindowPage";
 import { QuickEntryWindowPage } from "./pages/QuickEntryWindowPage";
 import { ResumeLibraryPage } from "./pages/ResumeLibraryPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { ShortcutPromptWindowPage } from "./pages/ShortcutPromptWindowPage";
+import { StatisticsPage } from "./pages/StatisticsPage";
 import { createTheme, type ThemeMode } from "./theme";
 
 const ResumePreviewWindowPage = lazy(() =>
@@ -125,6 +127,16 @@ function AppRoot() {
     );
   }
 
+  if (window.location.pathname === "/application-edit") {
+    return (
+      <ConfigProvider locale={antdLocale} theme={themeConfig}>
+        <AntdApp>
+          <ApplicationEditWindowPage />
+        </AntdApp>
+      </ConfigProvider>
+    );
+  }
+
   if (window.location.pathname === "/shortcut-prompt") {
     return (
       <ConfigProvider locale={antdLocale} theme={themeConfig}>
@@ -220,7 +232,9 @@ function AppRoot() {
                     path="internship"
                     element={<Dashboard category="internship" />}
                   />
+                  <Route path="social" element={<Dashboard category="social" />} />
                   <Route path="resumes" element={<ResumeLibraryPage />} />
+                  <Route path="statistics" element={<StatisticsPage />} />
                   <Route path="settings" element={<SettingsPage />} />
                   <Route path="*" element={<Navigate to="/" replace />} />
                 </Route>

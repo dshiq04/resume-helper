@@ -11,6 +11,7 @@
 - **简历元数据与置顶**：每份简历可填写名称、标签并置顶；拖入文件时自动用文件名补全简历名称，卡片按置顶和上传时间排序。
 - **独立简历预览窗口**：点击「查看」会打开新的 Wails 窗口，使用 [Anyview](https://github.com/harshpreet931/anyview) 原生渲染 PDF、Word、PowerPoint、图片与 Markdown（无需 iframe 或在线转换服务）；支持文本选择、全文搜索、缩略图、大纲、缩放与打印，并内置本地 PDF.js 字体 / CMap / WASM / ICC 资源，离线可用；窗口顶部是与主窗口一致的 29px 自定义标题栏，仅保留窗口置顶、最小化、全屏 / 还原和关闭。
 - **便携式简历文件**：上传的原始文件保存在程序目录下的 `resume/` 文件夹，名称、标签、文件信息与置顶状态写入数据库。
+- **简历加密存储**：首次启动会自动生成设备标识码并写入 `settings` 表（`security.device_id`）；简历上传时通过 [moov-io/cryptfs](https://github.com/moov-io/cryptfs) 使用 AES-256-GCM 加密后，以 `.reb` 后缀落盘，原始文件名和类型只保存在数据库中。查看或下载时后端读取该标识码派生密钥并解密返回，前端再按原始文件名和 MIME 类型恢复展示。升级前已存在的未加密简历仍可正常读取。
 - **Zap 日志**：使用 `go.uber.org/zap` 记录启动、数据库、HTTP 请求与错误信息，日志按天写入程序目录下的 `logs/` 文件夹。日志级别包含 DEBUG（调试）、INFO（常规操作）、WARN（可恢复异常）与 ERROR（需要关注的错误）。
 - **三类投递看板**：春招、秋招、实习，侧边栏可快速切换并显示数量；分类使用 React Router 路由页面（`/spring`、`/autumn`、`/internship`）。
 - **完整投递字段**：企业名称、投递链接、状态、投递时间；状态默认「初筛」，投递时间由后端服务器在落库时生成。
@@ -20,6 +21,7 @@
 - **官网直达**：鼠标悬浮到投递链接时出现打开按钮，点击后通过系统默认浏览器打开（Wails 桌面环境）。链接按原始内容保存，不会自动添加 `http://` 或 `https://`。
 - **单条删除 / 批量删除**：每行提供删除按钮，表头支持多选后批量删除。
 - **批量修改状态**：多选记录后一键切换为初筛 / 笔试 / 面试 / 待定 / Offer / 淘汰。
+- **批量修改投递类型**：勾选记录后可在选择栏中一键切换春招 / 秋招 / 实习 / 社会招聘。
 - **搜索**：按企业名称、投递链接模糊搜索，并可按状态筛选。
 - **Excel 导入**：支持 `.xlsx` / `.xlsm` 批量导入，内置中英双语模板与下拉选项，导入结果会显示成功、跳过和错误明细。
 - **可选密码保护**：在设置页开启后，启动应用需要解锁；密码使用 **bcrypt** 哈希落库，绝不明文保存。
@@ -183,7 +185,7 @@ ResumeTrail/
 ├── resume-helper.exe
 ├── config.yaml          # 首次启动自动生成
 ├── resume-helper.db     # 默认 SQLite 数据库
-├── resume/              # 简历库上传的原始文件
+├── resume/              # 加密后的简历文件（.reb 后缀）
 └── logs/                # Zap 日志（按天生成）
 ```
 
@@ -310,6 +312,7 @@ psql -d resume_helper -f init.postgresql.sql
 | `DELETE` | `/api/application/:id` | 删除单条 |
 | `POST` | `/api/applications/batch-delete` | 批量删除 |
 | `PATCH` | `/api/applications/batch-status` | 批量修改状态 |
+| `PATCH` | `/api/applications/batch-category` | 批量修改投递类型 |
 | `POST` | `/api/applications/import` | 上传 Excel 导入 |
 | `GET` | `/api/applications/template` | 下载导入模板 |
 | `GET` | `/api/resumes` | 简历列表，置顶优先，支持 `search` |
@@ -317,9 +320,10 @@ psql -d resume_helper -f init.postgresql.sql
 | `GET` | `/api/resume/:id` | 单份简历元数据 |
 | `PUT` | `/api/resume/:id` | 更新名称 / 标签 / 置顶 |
 | `DELETE` | `/api/resume/:id` | 删除简历记录与文件 |
-| `GET` | `/api/resume/:id/file` | 读取原始文件（`download=1` 强制下载） |
+| `GET` | `/api/resume/:id/file` | 读取原始文件（后端用设备标识码解密后返回，`download=1` 强制下载） |
 | `GET` | `/api/stats` | 分类 / 状态 / 简历数量统计 |
 | `GET` | `/api/system/info` | 数据库、配置文件、版本信息 |
+| `GET` | `/api/system/device` | 当前设备标识码与简历加密算法 |
 | `GET` | `/api/system/database` | 当前数据库的图形化配置字段 |
 | `POST` | `/api/system/database/test` | 测试数据库连接（不保存） |
 | `PUT` | `/api/system/database` | 保存配置、迁移新库并立即切换连接 |
@@ -327,6 +331,7 @@ psql -d resume_helper -f init.postgresql.sql
 | `POST` | `/api/system/shortcut` | 创建桌面快捷方式 |
 | `POST` | `/api/system/shortcut/prompt` | 处理关闭时的快捷方式提示窗口选择 |
 | `POST` | `/api/system/quick-entry` | 打开独立的快速录入窗口 |
+| `GET` | `/api/system/quick-entry/defaults` | 按服务器时间返回默认投递位置（秋招 / 春招 / 实习） |
 | `POST` | `/api/system/resume-preview` | 打开独立的简历预览窗口 |
 
 开启密码后，除健康检查、认证接口和静态资源外，其余 `/api` 请求需要携带：
@@ -384,7 +389,7 @@ go test ./...
 │   ├── desktop/                         # Windows 桌面快捷方式检测与创建
 │   ├── logging/                         # Zap 日志初始化（logs 目录）
 │   ├── models/                          # GORM 实体（Application、Resume、Setting）
-│   └── server/                          # Gin 路由、CRUD、认证、Excel、简历、数据库设置
+│   └── server/                          # Gin 路由、CRUD、认证、Excel、简历、设备标识与加密、数据库设置
 ├── frontend/
 │   ├── src/
 │   │   ├── api/                         # Axios 客户端与类型
@@ -412,7 +417,7 @@ go test ./...
 - 所有数据保存在本地数据库，不包含任何遥测或上传逻辑。
 - 密码只以 bcrypt 哈希存储。
 - 导入的 Excel 文件只在内存中解析，不保留临时副本。
-- 简历原始文件保存在程序目录的 `resume/` 文件夹；删除简历时会同时删除对应文件。
+- 简历原始文件保存在程序目录的 `resume/` 文件夹，并以 `.reb` 后缀和 AES-256-GCM 密文形式落盘；密钥由 `settings` 表中的设备标识码派生，删除简历时会同时删除对应文件。
 - 运行日志保存在程序目录的 `logs/` 文件夹，不包含简历文件内容或密码明文。
 - MySQL / PostgreSQL 的 DSN 会出现在用户自己的配置文件中，请妥善保管该文件。
 

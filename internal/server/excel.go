@@ -72,6 +72,16 @@ var categoryAliases = map[string]string{
 	"インターンシップ":      models.CategoryInternship,
 	"인턴":            models.CategoryInternship,
 	"인턴십":           models.CategoryInternship,
+	"social":        models.CategorySocial,
+	"socialrecruit": models.CategorySocial,
+	"socialhiring":  models.CategorySocial,
+	"experienced":   models.CategorySocial,
+	"社招":            models.CategorySocial,
+	"社会招聘":          models.CategorySocial,
+	"社會招聘":          models.CategorySocial,
+	"中途採用":          models.CategorySocial,
+	"경력채용":          models.CategorySocial,
+	"경력":            models.CategorySocial,
 }
 
 var statusAliases = map[string]string{
@@ -178,7 +188,7 @@ func buildTemplate() (*excelize.File, error) {
 		ActivePane:  "bottomLeft",
 	})
 
-	categoryList := "spring,autumn,internship,春招,秋招,实习"
+	categoryList := "spring,autumn,internship,social,春招,秋招,实习,社招,社会招聘"
 	statusList := "screening,written,interview,pending,offer,rejected,初筛,笔试,面试,待定,Offer,淘汰"
 	_ = file.AddDataValidation(dataSheet, &excelize.DataValidation{
 		Sqref:      "A2:A5000",
@@ -197,7 +207,7 @@ func buildTemplate() (*excelize.File, error) {
 		{"ResumeTrail Excel Import / Excel 导入说明"},
 		{""},
 		{"1. Fill in the Applications sheet. One application per row."},
-		{"2. Category accepts spring / autumn / internship or 春招 / 秋招 / 实习 (and other supported languages)."},
+		{"2. Category accepts spring / autumn / internship / social or 春招 / 秋招 / 实习 / 社会招聘 (and other supported languages)."},
 		{"3. Status accepts screening / written / interview / pending / offer / rejected or 初筛 / 笔试 / 面试 / 待定 / Offer / 淘汰."},
 		{"4. Company name is required. Link is optional and is saved exactly as entered."},
 		{"5. Empty category defaults to spring; empty status defaults to screening."},

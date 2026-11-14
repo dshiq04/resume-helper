@@ -156,6 +156,19 @@ func TestApplicationLifecycle(t *testing.T) {
 		t.Fatalf("unexpected stats: %+v", stats)
 	}
 
+	resp, body = app.request(t, http.MethodGet, "/api/stats/daily", nil, "")
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("daily stats status = %d, body = %s", resp.StatusCode, body)
+	}
+	daily := decodeJSON[DailyStats](t, body)
+	if len(daily.Daily) != 1 {
+		t.Fatalf("unexpected daily stats: %+v", daily)
+	}
+	entry := daily.Daily[0]
+	if entry.Category != models.CategoryAutumn || entry.Count != 1 || entry.Date != created.AppliedAt.Local().Format("2006-01-02") {
+		t.Fatalf("unexpected daily entry: %+v", entry)
+	}
+
 	resp, body = app.request(t, http.MethodPost, "/api/applications", map[string]string{
 		"companyName": "Second Corp",
 		"category":    "spring",
@@ -196,6 +209,35 @@ func TestApplicationLifecycle(t *testing.T) {
 	batchResult := decodeJSON[map[string]int64](t, body)
 	if batchResult["updated"] != 2 {
 		t.Fatalf("batch updated = %d, want 2", batchResult["updated"])
+	}
+
+	resp, body = app.request(t, http.MethodPatch, "/api/applications/batch-category", map[string]any{
+		"ids":      []uint{created.ID, second.ID},
+		"category": "internship",
+	}, "")
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("batch category = %d, body = %s", resp.StatusCode, body)
+	}
+	batchResult = decodeJSON[map[string]int64](t, body)
+	if batchResult["updated"] != 2 {
+		t.Fatalf("batch category updated = %d, want 2", batchResult["updated"])
+	}
+	var recategorised []models.Application
+	if err := app.server.database().Where("id IN ?", []uint{created.ID, second.ID}).Find(&recategorised).Error; err != nil {
+		t.Fatalf("load recategorised applications: %v", err)
+	}
+	for _, item := range recategorised {
+		if item.Category != models.CategoryInternship {
+			t.Fatalf("category = %q, want %q", item.Category, models.CategoryInternship)
+		}
+	}
+
+	resp, body = app.request(t, http.MethodPatch, "/api/applications/batch-category", map[string]any{
+		"ids":      []uint{created.ID, second.ID},
+		"category": "unknown",
+	}, "")
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("invalid category status = %d, body = %s", resp.StatusCode, body)
 	}
 
 	resp, body = app.request(t, http.MethodDelete, fmt.Sprintf("/api/application/%d", second.ID), nil, "")
@@ -491,6 +533,50 @@ func TestCreateApplicationUsesServerTimeAndPinned(t *testing.T) {
 	}
 }
 
+func TestQuickEntryDefaultsFollowServerClock(t *testing.T) {
+	app := newTestApp(t)
+
+	resp, body := app.request(t, http.MethodGet, "/api/system/quick-entry/defaults", nil, "")
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("defaults status = %d, body = %s", resp.StatusCode, body)
+	}
+	defaults := decodeJSON[struct {
+		DefaultCategory string `json:"defaultCategory"`
+		ServerTime      string `json:"serverTime"`
+	}](t, body)
+	if !models.IsValidCategory(defaults.DefaultCategory) {
+		t.Fatalf("defaultCategory = %q, want a known category", defaults.DefaultCategory)
+	}
+	if want := models.DefaultCategoryForTime(time.Now()); defaults.DefaultCategory != want {
+		t.Fatalf("defaultCategory = %q, want %q from server clock", defaults.DefaultCategory, want)
+	}
+	if _, err := time.Parse(time.RFC3339, defaults.ServerTime); err != nil {
+		t.Fatalf("serverTime = %q: %v", defaults.ServerTime, err)
+	}
+}
+
+func TestDefaultCategoryForTime(t *testing.T) {
+	cases := []struct {
+		month time.Month
+		want  string
+	}{
+		{time.January, models.CategoryInternship},
+		{time.February, models.CategorySpring},
+		{time.May, models.CategorySpring},
+		{time.June, models.CategoryInternship},
+		{time.July, models.CategoryInternship},
+		{time.August, models.CategoryAutumn},
+		{time.November, models.CategoryAutumn},
+		{time.December, models.CategoryInternship},
+	}
+	for _, tc := range cases {
+		at := time.Date(2026, tc.month, 15, 12, 0, 0, 0, time.Local)
+		if got := models.DefaultCategoryForTime(at); got != tc.want {
+			t.Fatalf("DefaultCategoryForTime(%s) = %q, want %q", tc.month, got, tc.want)
+		}
+	}
+}
+
 func TestDatabaseSettingsAndHotSwap(t *testing.T) {
 	app := newTestApp(t)
 	defer func() {
@@ -577,6 +663,14 @@ type Stats struct {
 	Matrix     map[string]map[string]int64 `json:"byCategoryStatus"`
 }
 
+type DailyStats struct {
+	Daily []struct {
+		Date     string `json:"date"`
+		Category string `json:"category"`
+		Count    int64  `json:"count"`
+	} `json:"daily"`
+}
+
 func TestResumeLifecycle(t *testing.T) {
 	app := newTestApp(t)
 
@@ -598,9 +692,38 @@ func TestResumeLifecycle(t *testing.T) {
 	if stored.StoredName == "" {
 		t.Fatalf("stored name should not be empty")
 	}
+	if !strings.HasSuffix(stored.StoredName, "."+encryptedResumeExtension) {
+		t.Fatalf("stored name = %q, want .%s suffix", stored.StoredName, encryptedResumeExtension)
+	}
+	if !created.Encrypted || !stored.Encrypted {
+		t.Fatalf("resume should be marked as encrypted")
+	}
 	storedPath := filepath.Join(app.server.resumeDirectory(), stored.StoredName)
-	if _, err := os.Stat(storedPath); err != nil {
+	storedBytes, err := os.ReadFile(storedPath)
+	if err != nil {
 		t.Fatalf("resume file was not stored: %v", err)
+	}
+	if bytes.Equal(storedBytes, []byte("%PDF-1.4 test")) || bytes.Contains(storedBytes, []byte("%PDF-1.4")) {
+		t.Fatalf("resume file was stored in plaintext: %q", string(storedBytes))
+	}
+
+	// The identifier is created once and persisted in the settings table.
+	resp, body = app.request(t, http.MethodGet, "/api/system/device", nil, "")
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("device status = %d, body = %s", resp.StatusCode, body)
+	}
+	device := decodeJSON[struct {
+		DeviceID string `json:"deviceId"`
+	}](t, body)
+	if len(device.DeviceID) != 64 {
+		t.Fatalf("device id = %q, want 64 hex characters", device.DeviceID)
+	}
+	var setting models.Setting
+	if err := app.server.database().First(&setting, "key = ?", deviceIDSettingKey).Error; err != nil {
+		t.Fatalf("load device setting: %v", err)
+	}
+	if setting.Value != device.DeviceID {
+		t.Fatalf("setting = %q, endpoint = %q", setting.Value, device.DeviceID)
 	}
 
 	resp, body = app.request(t, http.MethodGet, fmt.Sprintf("/api/resume/%d/file", created.ID), nil, "")
@@ -612,6 +735,9 @@ func TestResumeLifecycle(t *testing.T) {
 	}
 	if contentType := resp.Header.Get("Content-Type"); !strings.HasPrefix(contentType, "application/pdf") {
 		t.Fatalf("content type = %q", contentType)
+	}
+	if disposition := resp.Header.Get("Content-Disposition"); !strings.Contains(disposition, "Backend Resume.PDF") {
+		t.Fatalf("content disposition = %q", disposition)
 	}
 
 	resp, body = app.request(t, http.MethodPut, fmt.Sprintf("/api/resume/%d", created.ID), map[string]any{
@@ -739,8 +865,15 @@ func TestResumePathImport(t *testing.T) {
 	if created.Name != "Drop Resume" || created.FileType != "pdf" || len(created.Tags) != 1 || created.Tags[0] != "drop" {
 		t.Fatalf("unexpected imported resume: %+v", created)
 	}
+	if !strings.HasSuffix(created.StoredName, "."+encryptedResumeExtension) {
+		t.Fatalf("stored name = %q, want .%s suffix", created.StoredName, encryptedResumeExtension)
+	}
 	storedPath := filepath.Join(app.server.resumeDirectory(), created.StoredName)
-	data, err := os.ReadFile(storedPath)
+	raw, err := os.ReadFile(storedPath)
+	if err != nil || string(raw) == "%PDF-1.4 drop" {
+		t.Fatalf("imported file should be encrypted: err = %v, data = %q", err, string(raw))
+	}
+	data, err := app.server.readResumeFile(*created)
 	if err != nil || string(data) != "%PDF-1.4 drop" {
 		t.Fatalf("imported file mismatch: err = %v, data = %q", err, string(data))
 	}
@@ -764,5 +897,38 @@ func TestResumePathImport(t *testing.T) {
 	}
 	if _, err := app.server.ImportResumeFromPath(txtPath, "Bad", nil); err == nil {
 		t.Fatalf("unsupported extension should be rejected")
+	}
+}
+
+func TestLegacyUnencryptedResumeStillServed(t *testing.T) {
+	app := newTestApp(t)
+
+	dir := app.server.resumeDirectory()
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatalf("create resume folder: %v", err)
+	}
+	plaintext := []byte("%PDF-1.4 legacy")
+	storedName := "legacy-resume.pdf"
+	if err := os.WriteFile(filepath.Join(dir, storedName), plaintext, 0o644); err != nil {
+		t.Fatalf("write legacy resume: %v", err)
+	}
+	record := models.Resume{
+		Name:       "Legacy",
+		FileName:   "legacy.pdf",
+		StoredName: storedName,
+		FileType:   "pdf",
+		FileSize:   int64(len(plaintext)),
+		Encrypted:  false,
+	}
+	if err := app.server.database().Create(&record).Error; err != nil {
+		t.Fatalf("create legacy resume: %v", err)
+	}
+
+	resp, body := app.request(t, http.MethodGet, fmt.Sprintf("/api/resume/%d/file", record.ID), nil, "")
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("file status = %d, body = %s", resp.StatusCode, body)
+	}
+	if !bytes.Equal(body, plaintext) {
+		t.Fatalf("legacy file content = %q", string(body))
 	}
 }

@@ -11,6 +11,7 @@ import { api, ApiError } from "../api/client";
 import type {
   Application,
   ApplicationUpdate,
+  Category,
   CategoryFilter,
   Status,
 } from "../api/types";
@@ -48,6 +49,7 @@ export interface ApplicationsBoard {
   deleteRecord: (record: Application) => Promise<void>;
   deleteSelected: () => Promise<void>;
   updateSelectedStatus: (status: Status) => Promise<void>;
+  updateSelectedCategory: (category: Category) => Promise<void>;
   afterCreated: (application: Application) => void;
   afterImported: () => void;
 }
@@ -256,6 +258,24 @@ export function useApplications({
     [message, onDataChanged, refresh, selectedKeys, t],
   );
 
+  const updateSelectedCategory = useCallback(
+    async (category: Category) => {
+      if (selectedKeys.length === 0) return;
+      try {
+        const result = await api.batchCategory(selectedKeys, category);
+        message.success(
+          t("toast.categoryUpdated", { count: result.updated }),
+        );
+        setSelectedKeys([]);
+        onDataChanged();
+        refresh();
+      } catch (error) {
+        message.error(apiErrorMessage(error, t));
+      }
+    },
+    [message, onDataChanged, refresh, selectedKeys, t],
+  );
+
   const afterCreated = useCallback(
     (created: Application) => {
       onDataChanged();
@@ -299,6 +319,7 @@ export function useApplications({
     deleteRecord,
     deleteSelected,
     updateSelectedStatus,
+    updateSelectedCategory,
     afterCreated,
     afterImported,
   };

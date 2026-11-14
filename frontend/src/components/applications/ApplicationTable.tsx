@@ -41,6 +41,7 @@ interface ApplicationTableProps {
   onPageSizeChange: (pageSize: number) => void;
   onStatusChange: (record: Application, status: Status) => void;
   onPin: (record: Application) => void;
+  onEdit: (record: Application) => void;
   onDelete: (record: Application) => void;
   onAdd: () => void;
 }
@@ -68,6 +69,7 @@ export function ApplicationTable({
   onPageSizeChange,
   onStatusChange,
   onPin,
+  onEdit,
   onDelete,
   onAdd,
 }: ApplicationTableProps) {
@@ -151,7 +153,7 @@ export function ApplicationTable({
     {
       title: t("table.actions"),
       key: "actions",
-      width: 86,
+      width: 108,
       align: "right",
       render: (_value, record) =>
         record.id === DRAFT_ID ? (
@@ -165,6 +167,7 @@ export function ApplicationTable({
             application={record}
             pinSaving={pinSavingId === record.id}
             onPin={onPin}
+            onEdit={onEdit}
             onDelete={onDelete}
           />
         ),

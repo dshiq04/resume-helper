@@ -11,8 +11,11 @@ import type {
   DatabaseSettingsResponse,
   DatabaseTestResult,
   DatabaseUpdateResult,
+  DailyStats,
+  DeviceInfo,
   ImportResult,
   ListParams,
+  QuickEntryDefaults,
   Resume,
   ResumeCreateInput,
   ResumeList,
@@ -171,6 +174,9 @@ export const api = {
       data: input,
     });
   },
+  getApplication(id: number) {
+    return request<Application>(`/application/${id}`);
+  },
   updateApplication(id: number, input: ApplicationUpdate) {
     return request<Application>(`/application/${id}`, {
       method: "PUT",
@@ -192,6 +198,12 @@ export const api = {
     return request<{ updated: number }>("/applications/batch-status", {
       method: "PATCH",
       data: { ids, status },
+    });
+  },
+  batchCategory(ids: number[], category: string) {
+    return request<{ updated: number }>("/applications/batch-category", {
+      method: "PATCH",
+      data: { ids, category },
     });
   },
   importExcel(file: File) {
@@ -218,8 +230,14 @@ export const api = {
   stats() {
     return request<Stats>("/stats");
   },
+  dailyStats() {
+    return request<DailyStats>("/stats/daily");
+  },
   systemInfo() {
     return request<SystemInfo>("/system/info");
+  },
+  deviceInfo() {
+    return request<DeviceInfo>("/system/device");
   },
   databaseSettings() {
     return request<DatabaseSettingsResponse>("/system/database");
@@ -267,6 +285,16 @@ export const api = {
       data: { category },
       timeout: 10_000,
     });
+  },
+  openApplicationEdit(id: number) {
+    return request<{ opened: boolean }>("/system/application-edit", {
+      method: "POST",
+      data: { id },
+      timeout: 10_000,
+    });
+  },
+  quickEntryDefaults() {
+    return request<QuickEntryDefaults>("/system/quick-entry/defaults");
   },
   listResumes(search?: string) {
     return request<ResumeList>("/resumes", {

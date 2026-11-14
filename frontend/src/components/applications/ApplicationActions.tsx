@@ -1,6 +1,7 @@
 import { Button, Popconfirm, Tooltip } from "antd";
 import {
   DeleteOutlined,
+  EditOutlined,
   PushpinFilled,
   PushpinOutlined,
 } from "@ant-design/icons";
@@ -12,6 +13,7 @@ interface ApplicationActionsProps {
   pinSaving: boolean;
   mobile?: boolean;
   onPin: (record: Application) => void;
+  onEdit: (record: Application) => void;
   onDelete: (record: Application) => void;
 }
 
@@ -20,6 +22,7 @@ export function ApplicationActions({
   pinSaving,
   mobile = false,
   onPin,
+  onEdit,
   onDelete,
 }: ApplicationActionsProps) {
   const { t } = useI18n();
@@ -38,6 +41,17 @@ export function ApplicationActions({
           loading={pinSaving}
           icon={application.pinned ? <PushpinFilled /> : <PushpinOutlined />}
           onClick={() => onPin(application)}
+        />
+      </Tooltip>
+
+      <Tooltip title={t("action.modify")}>
+        <Button
+          type="text"
+          size="small"
+          className={`row-edit-button ${mobile ? "mobile-card-icon" : ""}`}
+          aria-label={t("action.modify")}
+          icon={<EditOutlined />}
+          onClick={() => onEdit(application)}
         />
       </Tooltip>
 

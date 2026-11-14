@@ -1,4 +1,4 @@
-export type Category = "spring" | "autumn" | "internship";
+export type Category = "spring" | "autumn" | "internship" | "social";
 export type Status =
   | "screening"
   | "written"
@@ -7,7 +7,12 @@ export type Status =
   | "offer"
   | "rejected";
 
-export const CATEGORIES: Category[] = ["spring", "autumn", "internship"];
+export const CATEGORIES: Category[] = [
+  "spring",
+  "autumn",
+  "internship",
+  "social",
+];
 export const STATUSES: Status[] = [
   "screening",
   "written",
@@ -59,12 +64,27 @@ export interface ApplicationUpdate {
   pinned?: boolean;
 }
 
+export interface QuickEntryDefaults {
+  defaultCategory: Category;
+  serverTime: string;
+}
+
 export interface Stats {
   total: number;
   resumes: number;
   byCategory: Record<Category, number>;
   byStatus: Record<Status, number>;
   byCategoryStatus: Record<Category, Record<Status, number>>;
+}
+
+export interface DailyStat {
+  date: string;
+  category: Category;
+  count: number;
+}
+
+export interface DailyStats {
+  daily: DailyStat[];
 }
 
 export interface AuthStatus {
@@ -125,6 +145,12 @@ export interface DatabaseTestResult {
   message: string;
 }
 
+export interface DeviceInfo {
+  deviceId: string;
+  algorithm: string;
+  keyDerivation: string;
+}
+
 export interface ShortcutStatus {
   supported: boolean;
   exists: boolean;
@@ -162,6 +188,7 @@ export interface Resume {
   fileName: string;
   fileType: ResumeFileType;
   fileSize: number;
+  encrypted: boolean;
   pinned: boolean;
   createdAt: string;
   updatedAt: string;

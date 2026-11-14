@@ -13,6 +13,7 @@ type Resume struct {
 	StoredName string    `gorm:"type:varchar(255);not null;uniqueIndex" json:"-"`
 	FileType   string    `gorm:"type:varchar(16);not null" json:"fileType"`
 	FileSize   int64     `gorm:"not null;default:0" json:"fileSize"`
+	Encrypted  bool      `gorm:"not null;default:false" json:"encrypted"`
 	Pinned     bool      `gorm:"not null;default:false;index" json:"pinned"`
 	CreatedAt  time.Time `json:"createdAt"`
 	UpdatedAt  time.Time `json:"updatedAt"`

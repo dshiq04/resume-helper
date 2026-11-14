@@ -69,7 +69,6 @@ export function SecuritySettings({
         icon={<SafetyCertificateOutlined />}
         tone="security"
         title={t("settings.security")}
-        description={t("settings.securityHint")}
       >
         <div className={`security-card ${passwordEnabled ? "is-on" : ""}`}>
           <div className="security-card-head">
@@ -82,7 +81,6 @@ export function SecuritySettings({
                   ? t("settings.passwordOn")
                   : t("settings.passwordOff")}
               </strong>
-              <span>{t("settings.securityHint")}</span>
             </div>
             <span className={`security-status ${passwordEnabled ? "is-on" : ""}`}>
               {passwordEnabled ? t("common.on") : t("common.off")}

@@ -33,6 +33,7 @@ interface ApplicationCardsProps {
   onPageChange: (page: number) => void;
   onStatusChange: (record: Application, status: Status) => void;
   onPin: (record: Application) => void;
+  onEdit: (record: Application) => void;
   onDelete: (record: Application) => void;
   onAdd: () => void;
 }
@@ -59,6 +60,7 @@ export function ApplicationCards({
   onPageChange,
   onStatusChange,
   onPin,
+  onEdit,
   onDelete,
   onAdd,
 }: ApplicationCardsProps) {
@@ -113,6 +115,7 @@ export function ApplicationCards({
                 pinSaving={pinSavingId === record.id}
                 mobile
                 onPin={onPin}
+                onEdit={onEdit}
                 onDelete={onDelete}
               />
             </div>

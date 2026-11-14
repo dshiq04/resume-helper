@@ -1,7 +1,9 @@
 import {
   AppstoreOutlined,
+  BarChartOutlined,
   CloudOutlined,
   FileTextOutlined,
+  IdcardOutlined,
   RocketOutlined,
   SettingOutlined,
   SunOutlined,
@@ -15,6 +17,7 @@ import { Logo } from "./Logo";
 interface SidebarProps {
   stats: Stats | null;
   passwordEnabled: boolean;
+  collapsed: boolean;
 }
 
 const categories: Array<{
@@ -37,9 +40,15 @@ const categories: Array<{
     icon: RocketOutlined,
     accent: "#38bdf8",
   },
+  {
+    path: "/social",
+    labelKey: "nav.social",
+    icon: IdcardOutlined,
+    accent: "#fb7185",
+  },
 ];
 
-export function Sidebar({ stats, passwordEnabled }: SidebarProps) {
+export function Sidebar({ stats, passwordEnabled, collapsed }: SidebarProps) {
   const { t } = useI18n();
 
   const countFor = (path: string) => {
@@ -55,7 +64,7 @@ export function Sidebar({ stats, passwordEnabled }: SidebarProps) {
   const rate = total > 0 ? Math.round((offers / total) * 100) : 0;
 
   return (
-    <aside className="sidebar">
+    <aside className={`sidebar${collapsed ? " is-collapsed" : ""}`}>
       <NavLink
         to="/"
         end
@@ -107,6 +116,18 @@ export function Sidebar({ stats, passwordEnabled }: SidebarProps) {
           </span>
           <span className="sidebar-nav-label">{t("nav.resumes")}</span>
           <span className="sidebar-nav-count">{countFor("/resumes")}</span>
+        </NavLink>
+        <NavLink
+          to="/statistics"
+          className={({ isActive }) =>
+            `sidebar-nav-item ${isActive ? "is-active" : ""}`
+          }
+          title={t("nav.statistics")}
+        >
+          <span className="sidebar-nav-icon" style={{ color: "#a78bfa" }}>
+            <BarChartOutlined />
+          </span>
+          <span className="sidebar-nav-label">{t("nav.statistics")}</span>
         </NavLink>
       </nav>
 

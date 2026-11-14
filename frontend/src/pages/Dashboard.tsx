@@ -49,6 +49,14 @@ export function Dashboard({ category }: DashboardProps) {
     }
   };
 
+  const handleEdit = async (record: { id: number }) => {
+    try {
+      await api.openApplicationEdit(record.id);
+    } catch (error) {
+      message.error(apiErrorMessage(error, t));
+    }
+  };
+
   const sharedListProps = {
     items: board.items,
     total: board.total,
@@ -69,6 +77,7 @@ export function Dashboard({ category }: DashboardProps) {
     onDraftCancel: draft.cancel,
     onStatusChange: board.updateStatus,
     onPin: board.togglePin,
+    onEdit: (record: { id: number }) => void handleEdit(record),
     onDelete: board.deleteRecord,
     onAdd: draft.start,
   };
@@ -89,6 +98,7 @@ export function Dashboard({ category }: DashboardProps) {
           <SelectionBar
             count={board.selectedKeys.length}
             statusOptions={statusOptions}
+            onBatchCategory={board.updateSelectedCategory}
             onBatchStatus={board.updateSelectedStatus}
             onBatchDelete={board.deleteSelected}
             onClear={board.clearSelection}
