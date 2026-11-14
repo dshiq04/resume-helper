@@ -98,6 +98,7 @@ export function Dashboard({ category }: DashboardProps) {
           <SelectionBar
             count={board.selectedKeys.length}
             statusOptions={statusOptions}
+            onBatchCategory={board.updateSelectedCategory}
             onBatchStatus={board.updateSelectedStatus}
             onBatchDelete={board.deleteSelected}
             onClear={board.clearSelection}

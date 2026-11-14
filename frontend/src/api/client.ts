@@ -200,6 +200,12 @@ export const api = {
       data: { ids, status },
     });
   },
+  batchCategory(ids: number[], category: string) {
+    return request<{ updated: number }>("/applications/batch-category", {
+      method: "PATCH",
+      data: { ids, category },
+    });
+  },
   importExcel(file: File) {
     const data = new FormData();
     data.append("file", file);

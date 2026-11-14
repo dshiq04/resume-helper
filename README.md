@@ -21,6 +21,7 @@
 - **官网直达**：鼠标悬浮到投递链接时出现打开按钮，点击后通过系统默认浏览器打开（Wails 桌面环境）。链接按原始内容保存，不会自动添加 `http://` 或 `https://`。
 - **单条删除 / 批量删除**：每行提供删除按钮，表头支持多选后批量删除。
 - **批量修改状态**：多选记录后一键切换为初筛 / 笔试 / 面试 / 待定 / Offer / 淘汰。
+- **批量修改投递类型**：勾选记录后可在选择栏中一键切换春招 / 秋招 / 实习 / 社会招聘。
 - **搜索**：按企业名称、投递链接模糊搜索，并可按状态筛选。
 - **Excel 导入**：支持 `.xlsx` / `.xlsm` 批量导入，内置中英双语模板与下拉选项，导入结果会显示成功、跳过和错误明细。
 - **可选密码保护**：在设置页开启后，启动应用需要解锁；密码使用 **bcrypt** 哈希落库，绝不明文保存。
@@ -311,6 +312,7 @@ psql -d resume_helper -f init.postgresql.sql
 | `DELETE` | `/api/application/:id` | 删除单条 |
 | `POST` | `/api/applications/batch-delete` | 批量删除 |
 | `PATCH` | `/api/applications/batch-status` | 批量修改状态 |
+| `PATCH` | `/api/applications/batch-category` | 批量修改投递类型 |
 | `POST` | `/api/applications/import` | 上传 Excel 导入 |
 | `GET` | `/api/applications/template` | 下载导入模板 |
 | `GET` | `/api/resumes` | 简历列表，置顶优先，支持 `search` |

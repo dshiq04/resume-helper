@@ -1,14 +1,23 @@
 import { useMemo } from "react";
 import { Button, Dropdown, Popconfirm } from "antd";
 import type { MenuProps } from "antd";
-import { DeleteOutlined, SwapOutlined } from "@ant-design/icons";
-import type { Status, StatusOption } from "../../api/types";
+import {
+  AppstoreOutlined,
+  DeleteOutlined,
+  SwapOutlined,
+} from "@ant-design/icons";
+import type { Category, Status, StatusOption } from "../../api/types";
 import { useI18n } from "../../i18n";
-import { StatusBadge } from "../badges";
+import {
+  CategoryBadge,
+  StatusBadge,
+  useCategoryOptions,
+} from "../badges";
 
 interface SelectionBarProps {
   count: number;
   statusOptions: StatusOption[];
+  onBatchCategory: (category: Category) => void;
   onBatchStatus: (status: Status) => void;
   onBatchDelete: () => void;
   onClear: () => void;
@@ -17,11 +26,22 @@ interface SelectionBarProps {
 export function SelectionBar({
   count,
   statusOptions,
+  onBatchCategory,
   onBatchStatus,
   onBatchDelete,
   onClear,
 }: SelectionBarProps) {
   const { t } = useI18n();
+  const categoryOptions = useCategoryOptions();
+
+  const categoryItems = useMemo<MenuProps["items"]>(
+    () =>
+      categoryOptions.map((option) => ({
+        key: option.value,
+        label: <CategoryBadge category={option.value} />,
+      })),
+    [categoryOptions],
+  );
 
   const statusItems = useMemo<MenuProps["items"]>(
     () =>
@@ -39,6 +59,17 @@ export function SelectionBar({
         <span>{t("table.selectedCount", { count })}</span>
       </div>
       <div className="selection-actions">
+        <Dropdown
+          menu={{
+            items: categoryItems,
+            onClick: ({ key }) => onBatchCategory(key as Category),
+          }}
+          trigger={["click"]}
+        >
+          <Button icon={<AppstoreOutlined />}>
+            {t("action.changeCategory")}
+          </Button>
+        </Dropdown>
         <Dropdown
           menu={{
             items: statusItems,

@@ -211,6 +211,35 @@ func TestApplicationLifecycle(t *testing.T) {
 		t.Fatalf("batch updated = %d, want 2", batchResult["updated"])
 	}
 
+	resp, body = app.request(t, http.MethodPatch, "/api/applications/batch-category", map[string]any{
+		"ids":      []uint{created.ID, second.ID},
+		"category": "internship",
+	}, "")
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("batch category = %d, body = %s", resp.StatusCode, body)
+	}
+	batchResult = decodeJSON[map[string]int64](t, body)
+	if batchResult["updated"] != 2 {
+		t.Fatalf("batch category updated = %d, want 2", batchResult["updated"])
+	}
+	var recategorised []models.Application
+	if err := app.server.database().Where("id IN ?", []uint{created.ID, second.ID}).Find(&recategorised).Error; err != nil {
+		t.Fatalf("load recategorised applications: %v", err)
+	}
+	for _, item := range recategorised {
+		if item.Category != models.CategoryInternship {
+			t.Fatalf("category = %q, want %q", item.Category, models.CategoryInternship)
+		}
+	}
+
+	resp, body = app.request(t, http.MethodPatch, "/api/applications/batch-category", map[string]any{
+		"ids":      []uint{created.ID, second.ID},
+		"category": "unknown",
+	}, "")
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("invalid category status = %d, body = %s", resp.StatusCode, body)
+	}
+
 	resp, body = app.request(t, http.MethodDelete, fmt.Sprintf("/api/application/%d", second.ID), nil, "")
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("delete status = %d, body = %s", resp.StatusCode, body)

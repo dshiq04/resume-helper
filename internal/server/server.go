@@ -217,6 +217,7 @@ func (s *Server) newEngine() *gin.Engine {
 		protected.POST("/applications", s.createApplication)
 		protected.POST("/applications/batch-delete", s.batchDeleteApplications)
 		protected.PATCH("/applications/batch-status", s.batchUpdateStatus)
+		protected.PATCH("/applications/batch-category", s.batchUpdateCategory)
 		protected.GET("/application/:id", s.getApplication)
 		protected.PUT("/application/:id", s.updateApplication)
 		protected.DELETE("/application/:id", s.deleteApplication)

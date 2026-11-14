@@ -46,6 +46,11 @@ type batchStatusInput struct {
 	Status string `json:"status"`
 }
 
+type batchCategoryInput struct {
+	IDs      []uint `json:"ids"`
+	Category string `json:"category"`
+}
+
 func (s *Server) listApplications(c *gin.Context) {
 	var params listApplicationsParams
 	if err := c.ShouldBindQuery(&params); err != nil {
@@ -305,6 +310,33 @@ func (s *Server) batchUpdateStatus(c *gin.Context) {
 	result := s.database().Model(&models.Application{}).
 		Where("id IN ?", ids).
 		Update("status", status)
+	if result.Error != nil {
+		apiError(c, http.StatusInternalServerError, "update_failed", "Failed to update the selected applications.")
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"updated": result.RowsAffected})
+}
+
+func (s *Server) batchUpdateCategory(c *gin.Context) {
+	var input batchCategoryInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		apiError(c, http.StatusBadRequest, "invalid_body", "Invalid request body.")
+		return
+	}
+	ids := uniqueIDs(input.IDs)
+	if len(ids) == 0 {
+		apiError(c, http.StatusBadRequest, "ids_required", "Select at least one application.")
+		return
+	}
+	category := models.NormalizeCategory(input.Category)
+	if !models.IsValidCategory(category) {
+		apiError(c, http.StatusBadRequest, "invalid_category", "Unknown application category.")
+		return
+	}
+
+	result := s.database().Model(&models.Application{}).
+		Where("id IN ?", ids).
+		Update("category", category)
 	if result.Error != nil {
 		apiError(c, http.StatusInternalServerError, "update_failed", "Failed to update the selected applications.")
 		return
