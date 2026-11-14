@@ -2,6 +2,7 @@ package server
 
 import (
 	"net/http"
+	"sort"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -410,4 +411,55 @@ func (s *Server) stats(c *gin.Context) {
 		"byStatus":         byStatus,
 		"byCategoryStatus": byCategoryStatus,
 	})
+}
+
+type dailyStat struct {
+	Date     string `json:"date"`
+	Category string `json:"category"`
+	Count    int64  `json:"count"`
+}
+
+// dailyStats returns per-day application counts grouped by category. The
+// aggregation happens in Go so the query stays portable across SQLite, MySQL
+// and PostgreSQL, which all format dates differently.
+func (s *Server) dailyStats(c *gin.Context) {
+	var rows []struct {
+		Category  string
+		AppliedAt time.Time
+	}
+	if err := s.database().Model(&models.Application{}).
+		Select("category, applied_at").
+		Scan(&rows).Error; err != nil {
+		apiError(c, http.StatusInternalServerError, "query_failed", "Failed to load statistics.")
+		return
+	}
+
+	counts := make(map[string]*dailyStat, len(rows))
+	keys := make([]string, 0, len(rows))
+	for _, row := range rows {
+		if row.AppliedAt.IsZero() {
+			continue
+		}
+		category := models.NormalizeCategory(row.Category)
+		if !models.IsValidCategory(category) {
+			continue
+		}
+		date := row.AppliedAt.Local().Format("2006-01-02")
+		key := date + "|" + category
+		item, exists := counts[key]
+		if !exists {
+			item = &dailyStat{Date: date, Category: category}
+			counts[key] = item
+			keys = append(keys, key)
+		}
+		item.Count++
+	}
+
+	sort.Strings(keys)
+	daily := make([]dailyStat, 0, len(keys))
+	for _, key := range keys {
+		daily = append(daily, *counts[key])
+	}
+
+	c.JSON(http.StatusOK, gin.H{"daily": daily})
 }

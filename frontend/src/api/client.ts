@@ -11,6 +11,7 @@ import type {
   DatabaseSettingsResponse,
   DatabaseTestResult,
   DatabaseUpdateResult,
+  DailyStats,
   ImportResult,
   ListParams,
   QuickEntryDefaults,
@@ -218,6 +219,9 @@ export const api = {
   },
   stats() {
     return request<Stats>("/stats");
+  },
+  dailyStats() {
+    return request<DailyStats>("/stats/daily");
   },
   systemInfo() {
     return request<SystemInfo>("/system/info");

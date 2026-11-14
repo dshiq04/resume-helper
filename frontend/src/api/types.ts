@@ -72,6 +72,16 @@ export interface Stats {
   byCategoryStatus: Record<Category, Record<Status, number>>;
 }
 
+export interface DailyStat {
+  date: string;
+  category: Category;
+  count: number;
+}
+
+export interface DailyStats {
+  daily: DailyStat[];
+}
+
 export interface AuthStatus {
   enabled: boolean;
   authenticated: boolean;

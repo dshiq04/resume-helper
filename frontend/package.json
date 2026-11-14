@@ -16,6 +16,8 @@
     "anyview": "^0.2.4",
     "axios": "^1.21.1",
     "dompurify": "^3.4.17",
+    "echarts": "^6.1.0",
+    "echarts-for-react": "^3.0.6",
     "jszip": "^3.10.2",
     "mammoth": "^1.13.0",
     "papaparse": "^5.7.1",

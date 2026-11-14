@@ -156,6 +156,19 @@ func TestApplicationLifecycle(t *testing.T) {
 		t.Fatalf("unexpected stats: %+v", stats)
 	}
 
+	resp, body = app.request(t, http.MethodGet, "/api/stats/daily", nil, "")
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("daily stats status = %d, body = %s", resp.StatusCode, body)
+	}
+	daily := decodeJSON[DailyStats](t, body)
+	if len(daily.Daily) != 1 {
+		t.Fatalf("unexpected daily stats: %+v", daily)
+	}
+	entry := daily.Daily[0]
+	if entry.Category != models.CategoryAutumn || entry.Count != 1 || entry.Date != created.AppliedAt.Local().Format("2006-01-02") {
+		t.Fatalf("unexpected daily entry: %+v", entry)
+	}
+
 	resp, body = app.request(t, http.MethodPost, "/api/applications", map[string]string{
 		"companyName": "Second Corp",
 		"category":    "spring",
@@ -619,6 +632,14 @@ type Stats struct {
 	ByCategory map[string]int64            `json:"byCategory"`
 	ByStatus   map[string]int64            `json:"byStatus"`
 	Matrix     map[string]map[string]int64 `json:"byCategoryStatus"`
+}
+
+type DailyStats struct {
+	Daily []struct {
+		Date     string `json:"date"`
+		Category string `json:"category"`
+		Count    int64  `json:"count"`
+	} `json:"daily"`
 }
 
 func TestResumeLifecycle(t *testing.T) {

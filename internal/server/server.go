@@ -214,6 +214,7 @@ func (s *Server) newEngine() *gin.Engine {
 		protected.DELETE("/resume/:id", s.deleteResume)
 		protected.GET("/resume/:id/file", s.serveResumeFile)
 		protected.GET("/stats", s.stats)
+		protected.GET("/stats/daily", s.dailyStats)
 		protected.GET("/system/info", s.systemInfo)
 		protected.GET("/system/database", s.getDatabaseSettings)
 		protected.POST("/system/database/test", s.testDatabaseSettings)
