@@ -3,11 +3,22 @@ package server
 import (
 	"net/http"
 	"strings"
+	"time"
 
 	"resume-helper/internal/models"
 
 	"github.com/gin-gonic/gin"
 )
+
+// quickEntryDefaults reports the season preselected in the quick-entry window.
+// The decision uses the server clock so every client sees the same default.
+func (s *Server) quickEntryDefaults(c *gin.Context) {
+	now := time.Now()
+	c.JSON(http.StatusOK, gin.H{
+		"defaultCategory": models.DefaultCategoryForTime(now),
+		"serverTime":      now.Format(time.RFC3339),
+	})
+}
 
 func (s *Server) openQuickEntry(c *gin.Context) {
 	var input struct {

@@ -103,7 +103,7 @@ func (s *Server) listApplications(c *gin.Context) {
 
 	var items []models.Application
 	if err := build().
-		Order("pinned DESC, updated_at DESC, id DESC").
+		Order("pinned DESC, applied_at DESC, id DESC").
 		Offset((params.Page - 1) * params.PageSize).
 		Limit(params.PageSize).
 		Find(&items).Error; err != nil {

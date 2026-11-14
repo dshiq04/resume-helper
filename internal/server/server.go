@@ -222,6 +222,7 @@ func (s *Server) newEngine() *gin.Engine {
 		protected.POST("/system/shortcut", s.createDesktopShortcut)
 		protected.PUT("/system/shortcut/prompt-setting", s.updateShortcutPromptSetting)
 		protected.POST("/system/quick-entry", s.openQuickEntry)
+		protected.GET("/system/quick-entry/defaults", s.quickEntryDefaults)
 		protected.POST("/system/resume-preview", s.openResumePreview)
 	}
 

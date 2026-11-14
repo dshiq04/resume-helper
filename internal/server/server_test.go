@@ -491,6 +491,50 @@ func TestCreateApplicationUsesServerTimeAndPinned(t *testing.T) {
 	}
 }
 
+func TestQuickEntryDefaultsFollowServerClock(t *testing.T) {
+	app := newTestApp(t)
+
+	resp, body := app.request(t, http.MethodGet, "/api/system/quick-entry/defaults", nil, "")
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("defaults status = %d, body = %s", resp.StatusCode, body)
+	}
+	defaults := decodeJSON[struct {
+		DefaultCategory string `json:"defaultCategory"`
+		ServerTime      string `json:"serverTime"`
+	}](t, body)
+	if !models.IsValidCategory(defaults.DefaultCategory) {
+		t.Fatalf("defaultCategory = %q, want a known category", defaults.DefaultCategory)
+	}
+	if want := models.DefaultCategoryForTime(time.Now()); defaults.DefaultCategory != want {
+		t.Fatalf("defaultCategory = %q, want %q from server clock", defaults.DefaultCategory, want)
+	}
+	if _, err := time.Parse(time.RFC3339, defaults.ServerTime); err != nil {
+		t.Fatalf("serverTime = %q: %v", defaults.ServerTime, err)
+	}
+}
+
+func TestDefaultCategoryForTime(t *testing.T) {
+	cases := []struct {
+		month time.Month
+		want  string
+	}{
+		{time.January, models.CategoryInternship},
+		{time.February, models.CategorySpring},
+		{time.May, models.CategorySpring},
+		{time.June, models.CategoryInternship},
+		{time.July, models.CategoryInternship},
+		{time.August, models.CategoryAutumn},
+		{time.November, models.CategoryAutumn},
+		{time.December, models.CategoryInternship},
+	}
+	for _, tc := range cases {
+		at := time.Date(2026, tc.month, 15, 12, 0, 0, 0, time.Local)
+		if got := models.DefaultCategoryForTime(at); got != tc.want {
+			t.Fatalf("DefaultCategoryForTime(%s) = %q, want %q", tc.month, got, tc.want)
+		}
+	}
+}
+
 func TestDatabaseSettingsAndHotSwap(t *testing.T) {
 	app := newTestApp(t)
 	defer func() {

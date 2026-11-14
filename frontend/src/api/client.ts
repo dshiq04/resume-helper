@@ -13,6 +13,7 @@ import type {
   DatabaseUpdateResult,
   ImportResult,
   ListParams,
+  QuickEntryDefaults,
   Resume,
   ResumeCreateInput,
   ResumeList,
@@ -267,6 +268,9 @@ export const api = {
       data: { category },
       timeout: 10_000,
     });
+  },
+  quickEntryDefaults() {
+    return request<QuickEntryDefaults>("/system/quick-entry/defaults");
   },
   listResumes(search?: string) {
     return request<ResumeList>("/resumes", {

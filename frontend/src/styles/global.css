@@ -1893,10 +1893,31 @@ textarea {
 
 .quick-entry-actions {
   display: flex;
-  justify-content: flex-end;
+  align-items: center;
+  justify-content: space-between;
   width: 100%;
   gap: 7px;
   padding-top: 2px;
+}
+
+.quick-entry-category {
+  flex-shrink: 1;
+  min-width: 0;
+  padding: 1px;
+  border-radius: 7px;
+  font-size: 11px;
+}
+
+.quick-entry-category .ant-segmented-item-label {
+  min-height: 20px;
+  padding: 0 7px;
+  line-height: 20px;
+}
+
+.quick-entry-buttons {
+  display: flex;
+  flex-shrink: 0;
+  gap: 7px;
 }
 
 .quick-entry-actions .ant-btn {

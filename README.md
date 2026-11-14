@@ -327,6 +327,7 @@ psql -d resume_helper -f init.postgresql.sql
 | `POST` | `/api/system/shortcut` | 创建桌面快捷方式 |
 | `POST` | `/api/system/shortcut/prompt` | 处理关闭时的快捷方式提示窗口选择 |
 | `POST` | `/api/system/quick-entry` | 打开独立的快速录入窗口 |
+| `GET` | `/api/system/quick-entry/defaults` | 按服务器时间返回默认投递位置（秋招 / 春招 / 实习） |
 | `POST` | `/api/system/resume-preview` | 打开独立的简历预览窗口 |
 
 开启密码后，除健康检查、认证接口和静态资源外，其余 `/api` 请求需要携带：

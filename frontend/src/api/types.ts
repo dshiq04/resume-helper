@@ -59,6 +59,11 @@ export interface ApplicationUpdate {
   pinned?: boolean;
 }
 
+export interface QuickEntryDefaults {
+  defaultCategory: Category;
+  serverTime: string;
+}
+
 export interface Stats {
   total: number;
   resumes: number;
