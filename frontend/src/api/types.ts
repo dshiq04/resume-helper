@@ -1,4 +1,4 @@
-export type Category = "spring" | "autumn" | "internship";
+export type Category = "spring" | "autumn" | "internship" | "social";
 export type Status =
   | "screening"
   | "written"
@@ -7,7 +7,12 @@ export type Status =
   | "offer"
   | "rejected";
 
-export const CATEGORIES: Category[] = ["spring", "autumn", "internship"];
+export const CATEGORIES: Category[] = [
+  "spring",
+  "autumn",
+  "internship",
+  "social",
+];
 export const STATUSES: Status[] = [
   "screening",
   "written",

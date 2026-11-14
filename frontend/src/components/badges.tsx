@@ -1,6 +1,6 @@
 import { useMemo } from "react";
+import { CATEGORIES, STATUSES } from "../api/types";
 import type { Category, Status, StatusOption } from "../api/types";
-import { STATUSES } from "../api/types";
 import { useI18n } from "../i18n";
 import type { MessageKey } from "../i18n";
 
@@ -39,7 +39,7 @@ export function useCategoryOptions() {
   const { t, locale } = useI18n();
   return useMemo(
     () =>
-      (["spring", "autumn", "internship"] as Category[]).map((category) => ({
+      CATEGORIES.map((category) => ({
         value: category,
         label: t(`category.${category}` as MessageKey),
       })),

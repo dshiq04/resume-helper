@@ -54,7 +54,7 @@ export function createTheme(mode: ThemeMode): ThemeConfig {
         borderColor: dark ? "#1f2a3d" : "#f0f1f7",
         rowHoverBg: dark ? "#16223a" : "#f8f9ff",
         headerBorderRadius: 0,
-        cellPaddingBlock: 15,
+        cellPaddingBlock: 10,
         cellPaddingInline: 14,
       },
       Modal: {

@@ -21,7 +21,7 @@ import (
 	"gorm.io/gorm"
 )
 
-const Version = "1.0.0"
+const Version = "1.1"
 
 type Server struct {
 	cfg    *config.Config
@@ -40,6 +40,9 @@ type Server struct {
 
 	quickEntryMu     sync.RWMutex
 	quickEntryOpener func(category string)
+
+	applicationEditMu     sync.RWMutex
+	applicationEditOpener func(id uint)
 
 	shortcutPromptMu      sync.RWMutex
 	shortcutPromptHandler func(create bool) error
@@ -80,6 +83,14 @@ func (s *Server) SetQuickEntryOpener(opener func(category string)) {
 	s.quickEntryMu.Lock()
 	defer s.quickEntryMu.Unlock()
 	s.quickEntryOpener = opener
+}
+
+// SetApplicationEditOpener wires the desktop application-edit window opener
+// into the HTTP layer. Headless/browser mode leaves it nil.
+func (s *Server) SetApplicationEditOpener(opener func(id uint)) {
+	s.applicationEditMu.Lock()
+	defer s.applicationEditMu.Unlock()
+	s.applicationEditOpener = opener
 }
 
 // SetShortcutPromptHandler wires the shortcut-prompt window decision back
@@ -178,7 +189,7 @@ func (s *Server) requestLogger() gin.HandlerFunc {
 
 func (s *Server) newEngine() *gin.Engine {
 	r := gin.New()
-	r.Use(s.requestLogger(), gin.Recovery(), corsMiddleware(), securityHeaders())
+	r.Use(s.requestLogger(), gin.Recovery(), apiErrorHandler(), corsMiddleware(), securityHeaders())
 
 	api := r.Group("/api")
 	{
@@ -203,6 +214,7 @@ func (s *Server) newEngine() *gin.Engine {
 		protected.POST("/applications", s.createApplication)
 		protected.POST("/applications/batch-delete", s.batchDeleteApplications)
 		protected.PATCH("/applications/batch-status", s.batchUpdateStatus)
+		protected.GET("/application/:id", s.getApplication)
 		protected.PUT("/application/:id", s.updateApplication)
 		protected.DELETE("/application/:id", s.deleteApplication)
 		protected.POST("/applications/import", s.importApplications)
@@ -224,6 +236,7 @@ func (s *Server) newEngine() *gin.Engine {
 		protected.PUT("/system/shortcut/prompt-setting", s.updateShortcutPromptSetting)
 		protected.POST("/system/quick-entry", s.openQuickEntry)
 		protected.GET("/system/quick-entry/defaults", s.quickEntryDefaults)
+		protected.POST("/system/application-edit", s.openApplicationEdit)
 		protected.POST("/system/resume-preview", s.openResumePreview)
 	}
 
@@ -358,6 +371,53 @@ func apiError(c *gin.Context, status int, code, message string) {
 		"error": message,
 		"code":  code,
 	})
+}
+
+// apiFailure is an error that can be raised from a handler and rendered by the
+// global apiErrorHandler middleware. Keeping the response in one place lets
+// every endpoint share the same JSON error shape.
+type apiFailure struct {
+	status  int
+	code    string
+	message string
+}
+
+func (e *apiFailure) Error() string {
+	return e.message
+}
+
+// fail raises an application error for the global interceptor instead of
+// writing the response inline.
+func fail(c *gin.Context, status int, code, message string) {
+	_ = c.Error(&apiFailure{status: status, code: code, message: message})
+	c.Abort()
+}
+
+func apiErrorHandler() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.Next()
+
+		if c.Writer.Written() || len(c.Errors) == 0 {
+			return
+		}
+
+		failure := &apiFailure{
+			status:  http.StatusInternalServerError,
+			code:    "internal_error",
+			message: "Something went wrong.",
+		}
+		for _, err := range c.Errors {
+			var candidate *apiFailure
+			if errors.As(err, &candidate) {
+				failure = candidate
+				break
+			}
+		}
+		c.AbortWithStatusJSON(failure.status, gin.H{
+			"error": failure.message,
+			"code":  failure.code,
+		})
+	}
 }
 
 func parseID(c *gin.Context) (uint, bool) {

@@ -1125,9 +1125,14 @@ textarea {
 
 .search-input {
   width: min(345px, 100%);
+  height: 35px;
   background: var(--surface-soft);
   border-color: var(--border);
   border-radius: 11px;
+}
+
+.search-input .ant-input {
+  background: transparent;
 }
 
 .search-input .ant-input-prefix {
@@ -1140,13 +1145,20 @@ textarea {
 
 .status-filter {
   width: 165px;
+  height: 35px;
 }
 
 .status-filter .ant-select-selector,
 .status-filter.ant-select .ant-select-selector {
+  height: 35px !important;
   background: var(--surface-soft) !important;
   border-color: var(--border) !important;
   border-radius: 11px !important;
+}
+
+.status-filter .ant-select-selection-item,
+.status-filter .ant-select-selection-placeholder {
+  line-height: 33px !important;
 }
 
 .table-toolbar-spacer {
@@ -1571,7 +1583,8 @@ textarea {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 3px 9px;
+  height: 30px;
+  padding: 0 12px;
   color: var(--status-color);
   font-size: 13.5px;
   font-weight: 650;
@@ -1663,6 +1676,21 @@ textarea {
 
 .ant-table-row:hover .row-delete-button {
   opacity: 1;
+}
+
+.row-edit-button {
+  color: var(--text-tertiary);
+  opacity: 0.42;
+  transition: opacity 0.16s ease, color 0.16s ease, background 0.16s ease;
+}
+
+.ant-table-row:hover .row-edit-button {
+  opacity: 1;
+}
+
+.row-edit-button:hover {
+  color: var(--accent) !important;
+  background: var(--accent-soft) !important;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -2035,6 +2063,7 @@ textarea {
 }
 
 .quick-window-pin,
+.quick-window-min,
 .quick-window-close {
   --wails-draggable: no-drag;
   display: inline-flex;
@@ -2052,7 +2081,8 @@ textarea {
   transition: color 0.16s ease, background 0.16s ease;
 }
 
-.quick-window-pin:hover {
+.quick-window-pin:hover,
+.quick-window-min:hover {
   color: #f8fafc;
   background: rgba(148, 163, 184, 0.14);
 }
@@ -2116,6 +2146,77 @@ textarea {
 
 .quick-entry-actions .ant-btn {
   border-radius: 8px;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Application edit window                                                    */
+/* -------------------------------------------------------------------------- */
+
+.edit-window-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+.edit-window-body {
+  flex: 1;
+  min-height: 0;
+  padding: 16px 20px 8px;
+  overflow-y: auto;
+}
+
+.edit-window-body .ant-form-item {
+  margin-bottom: 16px;
+}
+
+.edit-window-body .ant-form-item-label {
+  padding-bottom: 5px;
+}
+
+.edit-window-body .ant-form-item-label > label {
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  font-weight: 650;
+}
+
+.edit-window-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+}
+
+.edit-window-alert {
+  margin-bottom: 14px;
+  border-radius: 10px;
+}
+
+.edit-window-footer {
+  display: flex;
+  flex-shrink: 0;
+  justify-content: flex-end;
+  gap: 9px;
+  padding: 12px 20px 14px;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+}
+
+.edit-window-footer .ant-btn {
+  min-width: 88px;
+  border-radius: 9px;
+}
+
+.edit-save-button {
+  background: linear-gradient(135deg, #10b981, #059669);
+  border: 0;
+  box-shadow: 0 8px 18px rgba(16, 185, 129, 0.26);
+}
+
+.edit-save-button:hover {
+  background: linear-gradient(135deg, #34d399, #10b981) !important;
+  box-shadow: 0 10px 22px rgba(16, 185, 129, 0.32);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -3216,6 +3317,31 @@ textarea {
   line-height: 1.55;
 }
 
+.settings-card-head > div:not(.settings-card-extra) {
+  min-width: 0;
+}
+
+.settings-card-extra {
+  flex-shrink: 0;
+  margin-left: auto;
+  padding-top: 1px;
+}
+
+.settings-version-badge {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 10px;
+  color: var(--text-tertiary);
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  background: var(--surface-soft);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+}
+
 .settings-card-body {
   padding-top: 15px;
 }
@@ -3668,10 +3794,20 @@ textarea {
 
   .dashboard-actions {
     width: 100%;
+    min-width: 0;
+    flex-wrap: wrap;
   }
 
   .dashboard-actions .ant-btn {
-    flex: 1;
+    flex: 1 1 0;
+    min-width: 0;
+    padding-inline: 8px;
+    font-size: 13px;
+    white-space: nowrap;
+  }
+
+  .dashboard-actions .ant-btn .anticon {
+    font-size: 13px;
   }
 
   .stats-grid {

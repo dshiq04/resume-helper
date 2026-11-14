@@ -173,6 +173,9 @@ export const api = {
       data: input,
     });
   },
+  getApplication(id: number) {
+    return request<Application>(`/application/${id}`);
+  },
   updateApplication(id: number, input: ApplicationUpdate) {
     return request<Application>(`/application/${id}`, {
       method: "PUT",
@@ -270,6 +273,13 @@ export const api = {
     return request<{ opened: boolean }>("/system/quick-entry", {
       method: "POST",
       data: { category },
+      timeout: 10_000,
+    });
+  },
+  openApplicationEdit(id: number) {
+    return request<{ opened: boolean }>("/system/application-edit", {
+      method: "POST",
+      data: { id },
       timeout: 10_000,
     });
   },

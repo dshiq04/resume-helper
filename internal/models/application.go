@@ -9,6 +9,7 @@ const (
 	CategorySpring     = "spring"
 	CategoryAutumn     = "autumn"
 	CategoryInternship = "internship"
+	CategorySocial     = "social"
 
 	StatusScreening = "screening"
 	StatusWritten   = "written"
@@ -19,7 +20,7 @@ const (
 )
 
 var (
-	Categories = []string{CategorySpring, CategoryAutumn, CategoryInternship}
+	Categories = []string{CategorySpring, CategoryAutumn, CategoryInternship, CategorySocial}
 	Statuses   = []string{StatusScreening, StatusWritten, StatusInterview, StatusPending, StatusOffer, StatusRejected}
 )
 

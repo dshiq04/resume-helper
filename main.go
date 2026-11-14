@@ -126,6 +126,9 @@ func main() {
 	httpServer.SetQuickEntryOpener(func(category string) {
 		openQuickEntryWindow(app, category)
 	})
+	httpServer.SetApplicationEditOpener(func(id uint) {
+		openApplicationEditWindow(app, id)
+	})
 	httpServer.SetResumePreviewOpener(func(id uint, title string) {
 		openResumePreviewWindow(app, id, title)
 	})
@@ -211,6 +214,37 @@ func openResumePreviewWindow(app *application.App, id uint, title string) {
 			Height:           840,
 			MinWidth:         520,
 			MinHeight:        420,
+			Frameless:        true,
+			DisableResize:    false,
+			InitialPosition:  application.WindowCentered,
+			BackgroundColour: application.NewRGB(15, 23, 42),
+		})
+		window.Show()
+		window.Focus()
+	})
+}
+
+func openApplicationEditWindow(app *application.App, id uint) {
+	application.InvokeAsync(func() {
+		target := "/application-edit?id=" + strconv.FormatUint(uint64(id), 10)
+		windowTitle := "修改投递"
+
+		if existing, ok := app.Window.Get("application-edit"); ok {
+			existing.SetTitle(windowTitle)
+			existing.SetURL(target)
+			existing.Show()
+			existing.Focus()
+			return
+		}
+
+		window := app.Window.NewWithOptions(application.WebviewWindowOptions{
+			Name:             "application-edit",
+			Title:            windowTitle,
+			URL:              target,
+			Width:            520,
+			Height:           560,
+			MinWidth:         420,
+			MinHeight:        430,
 			Frameless:        true,
 			DisableResize:    false,
 			InitialPosition:  application.WindowCentered,

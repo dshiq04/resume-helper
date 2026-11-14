@@ -20,8 +20,8 @@ import { closeWindow, isDesktopRuntime } from "../utils/desktop";
 
 function readCategory(): Category | null {
   const value = new URLSearchParams(window.location.search).get("category");
-  return value === "autumn" || value === "internship" || value === "spring"
-    ? value
+  return value && (CATEGORIES as string[]).includes(value)
+    ? (value as Category)
     : null;
 }
 

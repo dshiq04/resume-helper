@@ -146,6 +146,25 @@ func (s *Server) createApplication(c *gin.Context) {
 	c.JSON(http.StatusCreated, record)
 }
 
+func (s *Server) getApplication(c *gin.Context) {
+	id, ok := parseID(c)
+	if !ok {
+		return
+	}
+
+	var record models.Application
+	if err := s.database().First(&record, id).Error; err != nil {
+		if isRecordNotFound(err) {
+			fail(c, http.StatusNotFound, "not_found", "原内容不存在")
+			return
+		}
+		apiError(c, http.StatusInternalServerError, "query_failed", "Failed to load the application.")
+		return
+	}
+
+	c.JSON(http.StatusOK, record)
+}
+
 func (s *Server) updateApplication(c *gin.Context) {
 	id, ok := parseID(c)
 	if !ok {
@@ -156,7 +175,7 @@ func (s *Server) updateApplication(c *gin.Context) {
 	var record models.Application
 	if err := db.First(&record, id).Error; err != nil {
 		if isRecordNotFound(err) {
-			apiError(c, http.StatusNotFound, "not_found", "Application not found.")
+			fail(c, http.StatusNotFound, "not_found", "原内容不存在")
 			return
 		}
 		apiError(c, http.StatusInternalServerError, "query_failed", "Failed to load the application.")

@@ -5,6 +5,7 @@ interface SettingsCardProps {
   tone?: "default" | "security" | "data";
   title: string;
   description?: string;
+  extra?: ReactNode;
   children: ReactNode;
 }
 
@@ -13,6 +14,7 @@ export function SettingsCard({
   tone = "default",
   title,
   description,
+  extra,
   children,
 }: SettingsCardProps) {
   return (
@@ -33,6 +35,7 @@ export function SettingsCard({
           <h3>{title}</h3>
           {description && <p>{description}</p>}
         </div>
+        {extra && <div className="settings-card-extra">{extra}</div>}
       </header>
       <div className="settings-card-body">{children}</div>
     </section>

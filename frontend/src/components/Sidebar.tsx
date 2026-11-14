@@ -3,6 +3,7 @@ import {
   BarChartOutlined,
   CloudOutlined,
   FileTextOutlined,
+  IdcardOutlined,
   RocketOutlined,
   SettingOutlined,
   SunOutlined,
@@ -38,6 +39,12 @@ const categories: Array<{
     labelKey: "nav.internship",
     icon: RocketOutlined,
     accent: "#38bdf8",
+  },
+  {
+    path: "/social",
+    labelKey: "nav.social",
+    icon: IdcardOutlined,
+    accent: "#fb7185",
   },
 ];
 

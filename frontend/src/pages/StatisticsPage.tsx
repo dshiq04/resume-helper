@@ -16,6 +16,7 @@ const CATEGORY_LABEL_KEYS: Record<Category, MessageKey> = {
   spring: "category.spring",
   autumn: "category.autumn",
   internship: "category.internship",
+  social: "category.social",
 };
 
 function currentSeasonCategory(): Category {
