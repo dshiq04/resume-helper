@@ -663,6 +663,9 @@ func TestResumeLifecycle(t *testing.T) {
 	if stored.StoredName == "" {
 		t.Fatalf("stored name should not be empty")
 	}
+	if !strings.HasSuffix(stored.StoredName, "."+encryptedResumeExtension) {
+		t.Fatalf("stored name = %q, want .%s suffix", stored.StoredName, encryptedResumeExtension)
+	}
 	if !created.Encrypted || !stored.Encrypted {
 		t.Fatalf("resume should be marked as encrypted")
 	}
@@ -703,6 +706,9 @@ func TestResumeLifecycle(t *testing.T) {
 	}
 	if contentType := resp.Header.Get("Content-Type"); !strings.HasPrefix(contentType, "application/pdf") {
 		t.Fatalf("content type = %q", contentType)
+	}
+	if disposition := resp.Header.Get("Content-Disposition"); !strings.Contains(disposition, "Backend Resume.PDF") {
+		t.Fatalf("content disposition = %q", disposition)
 	}
 
 	resp, body = app.request(t, http.MethodPut, fmt.Sprintf("/api/resume/%d", created.ID), map[string]any{
@@ -829,6 +835,9 @@ func TestResumePathImport(t *testing.T) {
 	}
 	if created.Name != "Drop Resume" || created.FileType != "pdf" || len(created.Tags) != 1 || created.Tags[0] != "drop" {
 		t.Fatalf("unexpected imported resume: %+v", created)
+	}
+	if !strings.HasSuffix(created.StoredName, "."+encryptedResumeExtension) {
+		t.Fatalf("stored name = %q, want .%s suffix", created.StoredName, encryptedResumeExtension)
 	}
 	storedPath := filepath.Join(app.server.resumeDirectory(), created.StoredName)
 	raw, err := os.ReadFile(storedPath)

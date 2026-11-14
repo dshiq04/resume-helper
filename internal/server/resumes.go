@@ -28,6 +28,9 @@ const (
 	maxResumeTags     = 12
 	maxResumeTagRunes = 32
 	resumeFolderName  = "resume"
+	// encryptedResumeExtension is used for every encrypted file on disk so the
+	// original format is never exposed by the stored file name.
+	encryptedResumeExtension = "reb"
 	// ResumeDropTarget is the value of the data-file-drop-target attribute that
 	// routes Wails native file drops to the resume upload area.
 	ResumeDropTarget = "resume-upload"
@@ -165,7 +168,7 @@ func (s *Server) createResume(c *gin.Context) {
 		return
 	}
 
-	storedName, err := generateStoredName(extension)
+	storedName, err := generateStoredName()
 	if err != nil {
 		apiError(c, http.StatusInternalServerError, "storage_unavailable", "Failed to prepare the resume file.")
 		return
@@ -447,12 +450,12 @@ func sanitizeUploadFileName(value string) string {
 	return value
 }
 
-func generateStoredName(extension string) (string, error) {
+func generateStoredName() (string, error) {
 	raw := make([]byte, 8)
 	if _, err := rand.Read(raw); err != nil {
 		return "", err
 	}
-	return time.Now().Format("20060102-150405") + "-" + hex.EncodeToString(raw) + "." + extension, nil
+	return time.Now().Format("20060102-150405") + "-" + hex.EncodeToString(raw) + "." + encryptedResumeExtension, nil
 }
 
 func readMultipartFile(header *multipart.FileHeader) ([]byte, error) {
@@ -524,7 +527,7 @@ func (s *Server) ImportResumeFromPath(path string, name string, tags []string) (
 		return nil, fmt.Errorf("failed to create the resume folder")
 	}
 
-	storedName, err := generateStoredName(info.FileType)
+	storedName, err := generateStoredName()
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare the resume file")
 	}

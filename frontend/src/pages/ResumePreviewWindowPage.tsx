@@ -24,6 +24,7 @@ import type { Resume } from "../api/types";
 import { useI18n } from "../i18n";
 import "../i18n/anyview";
 import { apiErrorMessage } from "../utils/errors";
+import { restoreResumeFile } from "../utils/resumeFile";
 import { ResizeHandles } from "../components/ResizeHandles";
 import {
   closeWindow,
@@ -37,15 +38,6 @@ import {
 // ICC profiles are copied into dist/pdfjs by vite-plugin-static-copy so PDF
 // previews keep working offline.
 PdfAdapter.configureAssets("/pdfjs/");
-
-const MIME_TYPES: Record<string, string> = {
-  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  pdf: "application/pdf",
-  pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-  png: "image/png",
-  md: "text/markdown",
-  markdown: "text/markdown",
-};
 
 function readResumeID(): number | null {
   const raw = new URLSearchParams(window.location.search).get("id");
@@ -125,8 +117,9 @@ export function ResumePreviewWindowPage() {
         setResume(record);
         const blob = await api.fetchResumeFile(id);
         if (!active) return;
-        const type = MIME_TYPES[record.fileType] || blob.type;
-        const preview = new File([blob], record.fileName, { type });
+        // The API returns decrypted bytes from a ".reb" file. Restore the
+        // original extension and MIME type from the resume metadata.
+        const preview = restoreResumeFile(record, blob);
         setFile(preview);
         document.title = `${record.name} · ${t("resumes.previewTitle")}`;
       } catch (caught) {
