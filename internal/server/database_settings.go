@@ -10,6 +10,7 @@ import (
 	"resume-helper/internal/database"
 
 	"github.com/gin-gonic/gin"
+	"go.uber.org/zap"
 )
 
 type databaseInput struct {
@@ -102,6 +103,13 @@ func (s *Server) updateDatabaseSettings(c *gin.Context) {
 	s.cfg.Database = runtimeCfg
 	s.dbMu.Unlock()
 	s.auth.setDB(newDB)
+
+	// Keep the device identifier (and therefore the resume encryption key)
+	// available after switching databases. An identifier already present in the
+	// new database wins; otherwise the current one is written to it.
+	if _, err := s.ensureDeviceID(true); err != nil {
+		s.logWarn("failed to persist the device identifier in the new database", zap.Error(err))
+	}
 
 	if oldDB != nil {
 		go func() {

@@ -12,6 +12,7 @@ import type {
   DatabaseTestResult,
   DatabaseUpdateResult,
   DailyStats,
+  DeviceInfo,
   ImportResult,
   ListParams,
   QuickEntryDefaults,
@@ -228,6 +229,9 @@ export const api = {
   },
   systemInfo() {
     return request<SystemInfo>("/system/info");
+  },
+  deviceInfo() {
+    return request<DeviceInfo>("/system/device");
   },
   databaseSettings() {
     return request<DatabaseSettingsResponse>("/system/database");

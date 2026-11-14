@@ -49,6 +49,9 @@ type Server struct {
 
 	resumePreviewMu     sync.RWMutex
 	resumePreviewOpener func(id uint, title string)
+
+	deviceMu sync.Mutex
+	deviceID string
 }
 
 func New(cfg *config.Config, db *gorm.DB, assets fs.FS) *Server {
@@ -228,6 +231,7 @@ func (s *Server) newEngine() *gin.Engine {
 		protected.GET("/stats", s.stats)
 		protected.GET("/stats/daily", s.dailyStats)
 		protected.GET("/system/info", s.systemInfo)
+		protected.GET("/system/device", s.deviceInfo)
 		protected.GET("/system/database", s.getDatabaseSettings)
 		protected.POST("/system/database/test", s.testDatabaseSettings)
 		protected.PUT("/system/database", s.updateDatabaseSettings)
@@ -248,6 +252,12 @@ func (s *Server) newEngine() *gin.Engine {
 // returns the URL clients should use. If the configured port is unavailable,
 // an ephemeral port is selected instead.
 func (s *Server) Start() (string, error) {
+	// Create the installation identifier on first launch. It is written to the
+	// settings table and used to derive the resume encryption key.
+	if _, err := s.ensureDeviceID(false); err != nil {
+		return "", fmt.Errorf("initialize device identifier: %w", err)
+	}
+
 	host := strings.TrimSpace(s.cfg.Server.Host)
 	if host == "" {
 		host = "127.0.0.1"

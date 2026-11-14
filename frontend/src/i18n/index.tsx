@@ -185,6 +185,9 @@ const en = {
   "settings.versionBadge": "Version V{{version}}",
   "settings.about": "About ResumeTrail",
   "settings.aboutText": "A calm, focused place to track every opportunity.",
+  "settings.deviceId": "Device ID",
+  "settings.deviceEncryption":
+    "Resume files are encrypted at rest with {{algorithm}} using a key derived from this device ID.",
   "settings.shortcut": "Desktop shortcut",
   "settings.shortcutHint":
     "Create a shortcut so ResumeTrail can be opened directly from the desktop.",
@@ -495,6 +498,9 @@ const zhCNMessages: Record<MessageKey, string> = {
   "settings.versionBadge": "版本号 V{{version}}",
   "settings.about": "关于履途",
   "settings.aboutText": "一个安静、专注记录每次机会的地方。",
+  "settings.deviceId": "设备标识码",
+  "settings.deviceEncryption":
+    "简历文件使用由该设备标识码派生的密钥，通过 {{algorithm}} 加密后保存。",
   "settings.shortcut": "桌面快捷方式",
   "settings.shortcutHint": "创建后可以直接从桌面打开履途。",
   "settings.shortcutExists": "桌面快捷方式已存在",
@@ -788,6 +794,9 @@ const zhTWMessages: Record<MessageKey, string> = {
   "settings.versionBadge": "版本號 V{{version}}",
   "settings.about": "關於履途",
   "settings.aboutText": "一個安靜、專注記錄每次機會的地方。",
+  "settings.deviceId": "裝置識別碼",
+  "settings.deviceEncryption":
+    "履歷檔案使用由該裝置識別碼衍生的金鑰，透過 {{algorithm}} 加密後儲存。",
   "settings.shortcut": "桌面捷徑",
   "settings.shortcutHint": "建立後可以直接從桌面開啟履途。",
   "settings.shortcutExists": "桌面捷徑已存在",
@@ -1088,6 +1097,9 @@ const jaMessages: Record<MessageKey, string> = {
   "settings.versionBadge": "バージョン V{{version}}",
   "settings.about": "ResumeTrail について",
   "settings.aboutText": "すべての機会を静かに、集中して記録する場所。",
+  "settings.deviceId": "デバイス識別子",
+  "settings.deviceEncryption":
+    "履歴書ファイルは、このデバイス識別子から派生したキーで {{algorithm}} により暗号化して保存されます。",
   "settings.shortcut": "デスクトップショートカット",
   "settings.shortcutHint":
     "ショートカットを作成すると、デスクトップから直接 ResumeTrail を開けます。",
@@ -1393,6 +1405,9 @@ const koMessages: Record<MessageKey, string> = {
   "settings.versionBadge": "버전 V{{version}}",
   "settings.about": "ResumeTrail 정보",
   "settings.aboutText": "모든 기회를 차분하게 기록하는 공간.",
+  "settings.deviceId": "장치 식별자",
+  "settings.deviceEncryption":
+    "이력서 파일은 이 장치 식별자에서 파생된 키로 {{algorithm}} 암호화되어 저장됩니다.",
   "settings.shortcut": "바탕 화면 바로가기",
   "settings.shortcutHint":
     "바로가기를 만들면 바탕 화면에서 ResumeTrail을 바로 열 수 있습니다.",

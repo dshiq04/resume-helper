@@ -3056,6 +3056,40 @@ textarea {
   line-height: 1.55;
 }
 
+.settings-device {
+  margin-top: 12px;
+  padding: 11px 12px;
+  background: var(--surface-soft);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.settings-device-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.settings-device-label {
+  color: var(--text-secondary);
+  font-size: 10px;
+  font-weight: 650;
+}
+
+.settings-device-value {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  font-size: 9.5px;
+}
+
+.settings-device p {
+  margin: 7px 0 0;
+  color: var(--text-secondary);
+  font-size: 9.5px;
+  line-height: 1.55;
+}
+
 .settings-modal .ant-modal-content {
   border-radius: 20px;
 }

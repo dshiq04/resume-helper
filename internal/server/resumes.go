@@ -170,8 +170,17 @@ func (s *Server) createResume(c *gin.Context) {
 		apiError(c, http.StatusInternalServerError, "storage_unavailable", "Failed to prepare the resume file.")
 		return
 	}
+	content, err := readMultipartFile(header)
+	if err != nil {
+		apiError(c, http.StatusBadRequest, "file_unreadable", "Failed to read the resume file.")
+		return
+	}
 	target := filepath.Join(dir, storedName)
-	if err := saveMultipartFile(header, target); err != nil {
+	if err := s.writeEncryptedResume(target, content); err != nil {
+		s.logError("failed to encrypt resume file",
+			zap.String("stored", storedName),
+			zap.Error(err),
+		)
 		apiError(c, http.StatusInternalServerError, "storage_unavailable", "Failed to save the resume file.")
 		return
 	}
@@ -182,7 +191,8 @@ func (s *Server) createResume(c *gin.Context) {
 		FileName:   fileName,
 		StoredName: storedName,
 		FileType:   extension,
-		FileSize:   header.Size,
+		FileSize:   int64(len(content)),
+		Encrypted:  true,
 	}
 	if err := s.database().Create(record).Error; err != nil {
 		_ = os.Remove(target)
@@ -315,7 +325,25 @@ func (s *Server) serveResumeFile(c *gin.Context) {
 	c.Header("Content-Type", contentType)
 	c.Header("Content-Disposition", contentDisposition(mode, record.FileName))
 	c.Header("Cache-Control", "no-store")
-	c.File(filePath)
+
+	if !record.Encrypted {
+		// Resumes uploaded before encryption was introduced are still served
+		// directly without loading them into memory.
+		c.File(filePath)
+		return
+	}
+
+	plaintext, err := s.readResumeFile(record)
+	if err != nil {
+		s.logError("failed to decrypt resume file",
+			zap.Uint("id", record.ID),
+			zap.String("file", record.FileName),
+			zap.Error(err),
+		)
+		apiError(c, http.StatusInternalServerError, "decrypt_failed", "Failed to decrypt the resume file.")
+		return
+	}
+	c.Data(http.StatusOK, contentType, plaintext)
 }
 
 func (s *Server) openResumePreview(c *gin.Context) {
@@ -427,34 +455,24 @@ func generateStoredName(extension string) (string, error) {
 	return time.Now().Format("20060102-150405") + "-" + hex.EncodeToString(raw) + "." + extension, nil
 }
 
-func saveMultipartFile(header *multipart.FileHeader, target string) error {
+func readMultipartFile(header *multipart.FileHeader) ([]byte, error) {
 	source, err := header.Open()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer source.Close()
 
-	_, err = copyResumeFile(source, target, maxResumeFileSize)
-	return err
-}
-
-func copyResumeFile(source io.Reader, target string, maxBytes int64) (int64, error) {
-	destination, err := os.OpenFile(target, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
+	content, err := io.ReadAll(io.LimitReader(source, maxResumeFileSize+1))
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
-	defer destination.Close()
-
-	written, err := io.Copy(destination, io.LimitReader(source, maxBytes+1))
-	if err != nil {
-		_ = os.Remove(target)
-		return 0, err
+	if int64(len(content)) > maxResumeFileSize {
+		return nil, fmt.Errorf("resume file exceeds %d bytes", maxResumeFileSize)
 	}
-	if written > maxBytes {
-		_ = os.Remove(target)
-		return written, fmt.Errorf("resume file exceeds %d bytes", maxBytes)
+	if len(content) == 0 {
+		return nil, fmt.Errorf("resume file is empty")
 	}
-	return written, nil
+	return content, nil
 }
 
 type ResumeFileInfo struct {
@@ -517,14 +535,24 @@ func (s *Server) ImportResumeFromPath(path string, name string, tags []string) (
 	}
 	defer source.Close()
 
-	target := filepath.Join(dir, storedName)
-	written, err := copyResumeFile(source, target, maxResumeFileSize)
+	content, err := io.ReadAll(io.LimitReader(source, maxResumeFileSize+1))
 	if err != nil {
-		return nil, fmt.Errorf("failed to save the resume file")
+		return nil, fmt.Errorf("failed to read the resume file")
 	}
-	if written != info.FileSize {
-		_ = os.Remove(target)
+	if int64(len(content)) > maxResumeFileSize {
+		return nil, fmt.Errorf("the file is larger than 50 MB")
+	}
+	if int64(len(content)) != info.FileSize {
 		return nil, fmt.Errorf("resume file changed while uploading")
+	}
+
+	target := filepath.Join(dir, storedName)
+	if err := s.writeEncryptedResume(target, content); err != nil {
+		s.logError("failed to encrypt imported resume",
+			zap.String("stored", storedName),
+			zap.Error(err),
+		)
+		return nil, fmt.Errorf("failed to save the resume file")
 	}
 
 	record := &models.Resume{
@@ -533,7 +561,8 @@ func (s *Server) ImportResumeFromPath(path string, name string, tags []string) (
 		FileName:   info.FileName,
 		StoredName: storedName,
 		FileType:   info.FileType,
-		FileSize:   written,
+		FileSize:   int64(len(content)),
+		Encrypted:  true,
 	}
 	if err := s.database().Create(record).Error; err != nil {
 		_ = os.Remove(target)

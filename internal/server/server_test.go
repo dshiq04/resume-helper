@@ -663,9 +663,35 @@ func TestResumeLifecycle(t *testing.T) {
 	if stored.StoredName == "" {
 		t.Fatalf("stored name should not be empty")
 	}
+	if !created.Encrypted || !stored.Encrypted {
+		t.Fatalf("resume should be marked as encrypted")
+	}
 	storedPath := filepath.Join(app.server.resumeDirectory(), stored.StoredName)
-	if _, err := os.Stat(storedPath); err != nil {
+	storedBytes, err := os.ReadFile(storedPath)
+	if err != nil {
 		t.Fatalf("resume file was not stored: %v", err)
+	}
+	if bytes.Equal(storedBytes, []byte("%PDF-1.4 test")) || bytes.Contains(storedBytes, []byte("%PDF-1.4")) {
+		t.Fatalf("resume file was stored in plaintext: %q", string(storedBytes))
+	}
+
+	// The identifier is created once and persisted in the settings table.
+	resp, body = app.request(t, http.MethodGet, "/api/system/device", nil, "")
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("device status = %d, body = %s", resp.StatusCode, body)
+	}
+	device := decodeJSON[struct {
+		DeviceID string `json:"deviceId"`
+	}](t, body)
+	if len(device.DeviceID) != 64 {
+		t.Fatalf("device id = %q, want 64 hex characters", device.DeviceID)
+	}
+	var setting models.Setting
+	if err := app.server.database().First(&setting, "key = ?", deviceIDSettingKey).Error; err != nil {
+		t.Fatalf("load device setting: %v", err)
+	}
+	if setting.Value != device.DeviceID {
+		t.Fatalf("setting = %q, endpoint = %q", setting.Value, device.DeviceID)
 	}
 
 	resp, body = app.request(t, http.MethodGet, fmt.Sprintf("/api/resume/%d/file", created.ID), nil, "")
@@ -805,7 +831,11 @@ func TestResumePathImport(t *testing.T) {
 		t.Fatalf("unexpected imported resume: %+v", created)
 	}
 	storedPath := filepath.Join(app.server.resumeDirectory(), created.StoredName)
-	data, err := os.ReadFile(storedPath)
+	raw, err := os.ReadFile(storedPath)
+	if err != nil || string(raw) == "%PDF-1.4 drop" {
+		t.Fatalf("imported file should be encrypted: err = %v, data = %q", err, string(raw))
+	}
+	data, err := app.server.readResumeFile(*created)
 	if err != nil || string(data) != "%PDF-1.4 drop" {
 		t.Fatalf("imported file mismatch: err = %v, data = %q", err, string(data))
 	}
@@ -829,5 +859,38 @@ func TestResumePathImport(t *testing.T) {
 	}
 	if _, err := app.server.ImportResumeFromPath(txtPath, "Bad", nil); err == nil {
 		t.Fatalf("unsupported extension should be rejected")
+	}
+}
+
+func TestLegacyUnencryptedResumeStillServed(t *testing.T) {
+	app := newTestApp(t)
+
+	dir := app.server.resumeDirectory()
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatalf("create resume folder: %v", err)
+	}
+	plaintext := []byte("%PDF-1.4 legacy")
+	storedName := "legacy-resume.pdf"
+	if err := os.WriteFile(filepath.Join(dir, storedName), plaintext, 0o644); err != nil {
+		t.Fatalf("write legacy resume: %v", err)
+	}
+	record := models.Resume{
+		Name:       "Legacy",
+		FileName:   "legacy.pdf",
+		StoredName: storedName,
+		FileType:   "pdf",
+		FileSize:   int64(len(plaintext)),
+		Encrypted:  false,
+	}
+	if err := app.server.database().Create(&record).Error; err != nil {
+		t.Fatalf("create legacy resume: %v", err)
+	}
+
+	resp, body := app.request(t, http.MethodGet, fmt.Sprintf("/api/resume/%d/file", record.ID), nil, "")
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("file status = %d, body = %s", resp.StatusCode, body)
+	}
+	if !bytes.Equal(body, plaintext) {
+		t.Fatalf("legacy file content = %q", string(body))
 	}
 }

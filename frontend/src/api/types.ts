@@ -145,6 +145,12 @@ export interface DatabaseTestResult {
   message: string;
 }
 
+export interface DeviceInfo {
+  deviceId: string;
+  algorithm: string;
+  keyDerivation: string;
+}
+
 export interface ShortcutStatus {
   supported: boolean;
   exists: boolean;
@@ -182,6 +188,7 @@ export interface Resume {
   fileName: string;
   fileType: ResumeFileType;
   fileSize: number;
+  encrypted: boolean;
   pinned: boolean;
   createdAt: string;
   updatedAt: string;
