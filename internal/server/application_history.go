@@ -303,22 +303,33 @@ func statusKey(applicationID uint, status string) string {
 	return fmt.Sprintf("%d|%s", applicationID, status)
 }
 
-// sortChangesForTimeline follows the fixed stage order shown in the UI
-// (screening → written → interview → pending → offer → rejected) instead of
-// the chronological order of the change records.
+// timelineStatusOrder is the display order used by the detail timeline. It is
+// intentionally separate from models.Statuses so the list filters and select
+// options keep their existing order.
+var timelineStatusOrder = []string{
+	models.StatusPending,
+	models.StatusScreening,
+	models.StatusWritten,
+	models.StatusInterview,
+	models.StatusOffer,
+	models.StatusRejected,
+}
+
+// sortChangesForTimeline follows the fixed stage order shown in the UI instead
+// of the chronological order of the change records.
 func sortChangesForTimeline(items []models.ApplicationChange) {
-	rank := make(map[string]int, len(models.Statuses))
-	for index, status := range models.Statuses {
+	rank := make(map[string]int, len(timelineStatusOrder))
+	for index, status := range timelineStatusOrder {
 		rank[status] = index
 	}
 	sort.SliceStable(items, func(left, right int) bool {
 		leftRank, leftOk := rank[items[left].Status]
 		rightRank, rightOk := rank[items[right].Status]
 		if !leftOk {
-			leftRank = len(models.Statuses)
+			leftRank = len(timelineStatusOrder)
 		}
 		if !rightOk {
-			rightRank = len(models.Statuses)
+			rightRank = len(timelineStatusOrder)
 		}
 		if leftRank == rightRank {
 			return items[left].ChangedAt.Before(items[right].ChangedAt)
