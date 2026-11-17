@@ -1,5 +1,5 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from "react";
-import { App as AntdApp, Button, ConfigProvider, Spin } from "antd";
+import { App as AntdApp, Button, ConfigProvider, Spin, Watermark } from "antd";
 import { CloudServerOutlined, ReloadOutlined } from "@ant-design/icons";
 import { Navigate, Route, Routes } from "react-router-dom";
 import { Events } from "@wailsio/runtime";
@@ -283,6 +283,27 @@ function AppRoot() {
           />
           <ResizeHandles />
 
+          <Watermark
+            className="app-watermark"
+            content="开发中品质，请谅解"
+            gap={[120, 120]}
+            rotate={-22}
+            zIndex={6}
+            font={{
+              color:
+                themeMode === "dark"
+                  ? "rgba(226, 232, 240, 0.12)"
+                  : "rgba(15, 23, 42, 0.09)",
+              fontSize: 16,
+            }}
+            style={{
+              flex: 1,
+              minHeight: 0,
+              display: "flex",
+              flexDirection: "column",
+              width: "100%",
+            }}
+          >
           <div className="app-content">
             {stage === "checking" && (
               <div className="boot-screen">
@@ -346,6 +367,7 @@ function AppRoot() {
               </Routes>
             )}
           </div>
+          </Watermark>
         </div>
       </AntdApp>
     </ConfigProvider>
