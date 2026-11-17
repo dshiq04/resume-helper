@@ -1,4 +1,5 @@
-import { Table } from "antd";
+import { useState } from "react";
+import { Table, Tooltip } from "antd";
 import type { TableColumnsType } from "antd";
 import type { Application, Status, StatusOption } from "../../api/types";
 import type { ApplicationDraft } from "../../hooks/useApplicationDraft";
@@ -73,7 +74,8 @@ export function ApplicationTable({
   onDelete,
   onAdd,
 }: ApplicationTableProps) {
-  const { t, formatDate, locale } = useI18n();
+  const { t, formatDate, formatFullDate, locale } = useI18n();
+  const [activeRowId, setActiveRowId] = useState<number | null>(null);
 
   const columns: TableColumnsType<Application> = [
     {
@@ -147,7 +149,9 @@ export function ApplicationTable({
         record.id === DRAFT_ID ? (
           <span className="draft-unsaved">{t("draft.unsaved")}</span>
         ) : (
-          <span className="updated-at">{formatDate(value)}</span>
+          <Tooltip title={formatFullDate(value)} placement="top">
+            <span className="updated-at">{formatDate(value)}</span>
+          </Tooltip>
         ),
     },
     {
@@ -205,10 +209,21 @@ export function ApplicationTable({
       rowClassName={(record) =>
         record.id === DRAFT_ID
           ? "is-draft-row"
-          : record.pinned
-            ? "is-pinned-row"
-            : ""
+          : activeRowId === record.id
+            ? "is-gradient-active"
+            : record.pinned
+              ? "is-pinned-row"
+              : ""
       }
+      onRow={(record) => ({
+        onClick: () => {
+          if (record.id === DRAFT_ID) return;
+          setActiveRowId(record.id);
+          window.setTimeout(() => {
+            setActiveRowId((current) => (current === record.id ? null : current));
+          }, 850);
+        },
+      })}
       rowSelection={{
         selectedRowKeys: selectedKeys,
         getCheckboxProps: (record) => ({ disabled: record.id === DRAFT_ID }),

@@ -16,6 +16,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/xuri/excelize/v2"
 	"go.uber.org/zap"
+	"gorm.io/gorm"
 )
 
 const (
@@ -435,7 +436,18 @@ func (s *Server) parseAndImportWorkbook(file *excelize.File) (*ImportResult, err
 	}
 
 	if len(records) > 0 {
-		if err := s.database().CreateInBatches(&records, 200).Error; err != nil {
+		db := s.database()
+		if err := db.Transaction(func(tx *gorm.DB) error {
+			if err := tx.CreateInBatches(&records, 200).Error; err != nil {
+				return err
+			}
+			for _, record := range records {
+				if err := recordStatusChange(tx, record.ID, record.Status, record.AppliedAt); err != nil {
+					return err
+				}
+			}
+			return nil
+		}); err != nil {
 			return nil, fmt.Errorf("save imported applications: %w", err)
 		}
 	}

@@ -33,10 +33,16 @@ export function useInlineEdit({
   const { t } = useI18n();
   const { message } = AntdApp.useApp();
   const [editing, setEditing] = useState<InlineEditState | null>(null);
-  const [value, setValue] = useState("");
+  const [value, setValueState] = useState("");
+  const valueRef = useRef("");
   const [saving, setSaving] = useState(false);
   const cancelRef = useRef(false);
   const savingRef = useRef(false);
+
+  const setValue = useCallback((next: string) => {
+    valueRef.current = next;
+    setValueState(next);
+  }, []);
 
   const cancel = useCallback(() => {
     cancelRef.current = true;
@@ -45,8 +51,9 @@ export function useInlineEdit({
 
   const start = useCallback((record: Application, field: InlineEditField) => {
     cancelRef.current = false;
+    valueRef.current = record[field];
     setEditing({ id: record.id, field });
-    setValue(record[field]);
+    setValueState(record[field]);
   }, []);
 
   const commit = useCallback(async () => {
@@ -62,7 +69,7 @@ export function useInlineEdit({
       return;
     }
 
-    const nextValue = value;
+    const nextValue = valueRef.current;
     const currentValue = record[editing.field];
     if (editing.field === "companyName" && !nextValue.trim()) {
       message.warning(t("error.companyRequired"));
@@ -86,7 +93,7 @@ export function useInlineEdit({
       setSaving(false);
       setEditing(null);
     }
-  }, [editing, items, message, onSave, t, value]);
+  }, [editing, items, message, onSave, t]);
 
   return {
     editing,

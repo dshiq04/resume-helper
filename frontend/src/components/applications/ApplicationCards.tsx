@@ -1,4 +1,4 @@
-import { Checkbox, Pagination, Spin } from "antd";
+import { Checkbox, Pagination, Spin, Tooltip } from "antd";
 import { PushpinFilled } from "@ant-design/icons";
 import type { Application, Status, StatusOption } from "../../api/types";
 import type { ApplicationDraft } from "../../hooks/useApplicationDraft";
@@ -64,7 +64,7 @@ export function ApplicationCards({
   onDelete,
   onAdd,
 }: ApplicationCardsProps) {
-  const { t, formatDate } = useI18n();
+  const { t, formatDate, formatFullDate } = useI18n();
 
   if (loading && items.length === 0 && !draft) {
     return (
@@ -135,9 +135,11 @@ export function ApplicationCards({
           </div>
 
           <div className="mobile-card-footer">
-            <span>
-              {t("table.appliedAt")}: {formatDate(record.appliedAt)}
-            </span>
+            <Tooltip title={formatFullDate(record.appliedAt)} placement="top">
+              <span>
+                {t("table.appliedAt")}: {formatDate(record.appliedAt)}
+              </span>
+            </Tooltip>
             {record.pinned && (
               <span className="mobile-pinned-badge">
                 <PushpinFilled /> {t("action.pin")}

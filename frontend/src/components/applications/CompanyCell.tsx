@@ -1,10 +1,10 @@
-import { Input } from "antd";
 import { PushpinFilled } from "@ant-design/icons";
 import type { Application } from "../../api/types";
 import type { InlineEditController } from "../../hooks/useInlineEdit";
 import { useI18n } from "../../i18n";
 import { avatarTone, companyInitial } from "../../utils/display";
 import { CategoryBadge } from "../badges";
+import { CompanyAutoComplete } from "../CompanyAutoComplete";
 
 interface CompanyCellProps {
   application: Application;
@@ -27,17 +27,16 @@ export function CompanyCell({ application, inline }: CompanyCellProps) {
       <div className="company-copy">
         <div className="company-name-row">
           {isEditing ? (
-            <Input
+            <CompanyAutoComplete
               autoFocus
               size="small"
               className="inline-edit-input"
               value={inline.value}
               maxLength={255}
               disabled={inline.saving}
-              onChange={(event) => inline.setValue(event.target.value)}
+              onChange={inline.setValue}
               onBlur={() => void inline.commit()}
-              onFocus={(event) => event.target.select()}
-              onPressEnter={(event) => event.currentTarget.blur()}
+              onPressEnter={() => void inline.commit()}
               onKeyDown={(event) => {
                 if (event.key === "Escape") inline.cancel();
               }}

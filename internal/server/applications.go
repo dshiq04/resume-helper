@@ -121,7 +121,7 @@ func (s *Server) listApplications(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"items":    items,
+		"items":    s.attachScreeningDays(db, items),
 		"total":    total,
 		"page":     params.Page,
 		"pageSize": params.PageSize,
@@ -144,7 +144,13 @@ func (s *Server) createApplication(c *gin.Context) {
 	// from the client payload.
 	record.AppliedAt = time.Now()
 
-	if err := s.database().Create(record).Error; err != nil {
+	db := s.database()
+	if err := db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(record).Error; err != nil {
+			return err
+		}
+		return recordStatusChange(tx, record.ID, record.Status, record.AppliedAt)
+	}); err != nil {
 		apiError(c, http.StatusInternalServerError, "create_failed", "Failed to create the application.")
 		return
 	}
@@ -235,8 +241,22 @@ func (s *Server) updateApplication(c *gin.Context) {
 		updates["pinned"] = *input.Pinned
 	}
 
+	previousStatus := record.Status
+	newStatus := ""
+	if input.Status != nil {
+		newStatus = models.NormalizeStatus(*input.Status)
+	}
+
 	if len(updates) > 0 {
-		if err := db.Model(&record).Updates(updates).Error; err != nil {
+		if err := db.Transaction(func(tx *gorm.DB) error {
+			if err := tx.Model(&record).Updates(updates).Error; err != nil {
+				return err
+			}
+			if newStatus != "" && newStatus != previousStatus {
+				return recordStatusChange(tx, record.ID, newStatus, time.Now())
+			}
+			return nil
+		}); err != nil {
 			apiError(c, http.StatusInternalServerError, "update_failed", "Failed to update the application.")
 			return
 		}
@@ -254,16 +274,29 @@ func (s *Server) deleteApplication(c *gin.Context) {
 	if !ok {
 		return
 	}
-	result := s.database().Delete(&models.Application{}, id)
-	if result.Error != nil {
+	db := s.database()
+	var trashID uint
+	err := db.Transaction(func(tx *gorm.DB) error {
+		var record models.Application
+		if err := tx.First(&record, id).Error; err != nil {
+			return err
+		}
+		trash, err := moveApplicationToTrash(tx, record)
+		if err != nil {
+			return err
+		}
+		trashID = trash.ID
+		return nil
+	})
+	if err != nil {
+		if isRecordNotFound(err) {
+			apiError(c, http.StatusNotFound, "not_found", "Application not found.")
+			return
+		}
 		apiError(c, http.StatusInternalServerError, "delete_failed", "Failed to delete the application.")
 		return
 	}
-	if result.RowsAffected == 0 {
-		apiError(c, http.StatusNotFound, "not_found", "Application not found.")
-		return
-	}
-	c.JSON(http.StatusOK, gin.H{"deleted": result.RowsAffected})
+	c.JSON(http.StatusOK, gin.H{"deleted": 1, "trashId": trashID})
 }
 
 func (s *Server) batchDeleteApplications(c *gin.Context) {
@@ -282,12 +315,26 @@ func (s *Server) batchDeleteApplications(c *gin.Context) {
 		return
 	}
 
-	result := s.database().Where("id IN ?", ids).Delete(&models.Application{})
-	if result.Error != nil {
+	trashIDs := make([]uint, 0, len(ids))
+	err := s.database().Transaction(func(tx *gorm.DB) error {
+		var records []models.Application
+		if err := tx.Where("id IN ?", ids).Find(&records).Error; err != nil {
+			return err
+		}
+		for _, record := range records {
+			trash, err := moveApplicationToTrash(tx, record)
+			if err != nil {
+				return err
+			}
+			trashIDs = append(trashIDs, trash.ID)
+		}
+		return nil
+	})
+	if err != nil {
 		apiError(c, http.StatusInternalServerError, "delete_failed", "Failed to delete the selected applications.")
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"deleted": result.RowsAffected})
+	c.JSON(http.StatusOK, gin.H{"deleted": len(trashIDs), "trashIds": trashIDs})
 }
 
 func (s *Server) batchUpdateStatus(c *gin.Context) {
@@ -307,14 +354,34 @@ func (s *Server) batchUpdateStatus(c *gin.Context) {
 		return
 	}
 
-	result := s.database().Model(&models.Application{}).
-		Where("id IN ?", ids).
-		Update("status", status)
-	if result.Error != nil {
+	db := s.database()
+	changed := make([]models.Application, 0, len(ids))
+	err := db.Transaction(func(tx *gorm.DB) error {
+		var records []models.Application
+		if err := tx.Where("id IN ?", ids).Find(&records).Error; err != nil {
+			return err
+		}
+		for _, record := range records {
+			if record.Status == status {
+				continue
+			}
+			if err := tx.Model(&models.Application{}).
+				Where("id = ?", record.ID).
+				Update("status", status).Error; err != nil {
+				return err
+			}
+			if err := recordStatusChange(tx, record.ID, status, time.Now()); err != nil {
+				return err
+			}
+			changed = append(changed, record)
+		}
+		return nil
+	})
+	if err != nil {
 		apiError(c, http.StatusInternalServerError, "update_failed", "Failed to update the selected applications.")
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"updated": result.RowsAffected})
+	c.JSON(http.StatusOK, gin.H{"updated": len(changed)})
 }
 
 func (s *Server) batchUpdateCategory(c *gin.Context) {
@@ -407,13 +474,29 @@ func uniqueIDs(ids []uint) []uint {
 }
 
 func (s *Server) stats(c *gin.Context) {
+	from, to, ok := parseStatsRange(c)
+	if !ok {
+		return
+	}
+	db := s.database()
+	base := func() *gorm.DB {
+		query := db.Model(&models.Application{})
+		if from != nil {
+			query = query.Where("applied_at >= ?", *from)
+		}
+		if to != nil {
+			query = query.Where("applied_at <= ?", *to)
+		}
+		return query
+	}
+
 	type groupRow struct {
 		Category string
 		Status   string
 		Count    int64
 	}
 	var rows []groupRow
-	if err := s.database().Model(&models.Application{}).
+	if err := base().
 		Select("category, status, COUNT(*) AS count").
 		Group("category, status").
 		Scan(&rows).Error; err != nil {
@@ -455,12 +538,39 @@ func (s *Server) stats(c *gin.Context) {
 		return
 	}
 
+	var screeningItems []models.Application
+	if err := base().Where("status = ?", models.StatusScreening).Find(&screeningItems).Error; err != nil {
+		apiError(c, http.StatusInternalServerError, "query_failed", "Failed to load statistics.")
+		return
+	}
+	views := s.attachScreeningDays(db, screeningItems)
+	daysSum := 0
+	maxDays := 0
+	for _, view := range views {
+		if view.ScreeningDays == nil {
+			continue
+		}
+		daysSum += *view.ScreeningDays
+		if *view.ScreeningDays > maxDays {
+			maxDays = *view.ScreeningDays
+		}
+	}
+	averageDays := 0
+	if len(views) > 0 {
+		averageDays = daysSum / len(views)
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"total":            total,
 		"resumes":          resumeCount,
 		"byCategory":       byCategory,
 		"byStatus":         byStatus,
 		"byCategoryStatus": byCategoryStatus,
+		"stuckScreening": gin.H{
+			"count":       len(views),
+			"averageDays": averageDays,
+			"maxDays":     maxDays,
+		},
 	})
 }
 
@@ -474,13 +584,22 @@ type dailyStat struct {
 // aggregation happens in Go so the query stays portable across SQLite, MySQL
 // and PostgreSQL, which all format dates differently.
 func (s *Server) dailyStats(c *gin.Context) {
+	from, to, ok := parseStatsRange(c)
+	if !ok {
+		return
+	}
+	query := s.database().Model(&models.Application{}).Select("category, applied_at")
+	if from != nil {
+		query = query.Where("applied_at >= ?", *from)
+	}
+	if to != nil {
+		query = query.Where("applied_at <= ?", *to)
+	}
 	var rows []struct {
 		Category  string
 		AppliedAt time.Time
 	}
-	if err := s.database().Model(&models.Application{}).
-		Select("category, applied_at").
-		Scan(&rows).Error; err != nil {
+	if err := query.Scan(&rows).Error; err != nil {
 		apiError(c, http.StatusInternalServerError, "query_failed", "Failed to load statistics.")
 		return
 	}

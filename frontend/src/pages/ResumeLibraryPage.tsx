@@ -62,7 +62,7 @@ function formatFileSize(bytes: number): string {
 }
 
 export function ResumeLibraryPage() {
-  const { t, formatDate } = useI18n();
+  const { t, formatDate, formatFullDate } = useI18n();
   const { message } = AntdApp.useApp();
   const { onDataChanged } = useOutletContext<WorkspaceOutletContext>();
   const [items, setItems] = useState<Resume[]>([]);
@@ -240,7 +240,9 @@ export function ResumeLibraryPage() {
         <div className="resume-card-meta">
           <span className="resume-type-pill">{meta.label}</span>
           <span>{formatFileSize(resume.fileSize)}</span>
-          <span>{formatDate(resume.createdAt)}</span>
+          <Tooltip title={formatFullDate(resume.createdAt)} placement="top">
+            <span>{formatDate(resume.createdAt)}</span>
+          </Tooltip>
         </div>
 
         <div

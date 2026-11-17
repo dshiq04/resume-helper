@@ -21,7 +21,7 @@ import (
 	"gorm.io/gorm"
 )
 
-const Version = "1.1"
+const Version = "1.2"
 
 type Server struct {
 	cfg    *config.Config
@@ -49,6 +49,14 @@ type Server struct {
 
 	resumePreviewMu     sync.RWMutex
 	resumePreviewOpener func(id uint, title string)
+
+	dataTransferMu     sync.RWMutex
+	dataTransferOpener func(mode string)
+
+	closePromptMu      sync.RWMutex
+	closePromptHandler func(action string, remember bool) error
+
+	backupMu sync.Mutex
 
 	deviceMu sync.Mutex
 	deviceID string
@@ -110,6 +118,22 @@ func (s *Server) SetResumePreviewOpener(opener func(id uint, title string)) {
 	s.resumePreviewMu.Lock()
 	defer s.resumePreviewMu.Unlock()
 	s.resumePreviewOpener = opener
+}
+
+// SetDataTransferOpener wires the independent backup window opener into the
+// HTTP layer.
+func (s *Server) SetDataTransferOpener(opener func(mode string)) {
+	s.dataTransferMu.Lock()
+	defer s.dataTransferMu.Unlock()
+	s.dataTransferOpener = opener
+}
+
+// SetClosePromptHandler wires the close-window decision back into the desktop
+// layer.
+func (s *Server) SetClosePromptHandler(handler func(action string, remember bool) error) {
+	s.closePromptMu.Lock()
+	defer s.closePromptMu.Unlock()
+	s.closePromptHandler = handler
 }
 
 // SetLogger wires a zap logger into the HTTP layer. Without it the server
@@ -204,6 +228,9 @@ func (s *Server) newEngine() *gin.Engine {
 		// can happen after the session has been locked. Both buttons must keep
 		// working without a valid session.
 		api.POST("/system/shortcut/prompt", s.resolveShortcutPrompt)
+		// The close prompt must work even when the app is locked, otherwise the
+		// user could not choose "minimise to tray" or "quit".
+		api.POST("/system/close-prompt", s.resolveClosePrompt)
 	}
 
 	protected := api.Group("")
@@ -218,11 +245,18 @@ func (s *Server) newEngine() *gin.Engine {
 		protected.POST("/applications/batch-delete", s.batchDeleteApplications)
 		protected.PATCH("/applications/batch-status", s.batchUpdateStatus)
 		protected.PATCH("/applications/batch-category", s.batchUpdateCategory)
+		protected.GET("/applications/companies", s.companySuggestions)
 		protected.GET("/application/:id", s.getApplication)
 		protected.PUT("/application/:id", s.updateApplication)
 		protected.DELETE("/application/:id", s.deleteApplication)
+		protected.GET("/application/:id/history", s.getApplicationHistory)
+		protected.POST("/application/:id/history", s.createApplicationHistory)
 		protected.POST("/applications/import", s.importApplications)
 		protected.GET("/applications/template", s.downloadTemplate)
+		protected.GET("/trash", s.listTrash)
+		protected.POST("/trash/:id/restore", s.restoreTrash)
+		protected.DELETE("/trash/:id", s.deleteTrash)
+		protected.DELETE("/trash", s.emptyTrash)
 		protected.GET("/resumes", s.listResumes)
 		protected.POST("/resumes", s.createResume)
 		protected.GET("/resume/:id", s.getResume)
@@ -231,8 +265,12 @@ func (s *Server) newEngine() *gin.Engine {
 		protected.GET("/resume/:id/file", s.serveResumeFile)
 		protected.GET("/stats", s.stats)
 		protected.GET("/stats/daily", s.dailyStats)
+		protected.GET("/stats/funnel", s.applicationFunnel)
 		protected.GET("/system/info", s.systemInfo)
 		protected.GET("/system/device", s.deviceInfo)
+		protected.GET("/system/preferences", s.getPreferences)
+		protected.PUT("/system/preferences", s.updatePreferences)
+		protected.POST("/system/data-transfer", s.openDataTransfer)
 		protected.GET("/system/database", s.getDatabaseSettings)
 		protected.POST("/system/database/test", s.testDatabaseSettings)
 		protected.PUT("/system/database", s.updateDatabaseSettings)

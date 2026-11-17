@@ -2,6 +2,7 @@ import {
   AppstoreOutlined,
   BarChartOutlined,
   CloudOutlined,
+  DeleteOutlined,
   FileTextOutlined,
   IdcardOutlined,
   RocketOutlined,
@@ -128,6 +129,18 @@ export function Sidebar({ stats, passwordEnabled, collapsed }: SidebarProps) {
             <BarChartOutlined />
           </span>
           <span className="sidebar-nav-label">{t("nav.statistics")}</span>
+        </NavLink>
+        <NavLink
+          to="/trash"
+          className={({ isActive }) =>
+            `sidebar-nav-item ${isActive ? "is-active" : ""}`
+          }
+          title={t("nav.trash")}
+        >
+          <span className="sidebar-nav-icon" style={{ color: "#fb7185" }}>
+            <DeleteOutlined />
+          </span>
+          <span className="sidebar-nav-label">{t("nav.trash")}</span>
         </NavLink>
       </nav>
 
