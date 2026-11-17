@@ -217,12 +217,13 @@ export function StatisticsPage() {
 
   return (
     <>
-    <div className="stats-page" ref={pageRef}>
+    <div className="stats-page">
+      <span className="season-pill stats-page-eyebrow">
+        <BarChartOutlined /> {t("nav.library")} · {t("nav.statistics")}
+      </span>
+      <div className="stats-export-capture" ref={pageRef}>
       <header className="stats-page-header stats-page-header-with-action">
         <div>
-          <span className="season-pill">
-            <BarChartOutlined /> {t("nav.library")} · {t("nav.statistics")}
-          </span>
           <h1>{t("stats.title")}</h1>
           <p>{t("stats.subtitle")}</p>
         </div>
@@ -440,6 +441,7 @@ export function StatisticsPage() {
           )}
         </>
       )}
+      </div>
     </div>
     {exporting && (
       <div className="stats-export-overlay" role="status" aria-live="polite">

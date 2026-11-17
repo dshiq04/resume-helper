@@ -5854,3 +5854,11 @@ textarea {
   font-size: 12.5px;
   font-weight: 700;
 }
+
+.stats-page-eyebrow {
+  margin-bottom: 0;
+}
+
+.stats-export-capture {
+  width: 100%;
+}
