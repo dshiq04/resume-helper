@@ -81,6 +81,7 @@ func (s *Server) getApplicationHistory(c *gin.Context) {
 		return
 	}
 	changes = reconcileApplicationChanges(record, changes)
+	sortChangesForTimeline(changes)
 
 	present := make(map[string]struct{}, len(changes))
 	for _, change := range changes {
@@ -300,6 +301,30 @@ func (s *Server) attachStatusDays(db *gorm.DB, items []models.Application) []app
 
 func statusKey(applicationID uint, status string) string {
 	return fmt.Sprintf("%d|%s", applicationID, status)
+}
+
+// sortChangesForTimeline follows the fixed stage order shown in the UI
+// (screening → written → interview → pending → offer → rejected) instead of
+// the chronological order of the change records.
+func sortChangesForTimeline(items []models.ApplicationChange) {
+	rank := make(map[string]int, len(models.Statuses))
+	for index, status := range models.Statuses {
+		rank[status] = index
+	}
+	sort.SliceStable(items, func(left, right int) bool {
+		leftRank, leftOk := rank[items[left].Status]
+		rightRank, rightOk := rank[items[right].Status]
+		if !leftOk {
+			leftRank = len(models.Statuses)
+		}
+		if !rightOk {
+			rightRank = len(models.Statuses)
+		}
+		if leftRank == rightRank {
+			return items[left].ChangedAt.Before(items[right].ChangedAt)
+		}
+		return leftRank < rightRank
+	})
 }
 
 func sortChanges(items []models.ApplicationChange) {

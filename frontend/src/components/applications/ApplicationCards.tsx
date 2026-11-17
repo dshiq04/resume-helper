@@ -100,20 +100,7 @@ export function ApplicationCards({
           className={`mobile-app-card ${record.pinned ? "is-pinned" : ""} ${
             selectedKeys.includes(record.id) ? "is-selected" : ""
           }`}
-          onClick={(event) => {
-            const target = event.target as HTMLElement;
-            if (
-              target.closest(
-                "button, a, input, textarea, select, .ant-select, .ant-checkbox-wrapper, .ant-btn, .ant-dropdown",
-              )
-            ) {
-              return;
-            }
-            onToggleSelection(
-              record.id,
-              !selectedKeys.includes(record.id),
-            );
-          }}
+
         >
           <div className="mobile-card-top">
             <Checkbox

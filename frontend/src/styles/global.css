@@ -5636,10 +5636,6 @@ textarea {
   box-shadow: 0 8px 18px rgba(15, 23, 42, 0.14);
 }
 
-.applications-table .ant-table-tbody > tr.ant-table-row {
-  cursor: pointer;
-}
-
 .date-range-filter {
   width: 246px;
 }

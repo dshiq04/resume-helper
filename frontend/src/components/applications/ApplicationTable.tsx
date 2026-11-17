@@ -213,25 +213,7 @@ export function ApplicationTable({
             ? "is-pinned-row"
             : ""
       }
-      onRow={(record) => ({
-        onClick: (event) => {
-          if (record.id === DRAFT_ID) return;
-          const target = event.target as HTMLElement;
-          if (
-            target.closest(
-              "button, a, input, textarea, select, .ant-select, .ant-checkbox-wrapper, .ant-btn, .ant-dropdown",
-            )
-          ) {
-            return;
-          }
-          const selected = selectedKeys.includes(record.id);
-          onSelectionChange(
-            selected
-              ? selectedKeys.filter((key) => key !== record.id)
-              : [...selectedKeys, record.id],
-          );
-        },
-      })}
+
       rowSelection={{
         selectedRowKeys: selectedKeys,
         getCheckboxProps: (record) => ({ disabled: record.id === DRAFT_ID }),
