@@ -283,7 +283,7 @@ func (s *Server) updateApplication(c *gin.Context) {
 				return err
 			}
 			if newStatus != "" && newStatus != previousStatus {
-				return recordStatusChange(tx, record.ID, newStatus, time.Now())
+				return updateStatusChange(tx, record.ID, previousStatus, newStatus, time.Now())
 			}
 			return nil
 		}); err != nil {
@@ -400,7 +400,7 @@ func (s *Server) batchUpdateStatus(c *gin.Context) {
 				Update("status", status).Error; err != nil {
 				return err
 			}
-			if err := recordStatusChange(tx, record.ID, status, time.Now()); err != nil {
+			if err := updateStatusChange(tx, record.ID, record.Status, status, time.Now()); err != nil {
 				return err
 			}
 			changed = append(changed, record)

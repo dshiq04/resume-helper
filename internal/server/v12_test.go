@@ -296,3 +296,56 @@ type companySuggestionsTest struct {
 func uintString(value uint) string {
 	return fmt.Sprintf("%d", value)
 }
+
+func TestTimelineEndsWithApplicationsStatusAndBumpsForwardTime(t *testing.T) {
+	app := newTestApp(t)
+
+	_, body := app.request(t, http.MethodPost, "/api/applications", map[string]string{
+		"companyName": "Timeline Corp",
+		"category":    "autumn",
+		"status":      "screening",
+	}, "")
+	created := decodeJSON[applicationStatusView](t, body).Application
+
+	path := "/api/application/" + uintString(created.ID)
+	if resp, body := app.request(t, http.MethodPut, path, map[string]string{"status": "written"}, ""); resp.StatusCode != http.StatusOK {
+		t.Fatalf("written update status = %d, body = %s", resp.StatusCode, body)
+	}
+	var firstWritten models.ApplicationChange
+	if err := app.server.database().
+		Where("application_id = ? AND status = ?", created.ID, models.StatusWritten).
+		First(&firstWritten).Error; err != nil {
+		t.Fatalf("load first written milestone: %v", err)
+	}
+
+	time.Sleep(15 * time.Millisecond)
+	app.request(t, http.MethodPut, path, map[string]string{"status": "screening"}, "")
+	if resp, body := app.request(t, http.MethodPut, path, map[string]string{"status": "written"}, ""); resp.StatusCode != http.StatusOK {
+		t.Fatalf("written re-update status = %d, body = %s", resp.StatusCode, body)
+	}
+
+	var secondWritten models.ApplicationChange
+	if err := app.server.database().
+		Where("application_id = ? AND status = ?", created.ID, models.StatusWritten).
+		First(&secondWritten).Error; err != nil {
+		t.Fatalf("reload written milestone: %v", err)
+	}
+	if !secondWritten.ChangedAt.After(firstWritten.ChangedAt) {
+		t.Fatalf("forward status should refresh server time: %v -> %v", firstWritten.ChangedAt, secondWritten.ChangedAt)
+	}
+
+	_, body = app.request(t, http.MethodGet, path+"/history", nil, "")
+	history := decodeJSON[applicationHistoryResponse](t, body)
+	if len(history.Items) == 0 || history.Items[len(history.Items)-1].Status != models.StatusWritten {
+		t.Fatalf("timeline should end with written: %+v", history.Items)
+	}
+
+	// Moving the application back to screening must hide the later written
+	// milestone from the timeline.
+	app.request(t, http.MethodPut, path, map[string]string{"status": "screening"}, "")
+	_, body = app.request(t, http.MethodGet, path+"/history", nil, "")
+	history = decodeJSON[applicationHistoryResponse](t, body)
+	if len(history.Items) != 1 || history.Items[0].Status != models.StatusScreening {
+		t.Fatalf("timeline should end with screening only: %+v", history.Items)
+	}
+}

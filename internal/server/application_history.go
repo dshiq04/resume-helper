@@ -1,6 +1,7 @@
 package server
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"sort"
@@ -48,6 +49,47 @@ func recordStatusChange(db *gorm.DB, applicationID uint, status string, changedA
 		Status:        status,
 		ChangedAt:     changedAt,
 	}).Error
+}
+
+// updateStatusChange records a normal status transition. When the new status
+// comes later in the timeline order than the previous status, an existing
+// milestone is refreshed with the server time so the timeline never keeps a
+// stale timestamp for a status the user just re-entered.
+func updateStatusChange(db *gorm.DB, applicationID uint, previousStatus, status string, changedAt time.Time) error {
+	if applicationID == 0 || status == "" {
+		return nil
+	}
+	if changedAt.IsZero() {
+		changedAt = time.Now()
+	}
+
+	var existing models.ApplicationChange
+	err := db.Where("application_id = ? AND status = ?", applicationID, status).First(&existing).Error
+	switch {
+	case errors.Is(err, gorm.ErrRecordNotFound):
+		return db.Create(&models.ApplicationChange{
+			ApplicationID: applicationID,
+			Status:        status,
+			ChangedAt:     changedAt,
+		}).Error
+	case err != nil:
+		return err
+	}
+
+	if timelineStatusRank(status) > timelineStatusRank(previousStatus) && changedAt.After(existing.ChangedAt) {
+		return db.Model(&existing).Update("changed_at", changedAt).Error
+	}
+	return nil
+}
+
+// timelineStatusRank returns the fixed position used by the detail timeline.
+func timelineStatusRank(status string) int {
+	for index, item := range timelineStatusOrder {
+		if item == status {
+			return index
+		}
+	}
+	return len(timelineStatusOrder)
 }
 
 func (s *Server) loadChanges(db *gorm.DB, applicationID uint) ([]models.ApplicationChange, error) {
@@ -230,33 +272,42 @@ func daysSince(value time.Time) int {
 // status is appended so the timeline always ends at the real current stage.
 func reconcileApplicationChanges(record models.Application, changes []models.ApplicationChange) []models.ApplicationChange {
 	sortChanges(changes)
-	if len(changes) == 0 {
-		return []models.ApplicationChange{{
-			ApplicationID: record.ID,
-			Status:        record.Status,
-			ChangedAt:     record.AppliedAt,
-		}}
-	}
+	currentRank := timelineStatusRank(record.Status)
 
-	lastMatch := -1
-	for index, change := range changes {
-		if change.Status == record.Status {
-			lastMatch = index
+	// The applications table is authoritative. Drop milestones that sit after
+	// the current status in the timeline order, then make sure the current
+	// status is present so it is always the last node.
+	filtered := make([]models.ApplicationChange, 0, len(changes)+1)
+	for _, change := range changes {
+		if timelineStatusRank(change.Status) <= currentRank {
+			filtered = append(filtered, change)
 		}
 	}
-	if lastMatch >= 0 {
-		return changes[:lastMatch+1]
+
+	foundCurrent := false
+	for _, change := range filtered {
+		if change.Status == record.Status {
+			foundCurrent = true
+			break
+		}
+	}
+	if !foundCurrent {
+		changedAt := record.UpdatedAt
+		if changedAt.IsZero() || (len(filtered) > 0 && changedAt.Before(filtered[len(filtered)-1].ChangedAt)) {
+			changedAt = time.Now()
+		}
+		if changedAt.IsZero() {
+			changedAt = record.AppliedAt
+		}
+		filtered = append(filtered, models.ApplicationChange{
+			ApplicationID: record.ID,
+			Status:        record.Status,
+			ChangedAt:     changedAt,
+		})
 	}
 
-	changedAt := record.UpdatedAt
-	if changedAt.IsZero() || changedAt.Before(changes[len(changes)-1].ChangedAt) {
-		changedAt = time.Now()
-	}
-	return append(changes, models.ApplicationChange{
-		ApplicationID: record.ID,
-		Status:        record.Status,
-		ChangedAt:     changedAt,
-	})
+	sortChangesForTimeline(filtered)
+	return filtered
 }
 
 // attachStatusDays adds the age of the current status to application rows.
