@@ -14,10 +14,10 @@ export const CATEGORIES: Category[] = [
   "social",
 ];
 export const STATUSES: Status[] = [
+  "pending",
   "screening",
   "written",
   "interview",
-  "pending",
   "offer",
   "rejected",
 ];
