@@ -40,8 +40,11 @@ const ResumePreviewWindowPage = lazy(() =>
 
 const THEME_KEY = "resumetrail.theme";
 
-// 开发中水印开关：改为 true 显示水印，改为 false 关闭水印。
-const SHOW_DEVELOPMENT_WATERMARK = true;
+// 开发中水印开关：在 frontend/.env 中配置
+// VITE_SHOW_DEVELOPMENT_WATERMARK=true / false
+const SHOW_DEVELOPMENT_WATERMARK =
+  String(import.meta.env.VITE_SHOW_DEVELOPMENT_WATERMARK).toLowerCase() ===
+  "true";
 
 function getInitialTheme(): ThemeMode {
   const saved = localStorage.getItem(THEME_KEY);
