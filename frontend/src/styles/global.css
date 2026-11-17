@@ -3357,6 +3357,17 @@ textarea {
   gap: 18px;
 }
 
+.settings-card-wide {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+
+@media (max-width: 767px) {
+  .settings-card-wide {
+    grid-column: auto;
+  }
+}
+
 .settings-card {
   padding: 22px;
   background: var(--surface);
@@ -3438,7 +3449,7 @@ textarea {
   flex: 1;
 }
 
-@media (max-width: 1023px) {
+@media (max-width: 767px) {
   .settings-page-grid {
     grid-template-columns: 1fr;
   }

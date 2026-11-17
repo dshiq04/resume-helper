@@ -31,22 +31,20 @@ export function SettingsPage() {
       </div>
 
       <div className="settings-page-grid">
-        <div className="settings-page-column">
-          <AppearanceSettings
-            themeMode={themeMode}
-            onThemeChange={onThemeChange}
-          />
-          <SecuritySettings
-            passwordEnabled={passwordEnabled}
-            onPasswordEnabledChange={onPasswordEnabledChange}
-            onLock={onLock}
-          />
-          <DataTransferSettings />
-        </div>
-        <div className="settings-page-column">
-          <StorageSettings />
-          <DesktopSettings />
-          <ShortcutSettings />
+        <AppearanceSettings
+          themeMode={themeMode}
+          onThemeChange={onThemeChange}
+        />
+        <SecuritySettings
+          passwordEnabled={passwordEnabled}
+          onPasswordEnabledChange={onPasswordEnabledChange}
+          onLock={onLock}
+        />
+        <StorageSettings />
+        <DataTransferSettings />
+        <DesktopSettings />
+        <ShortcutSettings />
+        <div className="settings-card-wide">
           <AboutSettings />
         </div>
       </div>
