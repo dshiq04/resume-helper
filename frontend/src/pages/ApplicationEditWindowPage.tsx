@@ -1,33 +1,15 @@
 import { useCallback, useEffect, useState } from "react";
-import {
-  Alert,
-  App as AntdApp,
-  Button,
-  DatePicker,
-  Form,
-  Input,
-  Modal,
-  Select,
-  Spin,
-  Timeline,
-  Tooltip,
-} from "antd";
+import { Alert, App as AntdApp, Button, Form, Input, Select, Spin } from "antd";
 import {
   BankOutlined,
   CloseOutlined,
   EditOutlined,
-  HistoryOutlined,
   LinkOutlined,
   MinusOutlined,
 } from "@ant-design/icons";
-import dayjs, { type Dayjs } from "dayjs";
 import { Events } from "@wailsio/runtime";
 import { api, ApiError } from "../api/client";
-import type {
-  ApplicationHistory,
-  Category,
-  Status,
-} from "../api/types";
+import type { Category, Status } from "../api/types";
 import { useCategoryOptions, useStatusOptions, StatusBadge } from "../components/badges";
 import { CompanyAutoComplete } from "../components/CompanyAutoComplete";
 import { useI18n } from "../i18n";
@@ -48,33 +30,15 @@ function readRecordId(): number | null {
 }
 
 export function ApplicationEditWindowPage() {
-  const { t, formatFullDate } = useI18n();
+  const { t } = useI18n();
   const { message } = AntdApp.useApp();
   const [form] = Form.useForm<EditFormValues>();
-  const [supplementForm] = Form.useForm<Record<string, Dayjs>>();
   const [recordId] = useState(readRecordId);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [history, setHistory] = useState<ApplicationHistory | null>(null);
-  const [historyLoading, setHistoryLoading] = useState(false);
-  const [supplementOpen, setSupplementOpen] = useState(false);
-  const [supplementSaving, setSupplementSaving] = useState(false);
   const categoryOptions = useCategoryOptions();
   const statusOptions = useStatusOptions();
-  const currentStatus = Form.useWatch("status", form);
-
-  const loadHistory = useCallback(async () => {
-    if (recordId === null) return;
-    setHistoryLoading(true);
-    try {
-      setHistory(await api.applicationHistory(recordId));
-    } catch {
-      setHistory(null);
-    } finally {
-      setHistoryLoading(false);
-    }
-  }, [recordId]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -113,12 +77,10 @@ export function ApplicationEditWindowPage() {
         if (active) setLoading(false);
       });
 
-    void loadHistory();
-
     return () => {
       active = false;
     };
-  }, [form, loadHistory, message, recordId, t]);
+  }, [form, message, recordId, t]);
 
   const notifyDataChanged = useCallback(() => {
     window.dispatchEvent(new Event("resumetrail:data-changed"));
@@ -128,46 +90,6 @@ export function ApplicationEditWindowPage() {
       });
     }
   }, []);
-
-  const openSupplement = () => {
-    if (!history) return;
-    const defaults: Record<string, Dayjs> = {};
-    for (const status of history.missingStatuses) {
-      defaults[status] = dayjs(history.appliedAt);
-    }
-    supplementForm.setFieldsValue(defaults);
-    setSupplementOpen(true);
-  };
-
-  const submitSupplement = async () => {
-    if (!history || recordId === null) return;
-    let values: Record<string, Dayjs>;
-    try {
-      values = await supplementForm.validateFields();
-    } catch {
-      return;
-    }
-    setSupplementSaving(true);
-    try {
-      for (const status of history.missingStatuses) {
-        const value = values[status];
-        if (!value) continue;
-        await api.addApplicationHistory(
-          recordId,
-          status,
-          value.endOf("day").toISOString(),
-        );
-      }
-      message.success(t("history.saved"));
-      setSupplementOpen(false);
-      notifyDataChanged();
-      await loadHistory();
-    } catch (error) {
-      message.error(apiErrorMessage(error, t));
-    } finally {
-      setSupplementSaving(false);
-    }
-  };
 
   const handleSubmit = async (values: EditFormValues) => {
     if (recordId === null) return;
@@ -294,109 +216,6 @@ export function ApplicationEditWindowPage() {
                 />
               </Form.Item>
             </Form>
-
-            <section className="edit-history">
-              <header className="edit-history-head">
-                <div>
-                  <h3>
-                    <HistoryOutlined /> {t("history.title")}
-                  </h3>
-                  <p>{t("history.hint")}</p>
-                </div>
-                {history && history.missingStatuses.length > 0 && (
-                  <Button size="small" onClick={openSupplement}>
-                    {t("history.missingButton")}
-                  </Button>
-                )}
-              </header>
-
-              {history && currentStatus === "screening" && (
-                <div className="history-screening-age">
-                  {t("history.screeningAge", { count: history.screeningDays })}
-                </div>
-              )}
-
-              {history && history.missingStatuses.length > 0 && (
-                <Alert
-                  type="warning"
-                  showIcon
-                  className="edit-history-alert"
-                  message={t("history.missingTitle")}
-                  description={t("history.missingHint")}
-                />
-              )}
-
-              {historyLoading ? (
-                <div className="edit-history-loading">
-                  <Spin size="small" />
-                </div>
-              ) : history && history.items.length > 0 ? (
-                <Timeline
-                  className="application-timeline"
-                  items={history.items.map((change, index) => ({
-                    color: change.status,
-                    children: (
-                      <div className="timeline-entry">
-                        <div className="timeline-entry-head">
-                          <StatusBadge status={change.status} />
-                          <Tooltip
-                            title={formatFullDate(change.changedAt)}
-                            placement="top"
-                          >
-                            <span className="timeline-date">
-                              {formatFullDate(change.changedAt)}
-                            </span>
-                          </Tooltip>
-                        </div>
-                        {typeof change.daysSincePrevious === "number" && (
-                          <span className="timeline-gap">
-                            {t("history.interval", {
-                              count: change.daysSincePrevious,
-                            })}
-                          </span>
-                        )}
-                        {index === history.items.length - 1 && (
-                          <span className="timeline-current">
-                            {t("history.current")}
-                          </span>
-                        )}
-                      </div>
-                    ),
-                  }))}
-                />
-              ) : (
-                <p className="edit-history-empty">{t("history.empty")}</p>
-              )}
-            </section>
-
-            <Modal
-              open={supplementOpen}
-              title={t("history.supplementTitle")}
-              okText={t("action.save")}
-              cancelText={t("action.cancel")}
-              confirmLoading={supplementSaving}
-              onOk={() => void submitSupplement()}
-              onCancel={() => {
-                if (!supplementSaving) setSupplementOpen(false);
-              }}
-              destroyOnHidden
-            >
-              <p className="edit-history-modal-hint">
-                {t("history.missingHint")}
-              </p>
-              <Form form={supplementForm} layout="vertical" requiredMark={false}>
-                {history?.missingStatuses.map((status) => (
-                  <Form.Item
-                    key={status}
-                    name={status}
-                    label={<StatusBadge status={status} />}
-                    rules={[{ required: true, message: t("history.missingRequired") }]}
-                  >
-                    <DatePicker className="edit-history-date" showTime={false} />
-                  </Form.Item>
-                ))}
-              </Form>
-            </Modal>
           </>
         )}
       </div>

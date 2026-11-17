@@ -9,9 +9,10 @@ import { CompanyAutoComplete } from "../CompanyAutoComplete";
 interface CompanyCellProps {
   application: Application;
   inline: InlineEditController;
+  onView?: (application: Application) => void;
 }
 
-export function CompanyCell({ application, inline }: CompanyCellProps) {
+export function CompanyCell({ application, inline, onView }: CompanyCellProps) {
   const { t } = useI18n();
   const isEditing =
     inline.editing?.id === application.id &&
@@ -19,11 +20,18 @@ export function CompanyCell({ application, inline }: CompanyCellProps) {
 
   return (
     <div className="company-cell">
-      <span
-        className={`company-avatar avatar-tone-${avatarTone(application.companyName)}`}
+      <button
+        type="button"
+        className={`company-avatar company-avatar-button avatar-tone-${avatarTone(application.companyName)}`}
+        aria-label={application.companyName}
+        title={application.companyName}
+        onClick={(event) => {
+          event.stopPropagation();
+          onView?.(application);
+        }}
       >
         {companyInitial(application.companyName)}
-      </span>
+      </button>
       <div className="company-copy">
         <div className="company-name-row">
           {isEditing ? (

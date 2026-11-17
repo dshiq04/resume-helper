@@ -33,6 +33,7 @@ interface ApplicationCardsProps {
   onPageChange: (page: number) => void;
   onStatusChange: (record: Application, status: Status) => void;
   onPin: (record: Application) => void;
+  onView: (record: Application) => void;
   onEdit: (record: Application) => void;
   onDelete: (record: Application) => void;
   onAdd: () => void;
@@ -60,6 +61,7 @@ export function ApplicationCards({
   onPageChange,
   onStatusChange,
   onPin,
+  onView,
   onEdit,
   onDelete,
   onAdd,
@@ -98,6 +100,20 @@ export function ApplicationCards({
           className={`mobile-app-card ${record.pinned ? "is-pinned" : ""} ${
             selectedKeys.includes(record.id) ? "is-selected" : ""
           }`}
+          onClick={(event) => {
+            const target = event.target as HTMLElement;
+            if (
+              target.closest(
+                "button, a, input, textarea, select, .ant-select, .ant-checkbox-wrapper, .ant-btn, .ant-dropdown",
+              )
+            ) {
+              return;
+            }
+            onToggleSelection(
+              record.id,
+              !selectedKeys.includes(record.id),
+            );
+          }}
         >
           <div className="mobile-card-top">
             <Checkbox
@@ -108,7 +124,11 @@ export function ApplicationCards({
                 onToggleSelection(record.id, event.target.checked)
               }
             />
-            <CompanyCell application={record} inline={inline} />
+            <CompanyCell
+              application={record}
+              inline={inline}
+              onView={onView}
+            />
             <div className="mobile-card-actions">
               <ApplicationActions
                 application={record}

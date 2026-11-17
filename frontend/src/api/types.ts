@@ -40,6 +40,7 @@ export interface Application {
   createdAt: string;
   updatedAt: string;
   screeningDays?: number;
+  statusDays?: number;
 }
 
 export interface ApplicationList {
@@ -90,6 +91,7 @@ export interface ApplicationChange {
   changedAt: string;
   createdAt: string;
   daysSincePrevious?: number;
+  daysInStatus?: number;
 }
 
 export interface ApplicationHistory {
@@ -272,6 +274,8 @@ export interface ListParams {
   search?: string;
   category?: Category | "all";
   status?: Status | "all";
+  from?: string;
+  to?: string;
   page?: number;
   pageSize?: number;
 }

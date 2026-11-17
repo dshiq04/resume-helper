@@ -44,6 +44,9 @@ type Server struct {
 	applicationEditMu     sync.RWMutex
 	applicationEditOpener func(id uint)
 
+	applicationViewMu     sync.RWMutex
+	applicationViewOpener func(id uint)
+
 	shortcutPromptMu      sync.RWMutex
 	shortcutPromptHandler func(create bool) error
 
@@ -102,6 +105,14 @@ func (s *Server) SetApplicationEditOpener(opener func(id uint)) {
 	s.applicationEditMu.Lock()
 	defer s.applicationEditMu.Unlock()
 	s.applicationEditOpener = opener
+}
+
+// SetApplicationViewOpener wires the read-only detail window opener into the
+// HTTP layer. Headless/browser mode leaves it nil.
+func (s *Server) SetApplicationViewOpener(opener func(id uint)) {
+	s.applicationViewMu.Lock()
+	defer s.applicationViewMu.Unlock()
+	s.applicationViewOpener = opener
 }
 
 // SetShortcutPromptHandler wires the shortcut-prompt window decision back
@@ -280,6 +291,7 @@ func (s *Server) newEngine() *gin.Engine {
 		protected.POST("/system/quick-entry", s.openQuickEntry)
 		protected.GET("/system/quick-entry/defaults", s.quickEntryDefaults)
 		protected.POST("/system/application-edit", s.openApplicationEdit)
+		protected.POST("/system/application-view", s.openApplicationView)
 		protected.POST("/system/resume-preview", s.openResumePreview)
 	}
 

@@ -10,11 +10,7 @@ import {
   Tooltip,
 } from "antd";
 import type { TableColumnsType } from "antd";
-import {
-  DeleteOutlined,
-  ReloadOutlined,
-  UndoOutlined,
-} from "@ant-design/icons";
+import { DeleteOutlined, UndoOutlined } from "@ant-design/icons";
 import { useOutletContext } from "react-router-dom";
 import { api } from "../api/client";
 import type { DeletedApplication } from "../api/types";
@@ -202,9 +198,6 @@ export function TrashPage() {
             {t("trash.count", { count: items.length })}
           </span>
           <div className="table-toolbar-spacer" />
-          <Button icon={<ReloadOutlined />} onClick={() => void load()}>
-            {t("common.retry")}
-          </Button>
           <Popconfirm
             title={t("trash.emptyTitleConfirm")}
             description={t("trash.emptyContent")}

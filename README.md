@@ -78,6 +78,7 @@
 | `/autumn` | 秋招投递 |
 | `/internship` | 实习投递 |
 | `/resumes` | 简历库 |
+| `/application-view` | 投递详情窗口（点击企业头像打开） |
 | `/resume-preview` | 独立简历预览窗口（由应用自动打开） |
 | `/settings` | 设置页 |
 | `/trash` | 回收站 |

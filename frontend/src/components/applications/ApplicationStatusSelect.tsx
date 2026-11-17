@@ -34,12 +34,14 @@ export function ApplicationStatusSelect({
         optionRender={(option) => <StatusBadge status={option.value as Status} />}
         onChange={(value) => onChange(application, value as Status)}
       />
-      {application.status === "screening" &&
-        typeof application.screeningDays === "number" && (
-          <span className="screening-age">
-            {t("table.screeningAge", { count: application.screeningDays })}
-          </span>
-        )}
+      {typeof application.statusDays === "number" && (
+        <span className="screening-age">
+          {t("table.statusAge", {
+            status: t(`status.${application.status}`),
+            count: application.statusDays,
+          })}
+        </span>
+      )}
     </div>
   );
 }

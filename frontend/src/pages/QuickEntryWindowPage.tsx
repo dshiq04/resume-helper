@@ -169,6 +169,7 @@ export function QuickEntryWindowPage() {
           maxLength={255}
           value={companyName}
           allowClear
+          suggestOnEmpty={false}
           prefix={<BankOutlined className="field-icon" />}
           placeholder={t("form.companyPlaceholder")}
           onChange={setCompanyName}

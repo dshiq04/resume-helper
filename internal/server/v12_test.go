@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"resume-helper/internal/models"
 )
@@ -18,7 +19,11 @@ func TestStatusHistoryAndDeduplication(t *testing.T) {
 		"category":    "autumn",
 		"status":      "screening",
 	}, "")
-	created := decodeJSON[models.Application](t, body)
+	createdView := decodeJSON[applicationStatusView](t, body)
+	created := createdView.Application
+	if createdView.StatusDays == nil {
+		t.Fatal("create response should include statusDays")
+	}
 
 	resp, body := app.request(t, http.MethodGet, "/api/application/"+uintString(created.ID)+"/history", nil, "")
 	if resp.StatusCode != http.StatusOK {
@@ -44,8 +49,10 @@ func TestStatusHistoryAndDeduplication(t *testing.T) {
 
 	resp, body = app.request(t, http.MethodGet, path+"/history", nil, "")
 	history := decodeJSON[applicationHistoryResponse](t, body)
-	if len(history.Items) != 3 {
-		t.Fatalf("history length = %d, want 3: %+v", len(history.Items), history.Items)
+	// The applications table is authoritative: after moving back to written,
+	// the later interview milestone must no longer be shown.
+	if len(history.Items) != 2 {
+		t.Fatalf("history length = %d, want 2: %+v", len(history.Items), history.Items)
 	}
 	if len(history.MissingStatuses) != 0 {
 		t.Fatalf("missing statuses = %v, want none", history.MissingStatuses)
@@ -212,6 +219,36 @@ func TestBackupReEncryptsResumeFiles(t *testing.T) {
 	after, err := app.server.readResumeFile(resumes[0])
 	if err != nil || string(after) != content {
 		t.Fatalf("read imported resume: %v, content = %q", err, string(after))
+	}
+}
+
+func TestApplicationListDateRangeFilter(t *testing.T) {
+	app := newTestApp(t)
+	app.request(t, http.MethodPost, "/api/applications", map[string]string{
+		"companyName": "Range Corp",
+		"category":    "autumn",
+	}, "")
+
+	tomorrow := time.Now().AddDate(0, 0, 1)
+	from := tomorrow.Format("2006-01-02") + "T00:00:00Z"
+	to := tomorrow.Format("2006-01-02") + "T23:59:59Z"
+	resp, body := app.request(t, http.MethodGet, "/api/applications?page=1&pageSize=10&from="+from+"&to="+to, nil, "")
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("date range list status = %d, body = %s", resp.StatusCode, body)
+	}
+	list := decodeJSON[ApplicationList](t, body)
+	if list.Total != 0 {
+		t.Fatalf("future range total = %d, want 0", list.Total)
+	}
+
+	today := time.Now().Format("2006-01-02")
+	resp, body = app.request(t, http.MethodGet, "/api/applications?page=1&pageSize=10&from="+today+"T00:00:00Z&to="+today+"T23:59:59Z", nil, "")
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("today range list status = %d, body = %s", resp.StatusCode, body)
+	}
+	list = decodeJSON[ApplicationList](t, body)
+	if list.Total != 1 {
+		t.Fatalf("today range total = %d, want 1", list.Total)
 	}
 }
 

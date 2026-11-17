@@ -13,6 +13,7 @@ import { I18nProvider, useI18n } from "./i18n";
 import { WorkspaceLayout } from "./layouts/WorkspaceLayout";
 import { Dashboard } from "./pages/Dashboard";
 import { ApplicationEditWindowPage } from "./pages/ApplicationEditWindowPage";
+import { ApplicationViewWindowPage } from "./pages/ApplicationViewWindowPage";
 import { ClosePromptWindowPage } from "./pages/ClosePromptWindowPage";
 import { DataTransferWindowPage } from "./pages/DataTransferWindowPage";
 import { QuickEntryWindowPage } from "./pages/QuickEntryWindowPage";
@@ -225,6 +226,16 @@ function AppRoot() {
       <ConfigProvider locale={antdLocale} theme={themeConfig}>
         <AntdApp>
           <ApplicationEditWindowPage />
+        </AntdApp>
+      </ConfigProvider>
+    );
+  }
+
+  if (window.location.pathname === "/application-view") {
+    return (
+      <ConfigProvider locale={antdLocale} theme={themeConfig}>
+        <AntdApp>
+          <ApplicationViewWindowPage />
         </AntdApp>
       </ConfigProvider>
     );

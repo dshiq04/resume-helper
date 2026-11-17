@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import {
   Alert,
   Button,
@@ -65,7 +65,6 @@ export function DataTransferWindowPage() {
   const [result, setResult] = useState<BackupResult | null>(null);
   const [preview, setPreview] = useState<BackupResult | null>(null);
   const [error, setError] = useState("");
-  const desktop = useMemo(isDesktopRuntime, []);
 
   const reset = (nextMode?: TransferMode) => {
     setError("");
@@ -76,7 +75,7 @@ export function DataTransferWindowPage() {
   };
 
   const exportData = async () => {
-    if (!desktop) {
+    if (!isDesktopRuntime()) {
       setError(t("transfer.desktopOnly"));
       return;
     }
@@ -108,7 +107,7 @@ export function DataTransferWindowPage() {
   };
 
   const chooseImport = async () => {
-    if (!desktop) {
+    if (!isDesktopRuntime()) {
       setError(t("transfer.desktopOnly"));
       return;
     }
@@ -230,15 +229,6 @@ export function DataTransferWindowPage() {
           onChange={(value) => reset(value as TransferMode)}
         />
 
-        {!desktop && (
-          <Alert
-            type="warning"
-            showIcon
-            message={t("transfer.desktopOnly")}
-            className="transfer-alert"
-          />
-        )}
-
         {mode === "export" ? (
           <section className="transfer-panel">
             <div className="transfer-panel-head">
@@ -257,7 +247,6 @@ export function DataTransferWindowPage() {
               block
               icon={<CloudDownloadOutlined />}
               loading={busy}
-              disabled={!desktop}
               onClick={() => void exportData()}
             >
               {busy ? t("transfer.exporting") : t("transfer.chooseSave")}
@@ -315,8 +304,7 @@ export function DataTransferWindowPage() {
                 block
                 icon={<CloudUploadOutlined />}
                 loading={busy}
-                disabled={!desktop}
-                onClick={() => void chooseImport()}
+                  onClick={() => void chooseImport()}
               >
                 {busy ? t("transfer.inspecting") : t("transfer.chooseFile")}
               </Button>

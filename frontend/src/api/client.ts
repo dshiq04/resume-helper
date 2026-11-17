@@ -172,6 +172,8 @@ export const api = {
     if (params.status && params.status !== "all") {
       query.status = params.status;
     }
+    if (params.from) query.from = params.from;
+    if (params.to) query.to = params.to;
     return request<ApplicationList>("/applications", { params: query });
   },
   createApplication(input: ApplicationInput) {
@@ -355,6 +357,13 @@ export const api = {
   },
   openApplicationEdit(id: number) {
     return request<{ opened: boolean }>("/system/application-edit", {
+      method: "POST",
+      data: { id },
+      timeout: 10_000,
+    });
+  },
+  openApplicationView(id: number) {
+    return request<{ opened: boolean }>("/system/application-view", {
       method: "POST",
       data: { id },
       timeout: 10_000,

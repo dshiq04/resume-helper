@@ -26,6 +26,7 @@ interface CompanyAutoCompleteProps {
   prefix?: ReactNode;
   disabled?: boolean;
   allowClear?: boolean;
+  suggestOnEmpty?: boolean;
   className?: string;
   inputRef?: Ref<InputRef>;
 }
@@ -58,6 +59,7 @@ export function CompanyAutoComplete({
   prefix,
   disabled,
   allowClear,
+  suggestOnEmpty = true,
   className,
   inputRef,
 }: CompanyAutoCompleteProps) {
@@ -115,19 +117,38 @@ export function CompanyAutoComplete({
       popupMatchSelectWidth={300}
       filterOption={false}
       onFocus={() => {
+        if (!suggestOnEmpty && value.trim() === "") {
+          setOpen(false);
+          return;
+        }
         setOpen(true);
         load(value);
       }}
       onDropdownVisibleChange={(visible) => {
+        if (visible && !suggestOnEmpty && value.trim() === "") {
+          setOpen(false);
+          return;
+        }
         setOpen(visible);
         if (visible) load(value);
       }}
       onSearch={(search) => {
+        if (search.trim() === "") {
+          setCompanies([]);
+          setOpen(false);
+          return;
+        }
+        setOpen(true);
         scheduleLoad(search);
       }}
       onChange={(next) => {
         onChange?.(next);
-        if (next.trim() === "") load("");
+        if (next.trim() === "") {
+          setCompanies([]);
+          setOpen(false);
+          return;
+        }
+        if (open) scheduleLoad(next);
       }}
       onSelect={(next) => {
         onChange?.(next);

@@ -1,6 +1,11 @@
 import { useState } from "react";
 import { App as AntdApp, Button, Checkbox } from "antd";
-import { CloseCircleOutlined, PoweroffOutlined, WindowsOutlined } from "@ant-design/icons";
+import {
+  CloseCircleOutlined,
+  CloseOutlined,
+  PoweroffOutlined,
+  WindowsOutlined,
+} from "@ant-design/icons";
 import { api } from "../api/client";
 import { useI18n } from "../i18n";
 import { apiErrorMessage } from "../utils/errors";
@@ -30,6 +35,17 @@ export function ClosePromptWindowPage() {
           <CloseCircleOutlined />
           {t("close.title")}
         </span>
+        <div className="quick-window-actions">
+          <button
+            className="quick-window-close"
+            type="button"
+            aria-label={t("window.close")}
+            title={t("window.close")}
+            onClick={() => void closeWindow()}
+          >
+            <CloseOutlined />
+          </button>
+        </div>
       </header>
 
       <div className="shortcut-prompt-body close-prompt-body">

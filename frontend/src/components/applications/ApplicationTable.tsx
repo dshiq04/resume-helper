@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { Table, Tooltip } from "antd";
 import type { TableColumnsType } from "antd";
 import type { Application, Status, StatusOption } from "../../api/types";
@@ -42,6 +41,7 @@ interface ApplicationTableProps {
   onPageSizeChange: (pageSize: number) => void;
   onStatusChange: (record: Application, status: Status) => void;
   onPin: (record: Application) => void;
+  onView: (record: Application) => void;
   onEdit: (record: Application) => void;
   onDelete: (record: Application) => void;
   onAdd: () => void;
@@ -70,12 +70,12 @@ export function ApplicationTable({
   onPageSizeChange,
   onStatusChange,
   onPin,
+  onView,
   onEdit,
   onDelete,
   onAdd,
 }: ApplicationTableProps) {
   const { t, formatDate, formatFullDate, locale } = useI18n();
-  const [activeRowId, setActiveRowId] = useState<number | null>(null);
 
   const columns: TableColumnsType<Application> = [
     {
@@ -94,7 +94,7 @@ export function ApplicationTable({
             onCancel={onDraftCancel}
           />
         ) : (
-          <CompanyCell application={record} inline={inline} />
+          <CompanyCell application={record} inline={inline} onView={onView} />
         ),
     },
     {
@@ -209,19 +209,27 @@ export function ApplicationTable({
       rowClassName={(record) =>
         record.id === DRAFT_ID
           ? "is-draft-row"
-          : activeRowId === record.id
-            ? "is-gradient-active"
-            : record.pinned
-              ? "is-pinned-row"
-              : ""
+          : record.pinned
+            ? "is-pinned-row"
+            : ""
       }
       onRow={(record) => ({
-        onClick: () => {
+        onClick: (event) => {
           if (record.id === DRAFT_ID) return;
-          setActiveRowId(record.id);
-          window.setTimeout(() => {
-            setActiveRowId((current) => (current === record.id ? null : current));
-          }, 850);
+          const target = event.target as HTMLElement;
+          if (
+            target.closest(
+              "button, a, input, textarea, select, .ant-select, .ant-checkbox-wrapper, .ant-btn, .ant-dropdown",
+            )
+          ) {
+            return;
+          }
+          const selected = selectedKeys.includes(record.id);
+          onSelectionChange(
+            selected
+              ? selectedKeys.filter((key) => key !== record.id)
+              : [...selectedKeys, record.id],
+          );
         },
       })}
       rowSelection={{

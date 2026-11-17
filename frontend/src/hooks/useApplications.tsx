@@ -6,6 +6,7 @@ import {
   type SetStateAction,
 } from "react";
 import { App as AntdApp, Button } from "antd";
+import type { Dayjs } from "dayjs";
 import { Events } from "@wailsio/runtime";
 import { api, ApiError } from "../api/client";
 import type {
@@ -34,6 +35,8 @@ export interface ApplicationsBoard {
   setSearchInput: (value: string) => void;
   statusFilter: Status | "all";
   setStatusFilter: (value: Status | "all") => void;
+  dateRange: [Dayjs, Dayjs] | null;
+  setDateRange: (value: [Dayjs, Dayjs] | null) => void;
   selectedKeys: number[];
   setSelectedKeys: Dispatch<SetStateAction<number[]>>;
   toggleSelection: (id: number, checked: boolean) => void;
@@ -68,6 +71,7 @@ export function useApplications({
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<Status | "all">("all");
+  const [dateRange, setDateRange] = useState<[Dayjs, Dayjs] | null>(null);
   const [selectedKeys, setSelectedKeys] = useState<number[]>([]);
   const [loading, setLoading] = useState(true);
   const [reloadToken, setReloadToken] = useState(0);
@@ -103,7 +107,7 @@ export function useApplications({
   useEffect(() => {
     setPage(1);
     setSelectedKeys([]);
-  }, [category, statusFilter]);
+  }, [category, statusFilter, dateRange]);
 
   useEffect(() => {
     setSelectedKeys([]);
@@ -116,6 +120,8 @@ export function useApplications({
         category,
         status: statusFilter,
         search,
+        from: dateRange?.[0].startOf("day").toISOString(),
+        to: dateRange?.[1].endOf("day").toISOString(),
         page,
         pageSize,
       });
@@ -131,7 +137,7 @@ export function useApplications({
     } finally {
       setLoading(false);
     }
-  }, [category, message, page, pageSize, search, statusFilter, t]);
+  }, [category, dateRange, message, page, pageSize, search, statusFilter, t]);
 
   useEffect(() => {
     void load();
@@ -347,6 +353,8 @@ export function useApplications({
     setSearchInput,
     statusFilter,
     setStatusFilter,
+    dateRange,
+    setDateRange,
     selectedKeys,
     setSelectedKeys,
     toggleSelection,
@@ -354,7 +362,7 @@ export function useApplications({
     loading,
     statusSavingId,
     pinSavingId,
-    hasFilters: Boolean(search) || statusFilter !== "all",
+    hasFilters: Boolean(search) || statusFilter !== "all" || dateRange !== null,
     refresh,
     updateField,
     updateStatus,

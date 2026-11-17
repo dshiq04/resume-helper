@@ -1,6 +1,7 @@
 package server
 
 import (
+	"fmt"
 	"net/http"
 	"sort"
 	"strings"
@@ -16,6 +17,7 @@ import (
 type applicationChangeView struct {
 	models.ApplicationChange
 	DaysSincePrevious *int `json:"daysSincePrevious,omitempty"`
+	DaysInStatus      *int `json:"daysInStatus,omitempty"`
 }
 
 type applicationHistoryResponse struct {
@@ -28,6 +30,7 @@ type applicationHistoryResponse struct {
 type applicationStatusView struct {
 	models.Application
 	ScreeningDays *int `json:"screeningDays,omitempty"`
+	StatusDays    *int `json:"statusDays,omitempty"`
 }
 
 // recordStatusChange appends a milestone the first time an application
@@ -77,6 +80,7 @@ func (s *Server) getApplicationHistory(c *gin.Context) {
 		apiError(c, http.StatusInternalServerError, "query_failed", "Failed to load the status history.")
 		return
 	}
+	changes = reconcileApplicationChanges(record, changes)
 
 	present := make(map[string]struct{}, len(changes))
 	for _, change := range changes {
@@ -91,7 +95,8 @@ func (s *Server) getApplicationHistory(c *gin.Context) {
 
 	views := make([]applicationChangeView, 0, len(changes))
 	var previous time.Time
-	for _, change := range changes {
+	now := time.Now()
+	for index, change := range changes {
 		view := applicationChangeView{ApplicationChange: change}
 		if !previous.IsZero() {
 			days := int(change.ChangedAt.Sub(previous).Hours() / 24)
@@ -100,6 +105,15 @@ func (s *Server) getApplicationHistory(c *gin.Context) {
 			}
 			view.DaysSincePrevious = &days
 		}
+		next := now
+		if index+1 < len(changes) {
+			next = changes[index+1].ChangedAt
+		}
+		daysInStatus := int(next.Sub(change.ChangedAt).Hours() / 24)
+		if daysInStatus < 0 {
+			daysInStatus = 0
+		}
+		view.DaysInStatus = &daysInStatus
 		views = append(views, view)
 		previous = change.ChangedAt
 	}
@@ -209,26 +223,60 @@ func daysSince(value time.Time) int {
 	return days
 }
 
-// attachScreeningDays adds the "stuck in screening" age to application rows.
+// reconcileApplicationChanges makes the applications table authoritative when
+// its current status and the change history disagree. If the current status is
+// already recorded, later milestones are discarded; otherwise the current
+// status is appended so the timeline always ends at the real current stage.
+func reconcileApplicationChanges(record models.Application, changes []models.ApplicationChange) []models.ApplicationChange {
+	sortChanges(changes)
+	if len(changes) == 0 {
+		return []models.ApplicationChange{{
+			ApplicationID: record.ID,
+			Status:        record.Status,
+			ChangedAt:     record.AppliedAt,
+		}}
+	}
+
+	lastMatch := -1
+	for index, change := range changes {
+		if change.Status == record.Status {
+			lastMatch = index
+		}
+	}
+	if lastMatch >= 0 {
+		return changes[:lastMatch+1]
+	}
+
+	changedAt := record.UpdatedAt
+	if changedAt.IsZero() || changedAt.Before(changes[len(changes)-1].ChangedAt) {
+		changedAt = time.Now()
+	}
+	return append(changes, models.ApplicationChange{
+		ApplicationID: record.ID,
+		Status:        record.Status,
+		ChangedAt:     changedAt,
+	})
+}
+
+// attachStatusDays adds the age of the current status to application rows.
 // The query is batched so listing a page never performs one lookup per row.
-func (s *Server) attachScreeningDays(db *gorm.DB, items []models.Application) []applicationStatusView {
+func (s *Server) attachStatusDays(db *gorm.DB, items []models.Application) []applicationStatusView {
 	views := make([]applicationStatusView, 0, len(items))
 	ids := make([]uint, 0, len(items))
 	for _, item := range items {
-		if item.Status == models.StatusScreening {
-			ids = append(ids, item.ID)
-		}
+		ids = append(ids, item.ID)
 	}
 
-	screeningStart := make(map[uint]time.Time, len(ids))
+	statusStart := make(map[string]time.Time, len(ids))
 	if len(ids) > 0 {
 		var changes []models.ApplicationChange
-		if err := db.Where("application_id IN ? AND status = ?", ids, models.StatusScreening).
+		if err := db.Where("application_id IN ?", ids).
 			Order("changed_at ASC, id ASC").
 			Find(&changes).Error; err == nil {
 			for _, change := range changes {
-				if _, exists := screeningStart[change.ApplicationID]; !exists {
-					screeningStart[change.ApplicationID] = change.ChangedAt
+				key := statusKey(change.ApplicationID, change.Status)
+				if _, exists := statusStart[key]; !exists {
+					statusStart[key] = change.ChangedAt
 				}
 			}
 		}
@@ -236,17 +284,22 @@ func (s *Server) attachScreeningDays(db *gorm.DB, items []models.Application) []
 
 	for _, item := range items {
 		view := applicationStatusView{Application: item}
+		since, exists := statusStart[statusKey(item.ID, item.Status)]
+		if !exists {
+			since = item.AppliedAt
+		}
+		days := daysSince(since)
+		view.StatusDays = &days
 		if item.Status == models.StatusScreening {
-			since, exists := screeningStart[item.ID]
-			if !exists {
-				since = item.AppliedAt
-			}
-			days := daysSince(since)
 			view.ScreeningDays = &days
 		}
 		views = append(views, view)
 	}
 	return views
+}
+
+func statusKey(applicationID uint, status string) string {
+	return fmt.Sprintf("%d|%s", applicationID, status)
 }
 
 func sortChanges(items []models.ApplicationChange) {

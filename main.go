@@ -134,6 +134,9 @@ func main() {
 	httpServer.SetApplicationEditOpener(func(id uint) {
 		openApplicationEditWindow(app, id)
 	})
+	httpServer.SetApplicationViewOpener(func(id uint) {
+		openApplicationViewWindow(app, id)
+	})
 	httpServer.SetResumePreviewOpener(func(id uint, title string) {
 		openResumePreviewWindow(app, id, title)
 	})
@@ -271,6 +274,37 @@ func openApplicationEditWindow(app *application.App, id uint) {
 			Height:           560,
 			MinWidth:         420,
 			MinHeight:        430,
+			Frameless:        true,
+			DisableResize:    false,
+			InitialPosition:  application.WindowCentered,
+			BackgroundColour: application.NewRGB(15, 23, 42),
+		})
+		window.Show()
+		window.Focus()
+	})
+}
+
+func openApplicationViewWindow(app *application.App, id uint) {
+	application.InvokeAsync(func() {
+		target := "/application-view?id=" + strconv.FormatUint(uint64(id), 10)
+		windowTitle := "投递详情"
+
+		if existing, ok := app.Window.Get("application-view"); ok {
+			existing.SetTitle(windowTitle)
+			existing.SetURL(target)
+			existing.Show()
+			existing.Focus()
+			return
+		}
+
+		window := app.Window.NewWithOptions(application.WebviewWindowOptions{
+			Name:             "application-view",
+			Title:            windowTitle,
+			URL:              target,
+			Width:            680,
+			Height:           760,
+			MinWidth:         520,
+			MinHeight:        520,
 			Frameless:        true,
 			DisableResize:    false,
 			InitialPosition:  application.WindowCentered,

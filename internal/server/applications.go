@@ -17,6 +17,8 @@ type listApplicationsParams struct {
 	Search   string `form:"search"`
 	Category string `form:"category"`
 	Status   string `form:"status"`
+	From     string `form:"from"`
+	To       string `form:"to"`
 	Page     int    `form:"page"`
 	PageSize int    `form:"pageSize"`
 }
@@ -85,6 +87,28 @@ func (s *Server) listApplications(c *gin.Context) {
 		return
 	}
 
+	var from, to *time.Time
+	if strings.TrimSpace(params.From) != "" {
+		parsed, err := parseFlexibleTime(params.From)
+		if err != nil {
+			apiError(c, http.StatusBadRequest, "invalid_range", "Invalid date range.")
+			return
+		}
+		from = &parsed
+	}
+	if strings.TrimSpace(params.To) != "" {
+		parsed, err := parseFlexibleTime(params.To)
+		if err != nil {
+			apiError(c, http.StatusBadRequest, "invalid_range", "Invalid date range.")
+			return
+		}
+		to = &parsed
+	}
+	if from != nil && to != nil && to.Before(*from) {
+		apiError(c, http.StatusBadRequest, "invalid_range", "The end date must be after the start date.")
+		return
+	}
+
 	db := s.database()
 	build := func() *gorm.DB {
 		query := db.Model(&models.Application{})
@@ -97,6 +121,12 @@ func (s *Server) listApplications(c *gin.Context) {
 		if search := strings.TrimSpace(params.Search); search != "" {
 			like := "%" + strings.ToLower(search) + "%"
 			query = query.Where("LOWER(company_name) LIKE ? OR LOWER(link) LIKE ?", like, like)
+		}
+		if from != nil {
+			query = query.Where("applied_at >= ?", *from)
+		}
+		if to != nil {
+			query = query.Where("applied_at <= ?", *to)
 		}
 		return query
 	}
@@ -121,7 +151,7 @@ func (s *Server) listApplications(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"items":    s.attachScreeningDays(db, items),
+		"items":    s.attachStatusDays(db, items),
 		"total":    total,
 		"page":     params.Page,
 		"pageSize": params.PageSize,
@@ -154,7 +184,7 @@ func (s *Server) createApplication(c *gin.Context) {
 		apiError(c, http.StatusInternalServerError, "create_failed", "Failed to create the application.")
 		return
 	}
-	c.JSON(http.StatusCreated, record)
+	c.JSON(http.StatusCreated, s.attachStatusDays(db, []models.Application{*record})[0])
 }
 
 func (s *Server) getApplication(c *gin.Context) {
@@ -173,7 +203,7 @@ func (s *Server) getApplication(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, record)
+	c.JSON(http.StatusOK, s.attachStatusDays(s.database(), []models.Application{record})[0])
 }
 
 func (s *Server) updateApplication(c *gin.Context) {
@@ -266,7 +296,7 @@ func (s *Server) updateApplication(c *gin.Context) {
 		apiError(c, http.StatusInternalServerError, "query_failed", "Failed to reload the application.")
 		return
 	}
-	c.JSON(http.StatusOK, record)
+	c.JSON(http.StatusOK, s.attachStatusDays(db, []models.Application{record})[0])
 }
 
 func (s *Server) deleteApplication(c *gin.Context) {
@@ -543,7 +573,7 @@ func (s *Server) stats(c *gin.Context) {
 		apiError(c, http.StatusInternalServerError, "query_failed", "Failed to load statistics.")
 		return
 	}
-	views := s.attachScreeningDays(db, screeningItems)
+	views := s.attachStatusDays(db, screeningItems)
 	daysSum := 0
 	maxDays := 0
 	for _, view := range views {
