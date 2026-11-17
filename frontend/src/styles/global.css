@@ -5823,3 +5823,34 @@ textarea {
     font-size: 20px;
   }
 }
+
+.stats-export-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 5000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(100, 116, 139, 0.18);
+  -webkit-backdrop-filter: blur(7px) saturate(120%);
+  backdrop-filter: blur(7px) saturate(120%);
+}
+
+.stats-export-overlay-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  min-width: 190px;
+  padding: 24px 30px;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  box-shadow: var(--shadow-float);
+}
+
+.stats-export-overlay-card strong {
+  font-size: 12.5px;
+  font-weight: 700;
+}

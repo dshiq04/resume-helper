@@ -216,6 +216,7 @@ export function StatisticsPage() {
   };
 
   return (
+    <>
     <div className="stats-page" ref={pageRef}>
       <header className="stats-page-header stats-page-header-with-action">
         <div>
@@ -440,5 +441,14 @@ export function StatisticsPage() {
         </>
       )}
     </div>
+    {exporting && (
+      <div className="stats-export-overlay" role="status" aria-live="polite">
+        <div className="stats-export-overlay-card">
+          <Spin size="large" />
+          <strong>{t("stats.exportingImage")}</strong>
+        </div>
+      </div>
+    )}
+    </>
   );
 }
