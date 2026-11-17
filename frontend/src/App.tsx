@@ -1,4 +1,12 @@
-import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from "react";
+import {
+  Suspense,
+  lazy,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
 import { App as AntdApp, Button, ConfigProvider, Spin, Watermark } from "antd";
 import { CloudServerOutlined, ReloadOutlined } from "@ant-design/icons";
 import { Navigate, Route, Routes } from "react-router-dom";
@@ -32,6 +40,9 @@ const ResumePreviewWindowPage = lazy(() =>
 
 const THEME_KEY = "resumetrail.theme";
 
+// 开发中水印开关：改为 true 显示水印，改为 false 关闭水印。
+const SHOW_DEVELOPMENT_WATERMARK = true;
+
 function getInitialTheme(): ThemeMode {
   const saved = localStorage.getItem(THEME_KEY);
   if (saved === "light" || saved === "dark") return saved;
@@ -41,6 +52,44 @@ function getInitialTheme(): ThemeMode {
 }
 
 type Stage = "checking" | "locked" | "ready" | "error";
+
+function AppContentFrame({
+  children,
+  themeMode,
+}: {
+  children: ReactNode;
+  themeMode: ThemeMode;
+}) {
+  if (!SHOW_DEVELOPMENT_WATERMARK) {
+    return <>{children}</>;
+  }
+
+  return (
+    <Watermark
+      className="app-watermark"
+      content="开发中品质，请谅解"
+      gap={[120, 120]}
+      rotate={-22}
+      zIndex={6}
+      font={{
+        color:
+          themeMode === "dark"
+            ? "rgba(226, 232, 240, 0.12)"
+            : "rgba(15, 23, 42, 0.09)",
+        fontSize: 16,
+      }}
+      style={{
+        flex: 1,
+        minHeight: 0,
+        display: "flex",
+        flexDirection: "column",
+        width: "100%",
+      }}
+    >
+      {children}
+    </Watermark>
+  );
+}
 
 function AppRoot() {
   const { t, antdLocale } = useI18n();
@@ -283,27 +332,7 @@ function AppRoot() {
           />
           <ResizeHandles />
 
-          <Watermark
-            className="app-watermark"
-            content="开发中品质，请谅解"
-            gap={[120, 120]}
-            rotate={-22}
-            zIndex={6}
-            font={{
-              color:
-                themeMode === "dark"
-                  ? "rgba(226, 232, 240, 0.12)"
-                  : "rgba(15, 23, 42, 0.09)",
-              fontSize: 16,
-            }}
-            style={{
-              flex: 1,
-              minHeight: 0,
-              display: "flex",
-              flexDirection: "column",
-              width: "100%",
-            }}
-          >
+          <AppContentFrame themeMode={themeMode}>
           <div className="app-content">
             {stage === "checking" && (
               <div className="boot-screen">
@@ -367,7 +396,7 @@ function AppRoot() {
               </Routes>
             )}
           </div>
-          </Watermark>
+          </AppContentFrame>
         </div>
       </AntdApp>
     </ConfigProvider>
