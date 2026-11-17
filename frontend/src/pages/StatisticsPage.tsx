@@ -161,17 +161,15 @@ export function StatisticsPage() {
   const exportImage = async () => {
     if (!pageRef.current || exporting) return;
     const target = pageRef.current;
-    const originalWidth = target.style.width;
     setExporting(true);
     try {
       const background =
         getComputedStyle(document.documentElement).getPropertyValue("--bg").trim() ||
         (themeMode === "dark" ? "#090e1a" : "#f4f5fb");
 
-      // Export at the full desktop layout width even when the app window is
-      // narrow. The calendar heatmap needs enough horizontal room for all
-      // twelve months; otherwise the right-hand months were clipped.
-      target.style.width = `${Math.max(target.clientWidth, 1180)}px`;
+      // Re-measure the charts before capturing, but never resize the visible
+      // page: changing its width here made the tablet/desktop layout jump to
+      // the right while the export was running.
       window.dispatchEvent(new Event("resize"));
       await new Promise<void>((resolve) => {
         window.requestAnimationFrame(() =>
@@ -209,8 +207,6 @@ export function StatisticsPage() {
     } catch {
       message.error(t("stats.exportFailed"));
     } finally {
-      target.style.width = originalWidth;
-      window.dispatchEvent(new Event("resize"));
       setExporting(false);
     }
   };
