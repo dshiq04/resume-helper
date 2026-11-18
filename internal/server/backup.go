@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"resume-helper/internal/appinfo"
 	"resume-helper/internal/models"
 
 	"go.uber.org/zap"
@@ -88,7 +89,7 @@ func (s *Server) ExportBackup(target string) (*BackupResult, error) {
 	manifest := backupManifest{
 		Format:       backupFormat,
 		Version:      backupVersion,
-		AppVersion:   Version,
+		AppVersion:   appinfo.Version,
 		ExportedAt:   time.Now(),
 		Applications: []models.Application{},
 		Resumes:      []backupResume{},

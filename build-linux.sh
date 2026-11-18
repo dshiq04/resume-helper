@@ -47,6 +47,8 @@ else
   build
 fi
 
+cp .env bin/.env
+
 echo
 echo "[OK] Built $OUT"
 ls -lh "$OUT"

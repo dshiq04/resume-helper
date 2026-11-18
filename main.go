@@ -14,6 +14,7 @@ import (
 	"syscall"
 	"time"
 
+	"resume-helper/internal/appinfo"
 	"resume-helper/internal/config"
 	"resume-helper/internal/database"
 	"resume-helper/internal/desktop"
@@ -39,6 +40,14 @@ var appIconPNG []byte
 var appIconICO []byte
 
 func main() {
+	dataDir, err := config.DataDir()
+	if err != nil {
+		log.Fatalf("locate data directory: %v", err)
+	}
+	if err := appinfo.Load(dataDir); err != nil {
+		log.Fatalf("load .env: %v", err)
+	}
+
 	cfg, err := config.Load()
 	if err != nil {
 		log.Fatalf("load configuration: %v", err)
@@ -50,7 +59,7 @@ func main() {
 		log.Fatalf("setup logging: %v", err)
 	}
 	defer closeLog()
-	appLogger.Info("ResumeTrail starting", zap.String("logFile", logPath))
+	appLogger.Info(appinfo.Name+" starting", zap.String("logFile", logPath))
 	appLogger.Debug("configuration loaded",
 		zap.String("dataDir", cfg.DataDir),
 		zap.String("config", cfg.SourcePath),
@@ -77,8 +86,8 @@ func main() {
 	if err != nil {
 		appLogger.Fatal("start HTTP server", zap.Error(err))
 	}
-	appLogger.Info("ResumeTrail is serving",
-		zap.String("version", server.Version),
+	appLogger.Info(appinfo.Name+" is serving",
+		zap.String("version", appinfo.Version),
 		zap.String("url", baseURL),
 		zap.String("database", database.DatabaseLabel(cfg.Database.Driver)),
 		zap.String("dsn", database.SafeDSN(cfg.Database.Driver, cfg.Database.DSN)),
@@ -95,7 +104,7 @@ func main() {
 	// fullscreen / close) and resize handling on the Wails origin, while the
 	// Gin engine continues to handle both the static files and /api requests.
 	app := application.New(application.Options{
-		Name:        "ResumeTrail",
+		Name:        appinfo.Name,
 		Description: "A beautiful resume application tracker",
 		Icon:        appIconPNG,
 		Services: []application.Service{
@@ -108,7 +117,7 @@ func main() {
 	})
 
 	mainWindow := app.Window.NewWithOptions(application.WebviewWindowOptions{
-		Title:            "履途 ResumeTrail",
+		Title:            appinfo.Title,
 		Width:            1360,
 		Height:           860,
 		MinWidth:         360,
@@ -354,9 +363,9 @@ type closePromptState struct {
 func createSystemTray(app *application.App, mainWindow *application.WebviewWindow, state *closePromptState) *application.SystemTray {
 	tray := app.SystemTray.New()
 	tray.SetIcon(appIconPNG)
-	tray.SetTooltip("履途 ResumeTrail")
+	tray.SetTooltip(appinfo.Title)
 	menu := app.NewMenu()
-	menu.Add("打开履途 / Open ResumeTrail").OnClick(func(*application.Context) {
+	menu.Add("打开 " + appinfo.Title + " / Open " + appinfo.Name).OnClick(func(*application.Context) {
 		application.InvokeAsync(func() {
 			mainWindow.Show()
 			mainWindow.Focus()
@@ -431,7 +440,7 @@ func openClosePromptWindow(app *application.App, state *closePromptState) {
 
 		window := app.Window.NewWithOptions(application.WebviewWindowOptions{
 			Name:             "close-prompt",
-			Title:            "关闭履途",
+			Title:            "关闭 " + appinfo.Title,
 			URL:              "/close-prompt",
 			Width:            470,
 			Height:           336,

@@ -6,7 +6,7 @@ import type { DeviceInfo } from "../../api/types";
 import { useI18n } from "../../i18n";
 import { SettingsCard } from "./SettingsCard";
 
-const APP_VERSION = "1.2";
+const APP_VERSION = __APP_VERSION__;
 
 export function AboutSettings() {
   const { t } = useI18n();

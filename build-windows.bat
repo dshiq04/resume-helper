@@ -43,6 +43,8 @@ set "GOARCH=%ARCH%"
 go build -trimpath -ldflags="-s -w -H windowsgui" -o "%OUT%" .
 if errorlevel 1 exit /b 1
 
+if exist ".env" copy /Y ".env" "bin\.env" >nul
+
 echo.
 echo [OK] Built %OUT%
 for %%F in ("%OUT%") do echo      Size: %%~zF bytes

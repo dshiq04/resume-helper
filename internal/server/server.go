@@ -14,14 +14,13 @@ import (
 	"sync"
 	"time"
 
+	"resume-helper/internal/appinfo"
 	"resume-helper/internal/config"
 
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
-
-const Version = "1.2"
 
 type Server struct {
 	cfg    *config.Config
@@ -357,7 +356,7 @@ func (s *Server) Stop(ctx context.Context) error {
 func (s *Server) health(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"status":  "ok",
-		"version": Version,
+		"version": appinfo.Version,
 		"time":    time.Now(),
 	})
 }
@@ -375,7 +374,7 @@ func (s *Server) systemInfo(c *gin.Context) {
 		location = dsn
 	}
 	c.JSON(http.StatusOK, gin.H{
-		"version":     Version,
+		"version":     appinfo.Version,
 		"goVersion":   runtime.Version(),
 		"driver":      driver,
 		"database":    databaseLabel(driver),
