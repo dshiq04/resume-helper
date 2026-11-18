@@ -30,7 +30,9 @@ func TestStatusHistoryAndDeduplication(t *testing.T) {
 		t.Fatalf("initial history status = %d, body = %s", resp.StatusCode, body)
 	}
 	initial := decodeJSON[applicationHistoryResponse](t, body)
-	if len(initial.Items) != 1 || initial.Items[0].Status != models.StatusScreening {
+	if len(initial.Items) != 2 ||
+		initial.Items[0].Status != models.StatusPending ||
+		initial.Items[1].Status != models.StatusScreening {
 		t.Fatalf("unexpected initial history: %+v", initial.Items)
 	}
 
@@ -51,8 +53,8 @@ func TestStatusHistoryAndDeduplication(t *testing.T) {
 	history := decodeJSON[applicationHistoryResponse](t, body)
 	// The applications table is authoritative: after moving back to written,
 	// the later interview milestone must no longer be shown.
-	if len(history.Items) != 2 {
-		t.Fatalf("history length = %d, want 2: %+v", len(history.Items), history.Items)
+	if len(history.Items) != 3 {
+		t.Fatalf("history length = %d, want 3: %+v", len(history.Items), history.Items)
 	}
 	if len(history.MissingStatuses) != 0 {
 		t.Fatalf("missing statuses = %v, want none", history.MissingStatuses)
@@ -99,8 +101,8 @@ func TestRecycleBinRestoresOriginalRecord(t *testing.T) {
 
 	resp, body = app.request(t, http.MethodGet, "/api/application/"+uintString(created.ID)+"/history", nil, "")
 	history := decodeJSON[applicationHistoryResponse](t, body)
-	if len(history.Items) != 2 {
-		t.Fatalf("restored history length = %d, want 2", len(history.Items))
+	if len(history.Items) != 3 {
+		t.Fatalf("restored history length = %d, want 3", len(history.Items))
 	}
 }
 
@@ -345,7 +347,9 @@ func TestTimelineEndsWithApplicationsStatusAndBumpsForwardTime(t *testing.T) {
 	app.request(t, http.MethodPut, path, map[string]string{"status": "screening"}, "")
 	_, body = app.request(t, http.MethodGet, path+"/history", nil, "")
 	history = decodeJSON[applicationHistoryResponse](t, body)
-	if len(history.Items) != 1 || history.Items[0].Status != models.StatusScreening {
-		t.Fatalf("timeline should end with screening only: %+v", history.Items)
+	if len(history.Items) != 2 ||
+		history.Items[0].Status != models.StatusPending ||
+		history.Items[1].Status != models.StatusScreening {
+		t.Fatalf("timeline should end with pending and screening: %+v", history.Items)
 	}
 }

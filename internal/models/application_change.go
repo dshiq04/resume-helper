@@ -18,23 +18,22 @@ type ApplicationChange struct {
 var StageOrder = []string{StatusScreening, StatusWritten, StatusInterview, StatusOffer}
 
 // StageChainForStatus returns the statuses that must have happened before (and
-// including) the given status. The chain follows the timeline order
-// screening → written → interview and then branches into two parallel terminal
-// stages: offer or rejected. A record that reached one terminal stage never
-// requires the other one, which keeps the "complete the history" form focused
-// on the outcome that actually happened. Pending is a side state that can
-// occur at any point, so it only implies that screening happened.
+// including) the given status. Pending is the first stage, followed by
+// screening → written → interview. The chain then branches into two parallel
+// terminal stages: offer or rejected. A record that reached one terminal stage
+// never requires the other one, which keeps the "complete the history" form
+// focused on the outcome that actually happened.
 func StageChainForStatus(status string) []string {
+	if status == StatusPending {
+		return []string{StatusPending}
+	}
 	if status == StatusRejected {
-		return []string{StatusScreening, StatusWritten, StatusInterview, StatusRejected}
+		return []string{StatusPending, StatusScreening, StatusWritten, StatusInterview, StatusRejected}
 	}
 	for index, stage := range StageOrder {
 		if stage == status {
-			return append([]string{}, StageOrder[:index+1]...)
+			return append([]string{StatusPending}, StageOrder[:index+1]...)
 		}
-	}
-	if status == StatusPending {
-		return []string{StatusScreening}
 	}
 	return []string{StatusScreening}
 }

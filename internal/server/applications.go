@@ -179,6 +179,11 @@ func (s *Server) createApplication(c *gin.Context) {
 		if err := tx.Create(record).Error; err != nil {
 			return err
 		}
+		// Pending is the first stage of every application, so the timeline
+		// always starts there even when the user records a later status.
+		if err := recordStatusChange(tx, record.ID, models.StatusPending, record.AppliedAt); err != nil {
+			return err
+		}
 		return recordStatusChange(tx, record.ID, record.Status, record.AppliedAt)
 	}); err != nil {
 		apiError(c, http.StatusInternalServerError, "create_failed", "Failed to create the application.")

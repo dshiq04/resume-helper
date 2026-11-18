@@ -442,6 +442,9 @@ func (s *Server) parseAndImportWorkbook(file *excelize.File) (*ImportResult, err
 				return err
 			}
 			for _, record := range records {
+				if err := recordStatusChange(tx, record.ID, models.StatusPending, record.AppliedAt); err != nil {
+					return err
+				}
 				if err := recordStatusChange(tx, record.ID, record.Status, record.AppliedAt); err != nil {
 					return err
 				}
