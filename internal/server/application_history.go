@@ -83,13 +83,22 @@ func updateStatusChange(db *gorm.DB, applicationID uint, previousStatus, status 
 }
 
 // timelineStatusRank returns the fixed position used by the detail timeline.
+// Offer and rejected are parallel terminal stages, so they share a rank and
+// are ordered by their timestamps instead.
 func timelineStatusRank(status string) int {
+	if status == models.StatusRejected {
+		status = models.StatusOffer
+	}
 	for index, item := range timelineStatusOrder {
 		if item == status {
 			return index
 		}
 	}
 	return len(timelineStatusOrder)
+}
+
+func isTerminalStatus(status string) bool {
+	return status == models.StatusOffer || status == models.StatusRejected
 }
 
 func (s *Server) loadChanges(db *gorm.DB, applicationID uint) ([]models.ApplicationChange, error) {
@@ -279,6 +288,13 @@ func reconcileApplicationChanges(record models.Application, changes []models.App
 	// status is present so it is always the last node.
 	filtered := make([]models.ApplicationChange, 0, len(changes)+1)
 	for _, change := range changes {
+		// Offer and rejected are mutually exclusive outcomes, so a record can
+		// only keep the terminal stage that matches its current status.
+		if isTerminalStatus(change.Status) &&
+			isTerminalStatus(record.Status) &&
+			change.Status != record.Status {
+			continue
+		}
 		if timelineStatusRank(change.Status) <= currentRank {
 			filtered = append(filtered, change)
 		}
@@ -367,21 +383,12 @@ var timelineStatusOrder = []string{
 }
 
 // sortChangesForTimeline follows the fixed stage order shown in the UI instead
-// of the chronological order of the change records.
+// of the chronological order of the change records. Offer and rejected share a
+// rank, so parallel terminal stages fall back to their timestamps.
 func sortChangesForTimeline(items []models.ApplicationChange) {
-	rank := make(map[string]int, len(timelineStatusOrder))
-	for index, status := range timelineStatusOrder {
-		rank[status] = index
-	}
 	sort.SliceStable(items, func(left, right int) bool {
-		leftRank, leftOk := rank[items[left].Status]
-		rightRank, rightOk := rank[items[right].Status]
-		if !leftOk {
-			leftRank = len(timelineStatusOrder)
-		}
-		if !rightOk {
-			rightRank = len(timelineStatusOrder)
-		}
+		leftRank := timelineStatusRank(items[left].Status)
+		rightRank := timelineStatusRank(items[right].Status)
 		if leftRank == rightRank {
 			return items[left].ChangedAt.Before(items[right].ChangedAt)
 		}

@@ -14,20 +14,26 @@ type ApplicationChange struct {
 	CreatedAt     time.Time `json:"createdAt"`
 }
 
-// StageOrder is the linear progression used by the conversion funnel and by
-// the "missing history" prompt for records created before history tracking.
+// StageOrder is the linear progression used by the conversion funnel.
 var StageOrder = []string{StatusScreening, StatusWritten, StatusInterview, StatusOffer}
 
 // StageChainForStatus returns the statuses that must have happened before (and
-// including) the given status. Side states such as pending and rejected only
-// imply that screening happened, because they can occur at any stage.
+// including) the given status. The chain follows the timeline order
+// screening → written → interview and then branches into two parallel terminal
+// stages: offer or rejected. A record that reached one terminal stage never
+// requires the other one, which keeps the "complete the history" form focused
+// on the outcome that actually happened. Pending is a side state that can
+// occur at any point, so it only implies that screening happened.
 func StageChainForStatus(status string) []string {
+	if status == StatusRejected {
+		return []string{StatusScreening, StatusWritten, StatusInterview, StatusRejected}
+	}
 	for index, stage := range StageOrder {
 		if stage == status {
 			return append([]string{}, StageOrder[:index+1]...)
 		}
 	}
-	if status == StatusPending || status == StatusRejected {
+	if status == StatusPending {
 		return []string{StatusScreening}
 	}
 	return []string{StatusScreening}
