@@ -40,7 +40,7 @@ const ResumePreviewWindowPage = lazy(() =>
 
 const THEME_KEY = "resumetrail.theme";
 
-// 开发中水印开关：在 frontend/.env 中配置
+// 开发中水印开关：在项目根目录 .env 中配置
 // VITE_SHOW_DEVELOPMENT_WATERMARK=true / false
 const SHOW_DEVELOPMENT_WATERMARK =
   String(import.meta.env.VITE_SHOW_DEVELOPMENT_WATERMARK).toLowerCase() ===

@@ -219,7 +219,9 @@ SQLite 的 `dsn` 为空时默认使用程序目录下的 `resume-helper.db`；�
 | `APP_NAME` | 英文应用名称：窗口与进程标识 | `ResumeTrail` |
 | `APP_TITLE` | 显示名称：窗口标题、托盘菜单、桌面快捷方式名称 | `履途 ResumeTrail` |
 | `APP_DEFAULT_LANGUAGE` | 默认界面语言：`zh-CN` / `zh-TW` / `en` / `ja` / `ko` | `zh-CN` |
+| `VITE_SHOW_DEVELOPMENT_WATERMARK` | 开发中水印开关：`true` 开启，`false` 关闭 | `true` |
 
+- 前端专用开关也统一放在这个 `.env` 中，不再使用 `frontend/.env`。
 - 修改后需要重新构建前端；运行时后端的值来自可执行文件旁边的 `.env`（构建脚本会自动复制）。
 - 如果发布时没有携带 `.env`，应用会使用上表中的默认值。
 - 也可以设置环境变量覆盖 `.env`，或通过 `APP_ENV_FILE` 指定其他配置文件路径。

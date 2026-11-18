@@ -4,8 +4,7 @@ import { viteStaticCopy } from "vite-plugin-static-copy";
 import { fileURLToPath } from "node:url";
 
 // The shared .env lives in the repository root so Go and the frontend read the
-// same version, application name and default language. frontend/.env still
-// holds frontend-only switches (for example the development watermark).
+// same version, application name, default language and frontend switches.
 const projectRoot = fileURLToPath(new URL("..", import.meta.url));
 
 // During `npm run dev`, API calls are proxied to the local Gin server.
@@ -20,6 +19,8 @@ export default defineConfig(({ mode }) => {
 
   return {
     logLevel: "error",
+    // Load .env from the repository root instead of frontend/.
+    envDir: projectRoot,
     define: {
       __APP_VERSION__: JSON.stringify(appVersion),
       __APP_NAME__: JSON.stringify(appName),
