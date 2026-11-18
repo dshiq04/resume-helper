@@ -239,13 +239,6 @@ func findConfigFile(dataDir string) (string, error) {
 	return "", nil
 }
 
-// DataDir returns the portable application directory. The executable's folder
-// is used for packaged builds; `go run` uses the current directory so
-// development files stay in the project instead of a temporary build folder.
-func DataDir() (string, error) {
-	return dataDirectory()
-}
-
 // dataDirectory returns the portable application directory. The executable's
 // folder is used for packaged builds; `go run` uses the current directory so
 // development files stay in the project instead of a temporary build folder.

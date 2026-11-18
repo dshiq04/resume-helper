@@ -16,7 +16,7 @@ import (
 )
 
 func shortcutFileName() string {
-	return appinfo.Title + ".lnk"
+	return appinfo.Title() + ".lnk"
 }
 
 func ShortcutSupported() bool {
@@ -68,7 +68,7 @@ func CreateShortcut() error {
 		powerShellQuote(shortcutPath),
 		powerShellQuote(executable),
 		powerShellQuote(workingDir),
-		powerShellQuote(appinfo.Title),
+		powerShellQuote(appinfo.Title()),
 		powerShellQuote(iconLocation),
 	)
 	cmd := exec.Command(

@@ -2,6 +2,7 @@ import axios, { type AxiosRequestConfig } from "axios";
 import type {
   Application,
   ApplicationHistory,
+  AppInfoInput,
   ApplicationInput,
   ApplicationList,
   ApplicationUpdate,
@@ -278,6 +279,13 @@ export const api = {
   },
   funnel(range?: { from?: string; to?: string }) {
     return request<FunnelStats>("/stats/funnel", { params: range });
+  },
+  applyAppInfo(input: AppInfoInput) {
+    return request<{ applied: boolean }>("/app-info", {
+      method: "POST",
+      data: input,
+      handleUnauthorized: false,
+    });
   },
   systemInfo() {
     return request<SystemInfo>("/system/info");

@@ -1,13 +1,11 @@
-// Package appinfo exposes the application metadata (version, name, title and
-// default language) that can be configured through the portable .env file.
+// Package appinfo holds the application metadata (version, name, title and
+// default language). The values are supplied by the frontend at runtime from
+// frontend/.env, so the build output never needs a .env file.
 package appinfo
 
 import (
-	"bufio"
-	"fmt"
-	"os"
-	"path/filepath"
 	"strings"
+	"sync/atomic"
 )
 
 const (
@@ -17,99 +15,63 @@ const (
 	fallbackLanguage = "zh-CN"
 )
 
-var (
-	// Version is the application version shown in the UI, the health endpoint
-	// and backup files.
-	Version = fallbackVersion
-	// Name is the English application name used for process and window
-	// identifiers.
-	Name = fallbackName
-	// Title is the display name used for window titles, the tray menu and the
-	// desktop shortcut file name.
-	Title = fallbackTitle
-	// DefaultLanguage is the locale used when the browser offers no supported
-	// language and the user has not picked one yet.
-	DefaultLanguage = fallbackLanguage
-)
-
-// Load reads .env from dir (or from the path in APP_ENV_FILE) and refreshes the
-// package-level metadata. Variables that already exist in the process
-// environment take precedence over the file.
-//
-// A missing .env file is not an error; the built-in defaults are kept.
-func Load(dir string) error {
-	path := strings.TrimSpace(os.Getenv("APP_ENV_FILE"))
-	if path == "" {
-		path = filepath.Join(dir, ".env")
-	}
-	if err := loadFile(path); err != nil {
-		return err
-	}
-
-	Version = envOrDefault("APP_VERSION", fallbackVersion)
-	Name = envOrDefault("APP_NAME", fallbackName)
-	Title = envOrDefault("APP_TITLE", fallbackTitle)
-	DefaultLanguage = normalizeLanguage(envOrDefault("APP_DEFAULT_LANGUAGE", fallbackLanguage))
-	return nil
+// Info is the metadata payload sent by the frontend after it loads.
+type Info struct {
+	Version         string `json:"version"`
+	Name            string `json:"name"`
+	Title           string `json:"title"`
+	DefaultLanguage string `json:"defaultLanguage"`
 }
 
-func loadFile(path string) error {
-	file, err := os.Open(path)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil
-		}
-		return fmt.Errorf("read %s: %w", path, err)
-	}
-	defer file.Close()
+var current atomic.Pointer[Info]
 
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-		if line == "" || strings.HasPrefix(line, "#") {
-			continue
-		}
-		line = strings.TrimPrefix(line, "export ")
-		key, value, ok := strings.Cut(line, "=")
-		if !ok {
-			continue
-		}
-		key = strings.TrimSpace(key)
-		if key == "" {
-			continue
-		}
-		// Never overwrite values supplied by the real environment.
-		if _, exists := os.LookupEnv(key); exists {
-			continue
-		}
-		if err := os.Setenv(key, parseValue(strings.TrimSpace(value))); err != nil {
-			return fmt.Errorf("apply %s from %s: %w", key, path, err)
-		}
-	}
-	if err := scanner.Err(); err != nil {
-		return fmt.Errorf("read %s: %w", path, err)
-	}
-	return nil
+func init() {
+	current.Store(&Info{
+		Version:         fallbackVersion,
+		Name:            fallbackName,
+		Title:           fallbackTitle,
+		DefaultLanguage: fallbackLanguage,
+	})
 }
 
-func parseValue(value string) string {
-	if len(value) >= 2 {
-		first, last := value[0], value[len(value)-1]
-		if (first == '"' && last == '"') || (first == '\'' && last == '\'') {
-			return value[1 : len(value)-1]
-		}
+// Apply merges the metadata sent by the frontend into the current values.
+// Empty fields keep their current value so a partial handshake is harmless.
+func Apply(info Info) {
+	next := *current.Load()
+	if value := strings.TrimSpace(info.Version); value != "" {
+		next.Version = value
 	}
-	if index := strings.Index(value, " #"); index >= 0 {
-		value = value[:index]
+	if value := strings.TrimSpace(info.Name); value != "" {
+		next.Name = value
 	}
-	return strings.TrimSpace(value)
+	if value := strings.TrimSpace(info.Title); value != "" {
+		next.Title = value
+	}
+	if value := strings.TrimSpace(info.DefaultLanguage); value != "" {
+		next.DefaultLanguage = normalizeLanguage(value)
+	}
+	current.Store(&next)
 }
 
-func envOrDefault(key, fallback string) string {
-	if value := strings.TrimSpace(os.Getenv(key)); value != "" {
-		return value
-	}
-	return fallback
+// Get returns a snapshot of the current metadata.
+func Get() Info {
+	return *current.Load()
+}
+
+func Version() string {
+	return Get().Version
+}
+
+func Name() string {
+	return Get().Name
+}
+
+func Title() string {
+	return Get().Title
+}
+
+func DefaultLanguage() string {
+	return Get().DefaultLanguage
 }
 
 func normalizeLanguage(value string) string {

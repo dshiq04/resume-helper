@@ -31,7 +31,6 @@ tasks:
       - frontend:build
     cmds:
       - go build -trimpath -ldflags="{{.LDFLAGS}}" -o "{{.BIN_DIR}}/{{.APP_NAME}}{{.BIN_EXT}}" .
-      - '{{if eq OS "windows"}}copy /Y ".env" "{{.BIN_DIR}}\.env" >NUL{{else}}cp ".env" "{{.BIN_DIR}}/.env"{{end}}'
 
   run:
     summary: Run the desktop application (requires frontend/dist)

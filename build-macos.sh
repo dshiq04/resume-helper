@@ -37,8 +37,6 @@ OUT="bin/resume-helper-macos-${ARCH}"
 echo "==> Building macOS (${ARCH}) binary..."
 GOOS=darwin GOARCH="$ARCH" go build -trimpath -ldflags="-s -w" -o "$OUT" .
 
-cp .env bin/.env
-
 echo
 echo "[OK] Built $OUT"
 ls -lh "$OUT"

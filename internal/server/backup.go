@@ -89,7 +89,7 @@ func (s *Server) ExportBackup(target string) (*BackupResult, error) {
 	manifest := backupManifest{
 		Format:       backupFormat,
 		Version:      backupVersion,
-		AppVersion:   appinfo.Version,
+		AppVersion:   appinfo.Version(),
 		ExportedAt:   time.Now(),
 		Applications: []models.Application{},
 		Resumes:      []backupResume{},

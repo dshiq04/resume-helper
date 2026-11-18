@@ -55,6 +55,9 @@ type Server struct {
 	dataTransferMu     sync.RWMutex
 	dataTransferOpener func(mode string)
 
+	appInfoMu      sync.RWMutex
+	appInfoHandler func()
+
 	closePromptMu      sync.RWMutex
 	closePromptHandler func(action string, remember bool) error
 
@@ -231,6 +234,9 @@ func (s *Server) newEngine() *gin.Engine {
 	api := r.Group("/api")
 	{
 		api.GET("/health", s.health)
+		// The frontend reports the values from frontend/.env right after it
+		// loads, before the lock screen, so this endpoint must stay public.
+		api.POST("/app-info", s.updateAppInfo)
 		api.GET("/auth/status", s.authStatus)
 		api.POST("/auth/login", s.authLogin)
 		api.POST("/auth/setup", s.authSetup)
@@ -356,7 +362,7 @@ func (s *Server) Stop(ctx context.Context) error {
 func (s *Server) health(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"status":  "ok",
-		"version": appinfo.Version,
+		"version": appinfo.Version(),
 		"time":    time.Now(),
 	})
 }
@@ -374,7 +380,7 @@ func (s *Server) systemInfo(c *gin.Context) {
 		location = dsn
 	}
 	c.JSON(http.StatusOK, gin.H{
-		"version":     appinfo.Version,
+		"version":     appinfo.Version(),
 		"goVersion":   runtime.Version(),
 		"driver":      driver,
 		"database":    databaseLabel(driver),

@@ -3,24 +3,25 @@ import react from "@vitejs/plugin-react";
 import { viteStaticCopy } from "vite-plugin-static-copy";
 import { fileURLToPath } from "node:url";
 
-// The shared .env lives in the repository root so Go and the frontend read the
-// same version, application name, default language and frontend switches.
-const projectRoot = fileURLToPath(new URL("..", import.meta.url));
+// The .env lives next to the frontend sources. Vite injects the application
+// metadata into the bundle, and the running frontend sends it to the Go backend
+// so no .env file has to be shipped next to the executable.
+const frontendRoot = fileURLToPath(new URL(".", import.meta.url));
 
 // During `npm run dev`, API calls are proxied to the local Gin server.
 // In the packaged app the frontend is served by Gin itself, so /api is
 // same-origin and no proxy is involved.
 export default defineConfig(({ mode }) => {
-  const appEnv = loadEnv(mode, projectRoot, "");
-  const appVersion = appEnv.APP_VERSION || "1.2";
-  const appName = appEnv.APP_NAME || "ResumeTrail";
-  const appTitle = appEnv.APP_TITLE || "履途 ResumeTrail";
-  const defaultLanguage = appEnv.APP_DEFAULT_LANGUAGE || "zh-CN";
+  const appEnv = loadEnv(mode, frontendRoot, "");
+  const appVersion = process.env.APP_VERSION || appEnv.APP_VERSION || "1.2";
+  const appName = process.env.APP_NAME || appEnv.APP_NAME || "ResumeTrail";
+  const appTitle =
+    process.env.APP_TITLE || appEnv.APP_TITLE || "履途 ResumeTrail";
+  const defaultLanguage =
+    process.env.APP_DEFAULT_LANGUAGE || appEnv.APP_DEFAULT_LANGUAGE || "zh-CN";
 
   return {
     logLevel: "error",
-    // Load .env from the repository root instead of frontend/.
-    envDir: projectRoot,
     define: {
       __APP_VERSION__: JSON.stringify(appVersion),
       __APP_NAME__: JSON.stringify(appName),

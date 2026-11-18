@@ -40,14 +40,6 @@ var appIconPNG []byte
 var appIconICO []byte
 
 func main() {
-	dataDir, err := config.DataDir()
-	if err != nil {
-		log.Fatalf("locate data directory: %v", err)
-	}
-	if err := appinfo.Load(dataDir); err != nil {
-		log.Fatalf("load .env: %v", err)
-	}
-
 	cfg, err := config.Load()
 	if err != nil {
 		log.Fatalf("load configuration: %v", err)
@@ -59,7 +51,7 @@ func main() {
 		log.Fatalf("setup logging: %v", err)
 	}
 	defer closeLog()
-	appLogger.Info(appinfo.Name+" starting", zap.String("logFile", logPath))
+	appLogger.Info(appinfo.Name()+" starting", zap.String("logFile", logPath))
 	appLogger.Debug("configuration loaded",
 		zap.String("dataDir", cfg.DataDir),
 		zap.String("config", cfg.SourcePath),
@@ -86,8 +78,8 @@ func main() {
 	if err != nil {
 		appLogger.Fatal("start HTTP server", zap.Error(err))
 	}
-	appLogger.Info(appinfo.Name+" is serving",
-		zap.String("version", appinfo.Version),
+	appLogger.Info(appinfo.Name()+" is serving",
+		zap.String("version", appinfo.Version()),
 		zap.String("url", baseURL),
 		zap.String("database", database.DatabaseLabel(cfg.Database.Driver)),
 		zap.String("dsn", database.SafeDSN(cfg.Database.Driver, cfg.Database.DSN)),
@@ -104,7 +96,7 @@ func main() {
 	// fullscreen / close) and resize handling on the Wails origin, while the
 	// Gin engine continues to handle both the static files and /api requests.
 	app := application.New(application.Options{
-		Name:        appinfo.Name,
+		Name:        appinfo.Name(),
 		Description: "A beautiful resume application tracker",
 		Icon:        appIconPNG,
 		Services: []application.Service{
@@ -117,7 +109,7 @@ func main() {
 	})
 
 	mainWindow := app.Window.NewWithOptions(application.WebviewWindowOptions{
-		Title:            appinfo.Title,
+		Title:            appinfo.Title(),
 		Width:            1360,
 		Height:           860,
 		MinWidth:         360,
@@ -128,9 +120,18 @@ func main() {
 		BackgroundColour: application.NewRGB(15, 23, 42),
 	})
 	closeState := &closePromptState{}
-	tray := createSystemTray(app, mainWindow, closeState)
+	tray, trayOpenItem := createSystemTray(app, mainWindow, closeState)
 	registerCloseBehavior(app, mainWindow, tray, closeState, httpServer)
 	registerFileDropEvent(appLogger, mainWindow)
+	httpServer.SetAppInfoHandler(func() {
+		// The frontend sends frontend/.env once it has loaded so the window and
+		// tray can switch from the built-in defaults to the configured values.
+		application.InvokeAsync(func() {
+			mainWindow.SetTitle(appinfo.Title())
+			tray.SetTooltip(appinfo.Title())
+			trayOpenItem.SetLabel(trayOpenLabel())
+		})
+	})
 	httpServer.SetShortcutPromptHandler(func(create bool) error {
 		return resolveShortcutPrompt(app, mainWindow, tray, closeState, create)
 	})
@@ -360,12 +361,21 @@ type closePromptState struct {
 	quitPrompting atomic.Bool
 }
 
-func createSystemTray(app *application.App, mainWindow *application.WebviewWindow, state *closePromptState) *application.SystemTray {
+func trayOpenLabel() string {
+	return "打开 " + appinfo.Title() + " / Open " + appinfo.Name()
+}
+
+func createSystemTray(
+	app *application.App,
+	mainWindow *application.WebviewWindow,
+	state *closePromptState,
+) (*application.SystemTray, *application.MenuItem) {
 	tray := app.SystemTray.New()
 	tray.SetIcon(appIconPNG)
-	tray.SetTooltip(appinfo.Title)
+	tray.SetTooltip(appinfo.Title())
 	menu := app.NewMenu()
-	menu.Add("打开 " + appinfo.Title + " / Open " + appinfo.Name).OnClick(func(*application.Context) {
+	openItem := menu.Add(trayOpenLabel())
+	openItem.OnClick(func(*application.Context) {
 		application.InvokeAsync(func() {
 			mainWindow.Show()
 			mainWindow.Focus()
@@ -385,7 +395,7 @@ func createSystemTray(app *application.App, mainWindow *application.WebviewWindo
 			mainWindow.Focus()
 		})
 	})
-	return tray
+	return tray, openItem
 }
 
 func registerCloseBehavior(
@@ -440,7 +450,7 @@ func openClosePromptWindow(app *application.App, state *closePromptState) {
 
 		window := app.Window.NewWithOptions(application.WebviewWindowOptions{
 			Name:             "close-prompt",
-			Title:            "关闭 " + appinfo.Title,
+			Title:            "关闭 " + appinfo.Title(),
 			URL:              "/close-prompt",
 			Width:            470,
 			Height:           336,

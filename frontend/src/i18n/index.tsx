@@ -1863,7 +1863,7 @@ const antdLocales = {
 
 const LOCALE_KEY = "resumetrail.locale";
 
-// Default language from the repository root .env, injected by vite.config.ts.
+// Default language from frontend/.env, injected by vite.config.ts.
 function defaultLocale(): Locale {
   const value = String(__APP_DEFAULT_LANGUAGE__).trim();
   return isLocale(value) ? value : "zh-CN";

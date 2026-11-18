@@ -205,6 +205,13 @@ export interface AuthSession {
 
 export type DatabaseDriver = "sqlite" | "mysql" | "postgres";
 
+export interface AppInfoInput {
+  version: string;
+  name: string;
+  title: string;
+  defaultLanguage: string;
+}
+
 export interface SystemInfo {
   version: string;
   goVersion: string;
