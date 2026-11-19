@@ -173,6 +173,7 @@ export interface BackupResult {
   exportedAt: string;
   version: string;
   appVersion: string;
+  importBlocked: boolean;
   counts: BackupCounts;
   warnings: string[];
 }

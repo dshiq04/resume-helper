@@ -73,7 +73,7 @@ export function DataTransferWindowPage() {
   const [error, setError] = useState("");
 
   const currentDevBeta = isDevOrBeta(__APP_VERSION__);
-  const previewDevBeta = isDevOrBeta(preview?.version || preview?.appVersion);
+  const previewBlocked = preview?.importBlocked ?? false;
 
   const reset = (nextMode?: TransferMode) => {
     setError("");
@@ -314,7 +314,7 @@ export function DataTransferWindowPage() {
             <p className="transfer-note is-warning">
               <WarningOutlined /> {t("transfer.passwordNote")}
             </p>
-            {previewDevBeta ? (
+            {previewBlocked ? (
               <Alert
                 type="warning"
                 showIcon
@@ -354,7 +354,7 @@ export function DataTransferWindowPage() {
                   </div>
                   <p className="transfer-preview-label">{t("transfer.contains")}</p>
                   {countsPanel(preview)}
-                  {!previewDevBeta && (
+                  {!previewBlocked && (
                     <Alert
                       type="warning"
                       showIcon
@@ -373,7 +373,7 @@ export function DataTransferWindowPage() {
                     type="primary"
                     size="large"
                     loading={busy}
-                    disabled={previewDevBeta}
+                    disabled={previewBlocked}
                     onClick={() => void importData()}
                   >
                     {busy ? t("transfer.importing") : t("transfer.confirmImport")}

@@ -110,12 +110,41 @@ func TestImportRejectsDevOrBetaBackupVersion(t *testing.T) {
 			manifest["version"] = version
 			manifest["appVersion"] = version
 		})
-		if _, err := app.server.InspectBackup(target); err != nil {
+		inspected, err := app.server.InspectBackup(target)
+		if err != nil {
 			t.Fatalf("inspect backup version %s: %v", version, err)
+		}
+		if !inspected.ImportBlocked {
+			t.Fatalf("inspect backup version %s should be blocked", version)
 		}
 		if _, err := app.server.ImportBackup(target); err == nil || !strings.Contains(err.Error(), "dev/beta") {
 			t.Fatalf("import backup version %s error = %v, want a dev/beta rejection", version, err)
 		}
+	}
+}
+
+func TestImportAllowsSameDevOrBetaVersion(t *testing.T) {
+	before := appinfo.Get()
+	t.Cleanup(func() {
+		appinfo.Apply(before)
+	})
+	appinfo.Apply(appinfo.Info{Version: "2.0-beta"})
+
+	app := newTestApp(t)
+	source := filepath.Join(t.TempDir(), "source.zip")
+	if _, err := app.server.ExportBackup(source); err != nil {
+		t.Fatalf("export backup: %v", err)
+	}
+
+	inspected, err := app.server.InspectBackup(source)
+	if err != nil {
+		t.Fatalf("inspect backup: %v", err)
+	}
+	if inspected.ImportBlocked {
+		t.Fatal("a backup from the same dev/beta version should be importable")
+	}
+	if _, err := app.server.ImportBackup(source); err != nil {
+		t.Fatalf("import backup from the same version: %v", err)
 	}
 }
 

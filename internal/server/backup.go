@@ -2,9 +2,11 @@ package server
 
 import (
 	"archive/zip"
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"hash/crc32"
 	"io"
 	"os"
 	"path"
@@ -12,6 +14,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"resume-helper/internal/appinfo"
 	"resume-helper/internal/models"
@@ -91,12 +94,13 @@ type BackupCounts struct {
 
 // BackupResult is returned by export, inspect and import.
 type BackupResult struct {
-	Path       string       `json:"path"`
-	ExportedAt time.Time    `json:"exportedAt"`
-	Version    string       `json:"version"`
-	AppVersion string       `json:"appVersion"`
-	Counts     BackupCounts `json:"counts"`
-	Warnings   []string     `json:"warnings"`
+	Path          string       `json:"path"`
+	ExportedAt    time.Time    `json:"exportedAt"`
+	Version       string       `json:"version"`
+	AppVersion    string       `json:"appVersion"`
+	ImportBlocked bool         `json:"importBlocked"`
+	Counts        BackupCounts `json:"counts"`
+	Warnings      []string     `json:"warnings"`
 }
 
 func (s *Server) ExportBackup(target string) (*BackupResult, error) {
@@ -262,6 +266,76 @@ func backupFileName(resume models.Resume) string {
 	return sanitizeUploadFileName(name)
 }
 
+// unicodePathExtraID is the Info-ZIP Unicode Path extra field. Archivers that
+// store names in a local ANSI code page (for example the Windows compressed
+// folder tool) add it with the UTF-8 spelling of the name.
+const unicodePathExtraID = 0x7075
+
+// backupEntryName returns the name of a zip entry, preferring the UTF-8 name
+// from the Info-ZIP Unicode Path extra field. archive/zip ignores that field,
+// so a backup re-zipped on Windows can otherwise expose GBK file names.
+func backupEntryName(file *zip.File) string {
+	if name, ok := unicodePathName(file.Extra, file.Name); ok {
+		return name
+	}
+	return file.Name
+}
+
+func unicodePathName(extra []byte, rawName string) (string, bool) {
+	for len(extra) >= 4 {
+		id := binary.LittleEndian.Uint16(extra[0:2])
+		size := int(binary.LittleEndian.Uint16(extra[2:4]))
+		if size+4 > len(extra) {
+			return "", false
+		}
+		data := extra[4 : 4+size]
+		if id == unicodePathExtraID && size >= 5 && data[0] == 1 {
+			// The checksum covers the raw name bytes, so a stale extra field
+			// left over from a rename is ignored.
+			if binary.LittleEndian.Uint32(data[1:5]) == crc32.ChecksumIEEE([]byte(rawName)) {
+				name := string(data[5:])
+				if utf8.ValidString(name) && name != "" {
+					return name, true
+				}
+			}
+		}
+		extra = extra[4+size:]
+	}
+	return "", false
+}
+
+func normalizeBackupEntryName(name string) string {
+	name = strings.ReplaceAll(name, "\\", "/")
+	name = path.Clean(name)
+	name = strings.TrimPrefix(name, "/")
+	if name == "." {
+		return ""
+	}
+	return name
+}
+
+// findBackupResumeEntry locates the archive entry that holds a resume. The
+// manifest path is used first; when an archiver dropped or added a folder or
+// id prefix, the entry is matched by its file name instead.
+func findBackupResumeEntry(entries map[string]*zip.File, byFileName map[string][]*zip.File, resume backupResume) *zip.File {
+	archivePath := normalizeBackupEntryName(resume.ArchivePath)
+	if entry, ok := entries[archivePath]; ok {
+		return entry
+	}
+	baseName := path.Base(archivePath)
+	candidates := byFileName[baseName]
+	if len(candidates) == 0 {
+		fileName := normalizeBackupEntryName(sanitizeUploadFileName(resume.FileName))
+		if fileName != "" && fileName != baseName {
+			candidates = byFileName[fileName]
+		}
+	}
+	if len(candidates) == 1 {
+		return candidates[0]
+	}
+	return nil
+}
+
 func (s *Server) InspectBackup(source string) (*BackupResult, error) {
 	reader, err := zip.OpenReader(strings.TrimSpace(source))
 	if err != nil {
@@ -276,7 +350,11 @@ func (s *Server) InspectBackup(source string) (*BackupResult, error) {
 	files := 0
 	var bytes int64
 	for _, file := range reader.File {
-		if strings.HasPrefix(file.Name, backupResumeDir+"/") && !file.FileInfo().IsDir() {
+		if file.FileInfo().IsDir() {
+			continue
+		}
+		name := normalizeBackupEntryName(backupEntryName(file))
+		if strings.HasPrefix(name, backupResumeDir+"/") {
 			files++
 			bytes += int64(file.UncompressedSize64)
 		}
@@ -288,10 +366,11 @@ func (s *Server) InspectBackup(source string) (*BackupResult, error) {
 		}
 	}
 	return &BackupResult{
-		Path:       source,
-		ExportedAt: manifest.ExportedAt,
-		Version:    backupSourceVersion(manifest),
-		AppVersion: manifest.AppVersion,
+		Path:          source,
+		ExportedAt:    manifest.ExportedAt,
+		Version:       backupSourceVersion(manifest),
+		AppVersion:    manifest.AppVersion,
+		ImportBlocked: backupImportBlocked(manifest),
 		Counts: BackupCounts{
 			Applications: len(manifest.Applications),
 			Resumes:      len(manifest.Resumes),
@@ -380,6 +459,34 @@ func backupSourceVersion(manifest *backupManifest) string {
 func isDevOrBetaVersion(version string) bool {
 	normalized := strings.ToLower(strings.TrimSpace(version))
 	return strings.Contains(normalized, "dev") || strings.Contains(normalized, "beta")
+}
+
+// backupImportBlocked reports whether a backup may not be imported. Backups
+// from dev/beta builds are export-only unless they come from exactly the same
+// version that is running now.
+func backupImportBlocked(manifest *backupManifest) bool {
+	source := backupSourceVersion(manifest)
+	if !isDevOrBetaVersion(source) {
+		return false
+	}
+	return !sameAppVersion(source, appinfo.Version())
+}
+
+func sameAppVersion(left, right string) bool {
+	left = strings.TrimSpace(left)
+	right = strings.TrimSpace(right)
+	if left == right {
+		return true
+	}
+	leftVersion, ok := parseAppVersion(left)
+	if !ok {
+		return false
+	}
+	rightVersion, ok := parseAppVersion(right)
+	if !ok {
+		return false
+	}
+	return compareAppVersions(leftVersion, rightVersion) == 0
 }
 
 type appVersion struct {
@@ -475,10 +582,11 @@ func (s *Server) ImportBackup(source string) (*BackupResult, error) {
 	if err != nil {
 		return nil, err
 	}
-	if version := backupSourceVersion(manifest); isDevOrBetaVersion(version) {
+	if version := backupSourceVersion(manifest); backupImportBlocked(manifest) {
 		return nil, fmt.Errorf(
-			"this backup was exported by dev/beta version %s; dev and beta versions are for development and testing only and support export only, so this backup cannot be imported",
+			"this backup was exported by dev/beta version %s and cannot be imported by version %s; dev and beta versions are for development and testing only and support export only",
 			version,
+			appinfo.Version(),
 		)
 	}
 
@@ -488,9 +596,21 @@ func (s *Server) ImportBackup(source string) (*BackupResult, error) {
 	}
 
 	entries := make(map[string]*zip.File, len(reader.File))
+	resumeEntries := make(map[string][]*zip.File)
 	for _, file := range reader.File {
-		if !file.FileInfo().IsDir() {
-			entries[file.Name] = file
+		if file.FileInfo().IsDir() {
+			continue
+		}
+		name := normalizeBackupEntryName(backupEntryName(file))
+		if name == "" {
+			continue
+		}
+		if _, exists := entries[name]; !exists {
+			entries[name] = file
+		}
+		if strings.HasPrefix(name, backupResumeDir+"/") {
+			baseName := path.Base(name)
+			resumeEntries[baseName] = append(resumeEntries[baseName], file)
 		}
 	}
 
@@ -522,10 +642,10 @@ func (s *Server) ImportBackup(source string) (*BackupResult, error) {
 			cleanup()
 			return nil, fmt.Errorf("resume %q has an unsupported type", resume.FileName)
 		}
-		entry, ok := entries[resume.ArchivePath]
-		if !ok {
+		entry := findBackupResumeEntry(entries, resumeEntries, resume)
+		if entry == nil {
 			cleanup()
-			return nil, fmt.Errorf("resume file %q is missing from the backup", resume.FileName)
+			return nil, fmt.Errorf("resume file %q is missing from the backup (expected %q)", resume.FileName, resume.ArchivePath)
 		}
 		if entry.UncompressedSize64 > maxBackupFileSize {
 			cleanup()
