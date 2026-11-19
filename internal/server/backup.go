@@ -9,6 +9,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -21,12 +22,37 @@ import (
 
 const (
 	backupFormat          = "resumetrail-backup"
-	backupVersion         = 1
+	backupFormatVersion   = 1
 	backupManifestFile    = "manifest.json"
 	backupResumeDir       = "resumes"
 	maxBackupManifestSize = 64 << 20
 	maxBackupFileSize     = maxResumeFileSize
 )
+
+// backupVersion is the ResumeTrail version that produced a backup. It is the
+// first key in manifest.json so tools can check compatibility without reading
+// the rest of the file. Older backups used the same key for a numeric format
+// version, which decodes to an empty value and falls back to appVersion.
+type backupVersion string
+
+func (v *backupVersion) UnmarshalJSON(data []byte) error {
+	trimmed := strings.TrimSpace(string(data))
+	if trimmed == "" || trimmed == "null" {
+		*v = ""
+		return nil
+	}
+	var text string
+	if err := json.Unmarshal(data, &text); err == nil {
+		*v = backupVersion(strings.TrimSpace(text))
+		return nil
+	}
+	var legacy int
+	if err := json.Unmarshal(data, &legacy); err == nil {
+		*v = ""
+		return nil
+	}
+	return errors.New("backup version must be a string")
+}
 
 type backupSetting struct {
 	Key       string    `json:"key"`
@@ -40,15 +66,16 @@ type backupResume struct {
 }
 
 type backupManifest struct {
-	Format       string                      `json:"format"`
-	Version      int                         `json:"version"`
-	AppVersion   string                      `json:"appVersion"`
-	ExportedAt   time.Time                   `json:"exportedAt"`
-	Applications []models.Application        `json:"applications"`
-	Resumes      []backupResume              `json:"resumes"`
-	Settings     []backupSetting             `json:"settings"`
-	Changes      []models.ApplicationChange  `json:"changes"`
-	Trash        []models.DeletedApplication `json:"trash"`
+	Version       backupVersion               `json:"version"`
+	Format        string                      `json:"format"`
+	FormatVersion int                         `json:"formatVersion"`
+	AppVersion    string                      `json:"appVersion"`
+	ExportedAt    time.Time                   `json:"exportedAt"`
+	Applications  []models.Application        `json:"applications"`
+	Resumes       []backupResume              `json:"resumes"`
+	Settings      []backupSetting             `json:"settings"`
+	Changes       []models.ApplicationChange  `json:"changes"`
+	Trash         []models.DeletedApplication `json:"trash"`
 }
 
 // BackupCounts summarises one backup operation for the transfer window.
@@ -66,6 +93,7 @@ type BackupCounts struct {
 type BackupResult struct {
 	Path       string       `json:"path"`
 	ExportedAt time.Time    `json:"exportedAt"`
+	Version    string       `json:"version"`
 	AppVersion string       `json:"appVersion"`
 	Counts     BackupCounts `json:"counts"`
 	Warnings   []string     `json:"warnings"`
@@ -87,15 +115,16 @@ func (s *Server) ExportBackup(target string) (*BackupResult, error) {
 
 	db := s.database()
 	manifest := backupManifest{
-		Format:       backupFormat,
-		Version:      backupVersion,
-		AppVersion:   appinfo.Version(),
-		ExportedAt:   time.Now(),
-		Applications: []models.Application{},
-		Resumes:      []backupResume{},
-		Settings:     []backupSetting{},
-		Changes:      []models.ApplicationChange{},
-		Trash:        []models.DeletedApplication{},
+		Version:       backupVersion(appinfo.Version()),
+		Format:        backupFormat,
+		FormatVersion: backupFormatVersion,
+		AppVersion:    appinfo.Version(),
+		ExportedAt:    time.Now(),
+		Applications:  []models.Application{},
+		Resumes:       []backupResume{},
+		Settings:      []backupSetting{},
+		Changes:       []models.ApplicationChange{},
+		Trash:         []models.DeletedApplication{},
 	}
 	if err := db.Order("id ASC").Find(&manifest.Applications).Error; err != nil {
 		return nil, fmt.Errorf("load applications: %w", err)
@@ -217,6 +246,7 @@ func (s *Server) ExportBackup(target string) (*BackupResult, error) {
 	return &BackupResult{
 		Path:       target,
 		ExportedAt: manifest.ExportedAt,
+		Version:    string(manifest.Version),
 		AppVersion: manifest.AppVersion,
 		Counts:     counts,
 		Warnings:   warnings,
@@ -260,6 +290,7 @@ func (s *Server) InspectBackup(source string) (*BackupResult, error) {
 	return &BackupResult{
 		Path:       source,
 		ExportedAt: manifest.ExportedAt,
+		Version:    backupSourceVersion(manifest),
 		AppVersion: manifest.AppVersion,
 		Counts: BackupCounts{
 			Applications: len(manifest.Applications),
@@ -300,10 +331,131 @@ func readBackupManifest(files []*zip.File) (*backupManifest, error) {
 	if manifest.Format != backupFormat {
 		return nil, errors.New("this file is not a ResumeTrail backup")
 	}
-	if manifest.Version > backupVersion {
-		return nil, fmt.Errorf("the backup version %d is newer than this application supports", manifest.Version)
+	if manifest.FormatVersion > backupFormatVersion {
+		return nil, fmt.Errorf("the backup format %d is newer than this application supports", manifest.FormatVersion)
+	}
+	if err := checkBackupVersion(&manifest); err != nil {
+		return nil, err
 	}
 	return &manifest, nil
+}
+
+// checkBackupVersion refuses backups exported by a newer application than the
+// one currently running. Older backups are always accepted.
+func checkBackupVersion(manifest *backupManifest) error {
+	source := backupSourceVersion(manifest)
+	client := strings.TrimSpace(appinfo.Version())
+	if source == "" || client == "" {
+		return nil
+	}
+	sourceVersion, ok := parseAppVersion(source)
+	if !ok {
+		return nil
+	}
+	clientVersion, ok := parseAppVersion(client)
+	if !ok {
+		return nil
+	}
+	if compareAppVersions(clientVersion, sourceVersion) < 0 {
+		return fmt.Errorf(
+			"this backup was exported from version %s, but the current version is %s; upgrade %s to %s or newer before importing",
+			source,
+			client,
+			appinfo.Name(),
+			source,
+		)
+	}
+	return nil
+}
+
+func backupSourceVersion(manifest *backupManifest) string {
+	if version := strings.TrimSpace(string(manifest.Version)); version != "" {
+		return version
+	}
+	return strings.TrimSpace(manifest.AppVersion)
+}
+
+// isDevOrBetaVersion reports whether a version was produced by an unstable
+// development or beta build. Those backups support export only.
+func isDevOrBetaVersion(version string) bool {
+	normalized := strings.ToLower(strings.TrimSpace(version))
+	return strings.Contains(normalized, "dev") || strings.Contains(normalized, "beta")
+}
+
+type appVersion struct {
+	core []int
+	pre  string
+}
+
+// parseAppVersion understands versions such as 1.2, v1.2.0, 1.2-beta and
+// 1.2.0+build. Unparseable values are ignored so a custom version string never
+// locks users out of their own backups.
+func parseAppVersion(value string) (appVersion, bool) {
+	value = strings.ToLower(strings.TrimSpace(value))
+	value = strings.TrimPrefix(value, "v")
+	if value == "" {
+		return appVersion{}, false
+	}
+	if index := strings.IndexByte(value, '+'); index >= 0 {
+		value = value[:index]
+	}
+	pre := ""
+	if index := strings.IndexByte(value, '-'); index >= 0 {
+		pre = value[index+1:]
+		value = value[:index]
+	}
+	parts := strings.Split(value, ".")
+	core := make([]int, 0, len(parts))
+	for _, part := range parts {
+		number, err := strconv.Atoi(strings.TrimSpace(part))
+		if err != nil {
+			return appVersion{}, false
+		}
+		core = append(core, number)
+	}
+	if len(core) == 0 {
+		return appVersion{}, false
+	}
+	return appVersion{core: core, pre: pre}, true
+}
+
+// compareAppVersions returns -1, 0 or 1 depending on whether a is older than,
+// equal to or newer than b. A release is newer than its pre-releases, so
+// 1.2 > 1.2-beta and 1.2-beta > 1.2-alpha.
+func compareAppVersions(a, b appVersion) int {
+	length := len(a.core)
+	if len(b.core) > length {
+		length = len(b.core)
+	}
+	for index := 0; index < length; index++ {
+		left, right := 0, 0
+		if index < len(a.core) {
+			left = a.core[index]
+		}
+		if index < len(b.core) {
+			right = b.core[index]
+		}
+		if left < right {
+			return -1
+		}
+		if left > right {
+			return 1
+		}
+	}
+	switch {
+	case a.pre == "" && b.pre == "":
+		return 0
+	case a.pre == "":
+		return 1
+	case b.pre == "":
+		return -1
+	case a.pre < b.pre:
+		return -1
+	case a.pre > b.pre:
+		return 1
+	default:
+		return 0
+	}
 }
 
 func (s *Server) ImportBackup(source string) (*BackupResult, error) {
@@ -322,6 +474,12 @@ func (s *Server) ImportBackup(source string) (*BackupResult, error) {
 	manifest, err := readBackupManifest(reader.File)
 	if err != nil {
 		return nil, err
+	}
+	if version := backupSourceVersion(manifest); isDevOrBetaVersion(version) {
+		return nil, fmt.Errorf(
+			"this backup was exported by dev/beta version %s; dev and beta versions are for development and testing only and support export only, so this backup cannot be imported",
+			version,
+		)
 	}
 
 	deviceID, err := s.ensureDeviceID(false)
@@ -592,6 +750,7 @@ func (s *Server) ImportBackup(source string) (*BackupResult, error) {
 	return &BackupResult{
 		Path:       source,
 		ExportedAt: manifest.ExportedAt,
+		Version:    backupSourceVersion(manifest),
 		AppVersion: manifest.AppVersion,
 		Counts:     counts,
 		Warnings:   []string{},

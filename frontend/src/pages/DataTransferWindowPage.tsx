@@ -58,6 +58,12 @@ function todayStamp(): string {
   return `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}`;
 }
 
+function isDevOrBeta(version: string | null | undefined): boolean {
+  if (!version) return false;
+  const normalized = version.trim().toLowerCase();
+  return normalized.includes("dev") || normalized.includes("beta");
+}
+
 export function DataTransferWindowPage() {
   const { t, formatFullDate } = useI18n();
   const [mode, setMode] = useState<TransferMode>(readMode);
@@ -65,6 +71,9 @@ export function DataTransferWindowPage() {
   const [result, setResult] = useState<BackupResult | null>(null);
   const [preview, setPreview] = useState<BackupResult | null>(null);
   const [error, setError] = useState("");
+
+  const currentDevBeta = isDevOrBeta(__APP_VERSION__);
+  const previewDevBeta = isDevOrBeta(preview?.version || preview?.appVersion);
 
   const reset = (nextMode?: TransferMode) => {
     setError("");
@@ -241,6 +250,14 @@ export function DataTransferWindowPage() {
               </div>
             </div>
             <p className="transfer-note">{t("transfer.deviceNote")}</p>
+            {currentDevBeta && (
+              <Alert
+                type="warning"
+                showIcon
+                className="transfer-alert"
+                message={t("transfer.devBetaWarning")}
+              />
+            )}
             <Button
               type="primary"
               size="large"
@@ -297,6 +314,23 @@ export function DataTransferWindowPage() {
             <p className="transfer-note is-warning">
               <WarningOutlined /> {t("transfer.passwordNote")}
             </p>
+            {previewDevBeta ? (
+              <Alert
+                type="warning"
+                showIcon
+                className="transfer-alert"
+                message={t("transfer.devBetaBackupBlocked")}
+              />
+            ) : (
+              currentDevBeta && (
+                <Alert
+                  type="warning"
+                  showIcon
+                  className="transfer-alert"
+                  message={t("transfer.devBetaWarning")}
+                />
+              )
+            )}
             {!preview ? (
               <Button
                 type="primary"
@@ -320,13 +354,15 @@ export function DataTransferWindowPage() {
                   </div>
                   <p className="transfer-preview-label">{t("transfer.contains")}</p>
                   {countsPanel(preview)}
-                  <Alert
-                    type="warning"
-                    showIcon
-                    className="transfer-alert"
-                    message={t("transfer.overwriteTitle")}
-                    description={t("transfer.overwriteMessage")}
-                  />
+                  {!previewDevBeta && (
+                    <Alert
+                      type="warning"
+                      showIcon
+                      className="transfer-alert"
+                      message={t("transfer.overwriteTitle")}
+                      description={t("transfer.overwriteMessage")}
+                    />
+                  )}
                 </div>
                 <div className="transfer-actions">
                   <Button disabled={busy} onClick={() => setPreview(null)}>
@@ -337,6 +373,7 @@ export function DataTransferWindowPage() {
                     type="primary"
                     size="large"
                     loading={busy}
+                    disabled={previewDevBeta}
                     onClick={() => void importData()}
                   >
                     {busy ? t("transfer.importing") : t("transfer.confirmImport")}

@@ -171,6 +171,7 @@ export interface BackupCounts {
 export interface BackupResult {
   path: string;
   exportedAt: string;
+  version: string;
   appVersion: string;
   counts: BackupCounts;
   warnings: string[];
