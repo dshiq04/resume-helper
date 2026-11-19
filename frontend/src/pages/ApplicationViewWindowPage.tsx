@@ -13,6 +13,7 @@ import {
 } from "antd";
 import {
   CloseOutlined,
+  DeleteOutlined,
   FieldTimeOutlined,
   HistoryOutlined,
   LinkOutlined,
@@ -22,7 +23,7 @@ import {
 import dayjs, { type Dayjs } from "dayjs";
 import { Events } from "@wailsio/runtime";
 import { api, ApiError } from "../api/client";
-import type { Application, ApplicationHistory } from "../api/types";
+import type { Application, ApplicationHistory, Status } from "../api/types";
 import { CategoryBadge, StatusBadge } from "../components/badges";
 import { useI18n } from "../i18n";
 import { apiErrorMessage } from "../utils/errors";
@@ -51,6 +52,7 @@ export function ApplicationViewWindowPage() {
   const [error, setError] = useState<string | null>(null);
   const [supplementOpen, setSupplementOpen] = useState(false);
   const [supplementSaving, setSupplementSaving] = useState(false);
+  const [supplementStatuses, setSupplementStatuses] = useState<Status[]>([]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -119,20 +121,26 @@ export function ApplicationViewWindowPage() {
       defaults[status] = dayjs(history.appliedAt);
     }
     supplementForm.setFieldsValue(defaults);
+    setSupplementStatuses([...history.missingStatuses]);
     setSupplementOpen(true);
+  };
+
+  const removeSupplementStatus = (status: Status) => {
+    setSupplementStatuses((current) => current.filter((item) => item !== status));
+    supplementForm.setFields([{ name: status, value: undefined, errors: [] }]);
   };
 
   const submitSupplement = async () => {
     if (!history || recordId === null) return;
     let values: Record<string, Dayjs>;
     try {
-      values = await supplementForm.validateFields();
+      values = await supplementForm.validateFields(supplementStatuses);
     } catch {
       return;
     }
     setSupplementSaving(true);
     try {
-      for (const status of history.missingStatuses) {
+      for (const status of supplementStatuses) {
         const value = values[status];
         if (!value) continue;
         await api.addApplicationHistory(
@@ -350,6 +358,7 @@ export function ApplicationViewWindowPage() {
         okText={t("action.save")}
         cancelText={t("action.cancel")}
         confirmLoading={supplementSaving}
+        okButtonProps={{ disabled: supplementStatuses.length === 0 }}
         onOk={() => void submitSupplement()}
         onCancel={() => {
           if (!supplementSaving) setSupplementOpen(false);
@@ -358,15 +367,26 @@ export function ApplicationViewWindowPage() {
       >
         <p className="edit-history-modal-hint">{t("history.missingHint")}</p>
         <Form form={supplementForm} layout="vertical" requiredMark={false}>
-          {history?.missingStatuses.map((status) => (
-            <Form.Item
-              key={status}
-              name={status}
-              label={<StatusBadge status={status} />}
-              rules={[{ required: true, message: t("history.missingRequired") }]}
-            >
-              <DatePicker className="edit-history-date" showTime={false} />
-            </Form.Item>
+          {supplementStatuses.map((status) => (
+            <div className="edit-history-field" key={status}>
+              <Form.Item
+                className="edit-history-form-item"
+                name={status}
+                label={<StatusBadge status={status} />}
+                rules={[{ required: true, message: t("history.missingRequired") }]}
+              >
+                <DatePicker className="edit-history-date" showTime={false} />
+              </Form.Item>
+              <Button
+                type="text"
+                danger
+                className="edit-history-delete"
+                aria-label={t("action.delete")}
+                title={t("action.delete")}
+                icon={<DeleteOutlined />}
+                onClick={() => removeSupplementStatus(status)}
+              />
+            </div>
           ))}
         </Form>
       </Modal>
