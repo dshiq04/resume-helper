@@ -138,10 +138,30 @@ func (s *Server) getApplicationHistory(c *gin.Context) {
 	for _, change := range changes {
 		present[change.Status] = struct{}{}
 	}
-	missing := make([]string, 0, len(models.StageOrder))
-	for _, status := range models.StageChainForStatus(record.Status) {
-		if _, exists := present[status]; !exists {
-			missing = append(missing, status)
+
+	// A record only needs its history filled in when it looks like it was
+	// backfilled: the timeline holds nothing but the current status. As soon as
+	// any earlier stage is recorded, the timeline came from real usage and the
+	// supplement prompt would only be noise.
+	chain := models.StageChainForStatus(record.Status)
+	currentRank := timelineStatusRank(record.Status)
+	hasEarlierStage := false
+	for _, status := range chain {
+		if status == record.Status || timelineStatusRank(status) >= currentRank {
+			continue
+		}
+		if _, exists := present[status]; exists {
+			hasEarlierStage = true
+			break
+		}
+	}
+
+	missing := make([]string, 0, len(chain))
+	if !hasEarlierStage {
+		for _, status := range chain {
+			if _, exists := present[status]; !exists {
+				missing = append(missing, status)
+			}
 		}
 	}
 

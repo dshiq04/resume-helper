@@ -858,7 +858,7 @@ textarea {
 }
 
 .page-view.is-page-entering {
-  animation: page-view-enter 240ms cubic-bezier(0.22, 1, 0.36, 1);
+  animation: page-view-enter 320ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 @keyframes page-view-enter {

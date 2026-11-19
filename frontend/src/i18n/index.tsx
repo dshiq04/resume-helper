@@ -12,6 +12,11 @@ import jaJP from "antd/locale/ja_JP";
 import koKR from "antd/locale/ko_KR";
 import zhCN from "antd/locale/zh_CN";
 import zhTW from "antd/locale/zh_TW";
+import dayjs from "dayjs";
+import "dayjs/locale/ja";
+import "dayjs/locale/ko";
+import "dayjs/locale/zh-cn";
+import "dayjs/locale/zh-tw";
 
 const en = {
   "app.brand": "ResumeTrail",
@@ -1861,6 +1866,17 @@ const antdLocales = {
   ko: resolveAntdLocale(koKR),
 } as const;
 
+// antd date and time components format their panels with dayjs, so the dayjs
+// locale has to follow the UI language as well. ConfigProvider's locale alone
+// only covers the surrounding component texts.
+const dayjsLocales: Record<Locale, string> = {
+  "zh-CN": "zh-cn",
+  "zh-TW": "zh-tw",
+  en: "en",
+  ja: "ja",
+  ko: "ko",
+};
+
 const LOCALE_KEY = "resumetrail.locale";
 
 // Default language from frontend/.env, injected by vite.config.ts.
@@ -1911,6 +1927,10 @@ const I18nContext = createContext<I18nContextValue | null>(null);
 
 export function I18nProvider({ children }: { children: ReactNode }) {
   const [locale, setLocaleState] = useState<Locale>(() => detectLocale());
+
+  // Applied during render so the date panels of the current render already use
+  // the new language.
+  dayjs.locale(dayjsLocales[locale]);
 
   useEffect(() => {
     localStorage.setItem(LOCALE_KEY, locale);

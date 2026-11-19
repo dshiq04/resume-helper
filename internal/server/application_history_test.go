@@ -9,35 +9,43 @@ import (
 	"resume-helper/internal/models"
 )
 
-func TestHistoryMissingStatusesUseParallelTerminal(t *testing.T) {
+func TestHistoryMissingStatusesRequireBackfilledRecord(t *testing.T) {
 	app := newTestApp(t)
-	tests := []struct {
-		status string
-		want   []string
-	}{
-		{
-			status: models.StatusOffer,
-			want:   []string{models.StatusScreening, models.StatusWritten, models.StatusInterview},
-		},
-		{
-			status: models.StatusRejected,
-			want:   []string{models.StatusScreening, models.StatusWritten, models.StatusInterview},
-		},
+	_, body := app.request(t, http.MethodPost, "/api/applications", map[string]string{
+		"companyName": "Terminal Corp",
+		"category":    "autumn",
+		"status":      models.StatusRejected,
+	}, "")
+	created := decodeJSON[applicationStatusView](t, body)
+
+	// Simulate a record created before status history existed: only the current
+	// status was backfilled, so every earlier stage still needs a date.
+	db := app.server.database()
+	if err := db.Where("application_id = ? AND status <> ?", created.ID, models.StatusRejected).
+		Delete(&models.ApplicationChange{}).Error; err != nil {
+		t.Fatalf("clear backfilled history: %v", err)
 	}
 
-	for _, test := range tests {
-		_, body := app.request(t, http.MethodPost, "/api/applications", map[string]string{
-			"companyName": "Terminal Corp",
-			"category":    "autumn",
-			"status":      test.status,
-		}, "")
-		created := decodeJSON[applicationStatusView](t, body)
+	_, body = app.request(t, http.MethodGet, "/api/application/"+uintString(created.ID)+"/history", nil, "")
+	history := decodeJSON[applicationHistoryResponse](t, body)
+	want := []string{models.StatusPending, models.StatusScreening, models.StatusWritten, models.StatusInterview}
+	if !reflect.DeepEqual(history.MissingStatuses, want) {
+		t.Fatalf("missing statuses = %v, want %v", history.MissingStatuses, want)
+	}
 
-		_, body = app.request(t, http.MethodGet, "/api/application/"+uintString(created.ID)+"/history", nil, "")
-		history := decodeJSON[applicationHistoryResponse](t, body)
-		if !reflect.DeepEqual(history.MissingStatuses, test.want) {
-			t.Fatalf("status %s missing statuses = %v, want %v", test.status, history.MissingStatuses, test.want)
-		}
+	// Recording any earlier stage means the timeline came from real usage, so
+	// the supplement prompt is no longer needed.
+	if err := db.Create(&models.ApplicationChange{
+		ApplicationID: created.ID,
+		Status:        models.StatusScreening,
+		ChangedAt:     time.Now(),
+	}).Error; err != nil {
+		t.Fatalf("record earlier stage: %v", err)
+	}
+	_, body = app.request(t, http.MethodGet, "/api/application/"+uintString(created.ID)+"/history", nil, "")
+	history = decodeJSON[applicationHistoryResponse](t, body)
+	if len(history.MissingStatuses) != 0 {
+		t.Fatalf("missing statuses = %v, want none", history.MissingStatuses)
 	}
 }
 
