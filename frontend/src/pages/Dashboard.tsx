@@ -7,7 +7,6 @@ import { useI18n } from "../i18n";
 import { apiErrorMessage } from "../utils/errors";
 import { useApplications } from "../hooks/useApplications";
 import { useApplicationDraft } from "../hooks/useApplicationDraft";
-import { useInlineEdit } from "../hooks/useInlineEdit";
 import { useMediaQuery } from "../hooks/useMediaQuery";
 import { useStatusOptions } from "../components/badges";
 import { StatsCards } from "../components/StatsCards";
@@ -32,10 +31,6 @@ export function Dashboard({ category }: DashboardProps) {
   const draft = useApplicationDraft({
     category,
     onCreated: board.afterCreated,
-  });
-  const inlineEdit = useInlineEdit({
-    items: board.items,
-    onSave: board.updateField,
   });
   const statusOptions = useStatusOptions();
   const isCompactList = useMediaQuery("(max-width: 1199px)");
@@ -75,7 +70,6 @@ export function Dashboard({ category }: DashboardProps) {
     statusSavingId: board.statusSavingId,
     pinSavingId: board.pinSavingId,
     statusOptions,
-    inline: inlineEdit,
     hasFilters: board.hasFilters,
     draft: draft.draft,
     draftSaving: draft.saving,

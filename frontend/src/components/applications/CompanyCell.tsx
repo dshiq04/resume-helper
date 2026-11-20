@@ -1,22 +1,16 @@
 import { PushpinFilled } from "@ant-design/icons";
 import type { Application } from "../../api/types";
-import type { InlineEditController } from "../../hooks/useInlineEdit";
 import { useI18n } from "../../i18n";
 import { avatarTone, companyInitial } from "../../utils/display";
 import { CategoryBadge } from "../badges";
-import { CompanyAutoComplete } from "../CompanyAutoComplete";
 
 interface CompanyCellProps {
   application: Application;
-  inline: InlineEditController;
   onView?: (application: Application) => void;
 }
 
-export function CompanyCell({ application, inline, onView }: CompanyCellProps) {
+export function CompanyCell({ application, onView }: CompanyCellProps) {
   const { t } = useI18n();
-  const isEditing =
-    inline.editing?.id === application.id &&
-    inline.editing.field === "companyName";
 
   return (
     <div className="company-cell">
@@ -34,30 +28,9 @@ export function CompanyCell({ application, inline, onView }: CompanyCellProps) {
       </button>
       <div className="company-copy">
         <div className="company-name-row">
-          {isEditing ? (
-            <CompanyAutoComplete
-              autoFocus
-              size="small"
-              className="inline-edit-input"
-              value={inline.value}
-              maxLength={255}
-              disabled={inline.saving}
-              onChange={inline.setValue}
-              onBlur={() => void inline.commit()}
-              onPressEnter={() => void inline.commit()}
-              onKeyDown={(event) => {
-                if (event.key === "Escape") inline.cancel();
-              }}
-            />
-          ) : (
-            <button
-              type="button"
-              className="company-name-button"
-              onClick={() => inline.start(application, "companyName")}
-            >
-              {application.companyName}
-            </button>
-          )}
+          <span className="company-name-button is-static">
+            {application.companyName}
+          </span>
           {application.pinned && (
             <span className="pinned-marker" title={t("action.pin")}>
               <PushpinFilled />

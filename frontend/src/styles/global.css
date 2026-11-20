@@ -1211,15 +1211,6 @@ textarea {
   flex: 1;
 }
 
-.edit-hint {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--text-tertiary);
-  font-size: 15.5px;
-  white-space: nowrap;
-}
-
 .selection-bar {
   display: flex;
   flex-wrap: wrap;
@@ -3701,10 +3692,6 @@ textarea {
   .settings-page-header h1 {
     font-size: 28px;
   }
-
-  .edit-hint {
-    display: none;
-  }
 }
 
 /* Tablet: icon rail + two-column cards. The rail visuals live on
@@ -3955,11 +3942,6 @@ textarea {
   .search-input,
   .status-filter {
     width: 100%;
-  }
-
-  .table-toolbar-spacer,
-  .edit-hint {
-    display: none;
   }
 
   .selection-bar {

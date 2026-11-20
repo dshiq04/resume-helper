@@ -1,5 +1,5 @@
 import { DatePicker, Input, Select } from "antd";
-import { EditOutlined, SearchOutlined } from "@ant-design/icons";
+import { SearchOutlined } from "@ant-design/icons";
 import type { Dayjs } from "dayjs";
 import type { Status, StatusOption } from "../../api/types";
 import { useI18n } from "../../i18n";
@@ -67,11 +67,6 @@ export function DashboardToolbar({
           onDateRangeChange([values[0], values[1]]);
         }}
       />
-      <div className="table-toolbar-spacer" />
-      <span className="edit-hint">
-        <EditOutlined />
-        {t("table.editHint")}
-      </span>
     </div>
   );
 }

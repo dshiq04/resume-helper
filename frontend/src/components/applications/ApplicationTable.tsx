@@ -2,7 +2,6 @@ import { Table, Tooltip } from "antd";
 import type { TableColumnsType } from "antd";
 import type { Application, Status, StatusOption } from "../../api/types";
 import type { ApplicationDraft } from "../../hooks/useApplicationDraft";
-import type { InlineEditController } from "../../hooks/useInlineEdit";
 import { useI18n } from "../../i18n";
 import { CompanyCell } from "./CompanyCell";
 import { LinkCell } from "./LinkCell";
@@ -28,7 +27,6 @@ interface ApplicationTableProps {
   statusSavingId: number | null;
   pinSavingId: number | null;
   statusOptions: StatusOption[];
-  inline: InlineEditController;
   hasFilters: boolean;
   draft: ApplicationDraft | null;
   draftSaving: boolean;
@@ -57,7 +55,6 @@ export function ApplicationTable({
   statusSavingId,
   pinSavingId,
   statusOptions,
-  inline,
   hasFilters,
   draft,
   draftSaving,
@@ -94,7 +91,7 @@ export function ApplicationTable({
             onCancel={onDraftCancel}
           />
         ) : (
-          <CompanyCell application={record} inline={inline} onView={onView} />
+          <CompanyCell application={record} onView={onView} />
         ),
     },
     {
@@ -113,7 +110,7 @@ export function ApplicationTable({
             onCancel={onDraftCancel}
           />
         ) : (
-          <LinkCell application={record} inline={inline} />
+          <LinkCell application={record} />
         ),
     },
     {

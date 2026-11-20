@@ -2,7 +2,6 @@ import { Checkbox, Pagination, Spin, Tooltip } from "antd";
 import { PushpinFilled } from "@ant-design/icons";
 import type { Application, Status, StatusOption } from "../../api/types";
 import type { ApplicationDraft } from "../../hooks/useApplicationDraft";
-import type { InlineEditController } from "../../hooks/useInlineEdit";
 import { useI18n } from "../../i18n";
 import { CompanyCell } from "./CompanyCell";
 import { LinkCell } from "./LinkCell";
@@ -21,7 +20,6 @@ interface ApplicationCardsProps {
   statusSavingId: number | null;
   pinSavingId: number | null;
   statusOptions: StatusOption[];
-  inline: InlineEditController;
   hasFilters: boolean;
   draft: ApplicationDraft | null;
   draftSaving: boolean;
@@ -49,7 +47,6 @@ export function ApplicationCards({
   statusSavingId,
   pinSavingId,
   statusOptions,
-  inline,
   hasFilters,
   draft,
   draftSaving,
@@ -111,11 +108,7 @@ export function ApplicationCards({
                 onToggleSelection(record.id, event.target.checked)
               }
             />
-            <CompanyCell
-              application={record}
-              inline={inline}
-              onView={onView}
-            />
+            <CompanyCell application={record} onView={onView} />
             <div className="mobile-card-actions">
               <ApplicationActions
                 application={record}
@@ -130,7 +123,7 @@ export function ApplicationCards({
 
           <div className="mobile-card-body">
             <div className="mobile-card-link-row">
-              <LinkCell application={record} inline={inline} mobile />
+              <LinkCell application={record} mobile />
             </div>
             <ApplicationStatusSelect
               application={record}
