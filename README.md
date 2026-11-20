@@ -353,6 +353,7 @@ psql -d resume_helper -f init.postgresql.sql
 | `GET` | `/api/stats` | 分类 / 状态 / 简历数量统计 |
 | `GET` | `/api/system/info` | 数据库、配置文件、版本信息 |
 | `GET` | `/api/system/device` | 当前设备标识码与简历加密算法 |
+| `GET` | `/api/system/platform` | 当前运行平台（电脑 / 平板 / 手机）与操作系统版本 |
 | `GET` | `/api/system/database` | 当前数据库的图形化配置字段 |
 | `POST` | `/api/system/database/test` | 测试数据库连接（不保存） |
 | `PUT` | `/api/system/database` | 保存配置、迁移新库并立即切换连接 |

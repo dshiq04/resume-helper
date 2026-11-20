@@ -20,6 +20,7 @@ import type {
   FunnelStats,
   ImportResult,
   ListParams,
+  PlatformInfo,
   Preferences,
   QuickEntryDefaults,
   Resume,
@@ -292,6 +293,9 @@ export const api = {
   },
   deviceInfo() {
     return request<DeviceInfo>("/system/device");
+  },
+  platformInfo() {
+    return request<PlatformInfo>("/system/platform");
   },
   databaseSettings() {
     return request<DatabaseSettingsResponse>("/system/database");

@@ -196,6 +196,11 @@ const en = {
   "settings.deviceId": "Device ID",
   "settings.deviceEncryption":
     "Resume files are encrypted at rest with {{algorithm}} using a key derived from this device ID.",
+  "settings.platform": "Current platform",
+  "settings.platform.computer": "Computer",
+  "settings.platform.tablet": "Tablet",
+  "settings.platform.phone": "Phone",
+  "settings.operatingSystem": "System",
   "settings.shortcut": "Desktop shortcut",
   "settings.shortcutHint":
     "Create a shortcut so ResumeTrail can be opened directly from the desktop.",
@@ -649,6 +654,11 @@ const zhCNMessages: Record<MessageKey, string> = {
   "settings.deviceId": "设备标识码",
   "settings.deviceEncryption":
     "简历文件使用由该设备标识码派生的密钥，通过 {{algorithm}} 加密后保存。",
+  "settings.platform": "当前平台",
+  "settings.platform.computer": "电脑",
+  "settings.platform.tablet": "平板",
+  "settings.platform.phone": "手机",
+  "settings.operatingSystem": "系统",
   "settings.shortcut": "桌面快捷方式",
   "settings.shortcutHint": "创建后可以直接从桌面打开履途。",
   "settings.shortcutExists": "桌面快捷方式已存在",
@@ -1083,6 +1093,11 @@ const zhTWMessages: Partial<Record<MessageKey, string>> = {
   "settings.deviceId": "裝置識別碼",
   "settings.deviceEncryption":
     "履歷檔案使用由該裝置識別碼衍生的金鑰，透過 {{algorithm}} 加密後儲存。",
+  "settings.platform": "目前平台",
+  "settings.platform.computer": "電腦",
+  "settings.platform.tablet": "平板",
+  "settings.platform.phone": "手機",
+  "settings.operatingSystem": "系統",
   "settings.shortcut": "桌面捷徑",
   "settings.shortcutHint": "建立後可以直接從桌面開啟履途。",
   "settings.shortcutExists": "桌面捷徑已存在",
@@ -1388,6 +1403,11 @@ const jaMessages: Partial<Record<MessageKey, string>> = {
   "settings.deviceId": "デバイス識別子",
   "settings.deviceEncryption":
     "履歴書ファイルは、このデバイス識別子から派生したキーで {{algorithm}} により暗号化して保存されます。",
+  "settings.platform": "現在のプラットフォーム",
+  "settings.platform.computer": "パソコン",
+  "settings.platform.tablet": "タブレット",
+  "settings.platform.phone": "スマートフォン",
+  "settings.operatingSystem": "システム",
   "settings.shortcut": "デスクトップショートカット",
   "settings.shortcutHint":
     "ショートカットを作成すると、デスクトップから直接 ResumeTrail を開けます。",
@@ -1698,6 +1718,11 @@ const koMessages: Partial<Record<MessageKey, string>> = {
   "settings.deviceId": "장치 식별자",
   "settings.deviceEncryption":
     "이력서 파일은 이 장치 식별자에서 파생된 키로 {{algorithm}} 암호화되어 저장됩니다.",
+  "settings.platform": "현재 플랫폼",
+  "settings.platform.computer": "컴퓨터",
+  "settings.platform.tablet": "태블릿",
+  "settings.platform.phone": "휴대폰",
+  "settings.operatingSystem": "시스템",
   "settings.shortcut": "바탕 화면 바로가기",
   "settings.shortcutHint":
     "바로가기를 만들면 바탕 화면에서 ResumeTrail을 바로 열 수 있습니다.",

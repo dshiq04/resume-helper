@@ -3112,6 +3112,26 @@ textarea {
   line-height: 1.55;
 }
 
+.settings-device-platform {
+  display: grid;
+  gap: 6px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+
+.settings-device-platform .settings-device-row {
+  flex-wrap: nowrap;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.settings-device-platform .settings-device-value {
+  color: var(--text);
+  font-weight: 600;
+  text-align: right;
+}
+
 .settings-modal .ant-modal-content {
   border-radius: 20px;
 }

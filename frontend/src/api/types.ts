@@ -259,6 +259,13 @@ export interface DatabaseTestResult {
   message: string;
 }
 
+export interface PlatformInfo {
+  kind: "computer" | "tablet" | "phone" | string;
+  os: string;
+  name: string;
+  version: string;
+}
+
 export interface DeviceInfo {
   deviceId: string;
   algorithm: string;

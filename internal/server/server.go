@@ -284,6 +284,7 @@ func (s *Server) newEngine() *gin.Engine {
 		protected.GET("/stats/funnel", s.applicationFunnel)
 		protected.GET("/system/info", s.systemInfo)
 		protected.GET("/system/device", s.deviceInfo)
+		protected.GET("/system/platform", s.platformInfo)
 		protected.GET("/system/preferences", s.getPreferences)
 		protected.PUT("/system/preferences", s.updatePreferences)
 		protected.POST("/system/data-transfer", s.openDataTransfer)
