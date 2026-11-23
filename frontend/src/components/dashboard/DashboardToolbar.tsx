@@ -1,5 +1,6 @@
-import { Input, Select } from "antd";
-import { EditOutlined, SearchOutlined } from "@ant-design/icons";
+import { DatePicker, Input, Select } from "antd";
+import { SearchOutlined } from "@ant-design/icons";
+import type { Dayjs } from "dayjs";
 import type { Status, StatusOption } from "../../api/types";
 import { useI18n } from "../../i18n";
 import { StatusBadge } from "../badges";
@@ -8,16 +9,20 @@ interface DashboardToolbarProps {
   searchInput: string;
   statusFilter: Status | "all";
   statusOptions: StatusOption[];
+  dateRange: [Dayjs, Dayjs] | null;
   onSearchChange: (value: string) => void;
   onStatusChange: (value: Status | "all") => void;
+  onDateRangeChange: (value: [Dayjs, Dayjs] | null) => void;
 }
 
 export function DashboardToolbar({
   searchInput,
   statusFilter,
   statusOptions,
+  dateRange,
   onSearchChange,
   onStatusChange,
+  onDateRangeChange,
 }: DashboardToolbarProps) {
   const { t } = useI18n();
 
@@ -47,11 +52,21 @@ export function DashboardToolbar({
         )}
         onChange={(value) => onStatusChange((value as Status) ?? "all")}
       />
-      <div className="table-toolbar-spacer" />
-      <span className="edit-hint">
-        <EditOutlined />
-        {t("table.editHint")}
-      </span>
+      <DatePicker.RangePicker
+        className="date-range-filter"
+        size="large"
+        value={dateRange}
+        allowClear
+        format="YYYY-MM-DD"
+        placeholder={[t("filter.dateFrom"), t("filter.dateTo")]}
+        onChange={(values) => {
+          if (!values || !values[0] || !values[1]) {
+            onDateRangeChange(null);
+            return;
+          }
+          onDateRangeChange([values[0], values[1]]);
+        }}
+      />
     </div>
   );
 }

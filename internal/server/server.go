@@ -14,14 +14,13 @@ import (
 	"sync"
 	"time"
 
+	"resume-helper/internal/appinfo"
 	"resume-helper/internal/config"
 
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
-
-const Version = "1.1"
 
 type Server struct {
 	cfg    *config.Config
@@ -44,11 +43,25 @@ type Server struct {
 	applicationEditMu     sync.RWMutex
 	applicationEditOpener func(id uint)
 
+	applicationViewMu     sync.RWMutex
+	applicationViewOpener func(id uint)
+
 	shortcutPromptMu      sync.RWMutex
 	shortcutPromptHandler func(create bool) error
 
 	resumePreviewMu     sync.RWMutex
 	resumePreviewOpener func(id uint, title string)
+
+	dataTransferMu     sync.RWMutex
+	dataTransferOpener func(mode string)
+
+	appInfoMu      sync.RWMutex
+	appInfoHandler func()
+
+	closePromptMu      sync.RWMutex
+	closePromptHandler func(action string, remember bool) error
+
+	backupMu sync.Mutex
 
 	deviceMu sync.Mutex
 	deviceID string
@@ -96,6 +109,14 @@ func (s *Server) SetApplicationEditOpener(opener func(id uint)) {
 	s.applicationEditOpener = opener
 }
 
+// SetApplicationViewOpener wires the read-only detail window opener into the
+// HTTP layer. Headless/browser mode leaves it nil.
+func (s *Server) SetApplicationViewOpener(opener func(id uint)) {
+	s.applicationViewMu.Lock()
+	defer s.applicationViewMu.Unlock()
+	s.applicationViewOpener = opener
+}
+
 // SetShortcutPromptHandler wires the shortcut-prompt window decision back
 // into the desktop layer.
 func (s *Server) SetShortcutPromptHandler(handler func(create bool) error) {
@@ -110,6 +131,22 @@ func (s *Server) SetResumePreviewOpener(opener func(id uint, title string)) {
 	s.resumePreviewMu.Lock()
 	defer s.resumePreviewMu.Unlock()
 	s.resumePreviewOpener = opener
+}
+
+// SetDataTransferOpener wires the independent backup window opener into the
+// HTTP layer.
+func (s *Server) SetDataTransferOpener(opener func(mode string)) {
+	s.dataTransferMu.Lock()
+	defer s.dataTransferMu.Unlock()
+	s.dataTransferOpener = opener
+}
+
+// SetClosePromptHandler wires the close-window decision back into the desktop
+// layer.
+func (s *Server) SetClosePromptHandler(handler func(action string, remember bool) error) {
+	s.closePromptMu.Lock()
+	defer s.closePromptMu.Unlock()
+	s.closePromptHandler = handler
 }
 
 // SetLogger wires a zap logger into the HTTP layer. Without it the server
@@ -197,6 +234,9 @@ func (s *Server) newEngine() *gin.Engine {
 	api := r.Group("/api")
 	{
 		api.GET("/health", s.health)
+		// The frontend reports the values from frontend/.env right after it
+		// loads, before the lock screen, so this endpoint must stay public.
+		api.POST("/app-info", s.updateAppInfo)
 		api.GET("/auth/status", s.authStatus)
 		api.POST("/auth/login", s.authLogin)
 		api.POST("/auth/setup", s.authSetup)
@@ -204,6 +244,9 @@ func (s *Server) newEngine() *gin.Engine {
 		// can happen after the session has been locked. Both buttons must keep
 		// working without a valid session.
 		api.POST("/system/shortcut/prompt", s.resolveShortcutPrompt)
+		// The close prompt must work even when the app is locked, otherwise the
+		// user could not choose "minimise to tray" or "quit".
+		api.POST("/system/close-prompt", s.resolveClosePrompt)
 	}
 
 	protected := api.Group("")
@@ -218,11 +261,18 @@ func (s *Server) newEngine() *gin.Engine {
 		protected.POST("/applications/batch-delete", s.batchDeleteApplications)
 		protected.PATCH("/applications/batch-status", s.batchUpdateStatus)
 		protected.PATCH("/applications/batch-category", s.batchUpdateCategory)
+		protected.GET("/applications/companies", s.companySuggestions)
 		protected.GET("/application/:id", s.getApplication)
 		protected.PUT("/application/:id", s.updateApplication)
 		protected.DELETE("/application/:id", s.deleteApplication)
+		protected.GET("/application/:id/history", s.getApplicationHistory)
+		protected.POST("/application/:id/history", s.createApplicationHistory)
 		protected.POST("/applications/import", s.importApplications)
 		protected.GET("/applications/template", s.downloadTemplate)
+		protected.GET("/trash", s.listTrash)
+		protected.POST("/trash/:id/restore", s.restoreTrash)
+		protected.DELETE("/trash/:id", s.deleteTrash)
+		protected.DELETE("/trash", s.emptyTrash)
 		protected.GET("/resumes", s.listResumes)
 		protected.POST("/resumes", s.createResume)
 		protected.GET("/resume/:id", s.getResume)
@@ -231,8 +281,13 @@ func (s *Server) newEngine() *gin.Engine {
 		protected.GET("/resume/:id/file", s.serveResumeFile)
 		protected.GET("/stats", s.stats)
 		protected.GET("/stats/daily", s.dailyStats)
+		protected.GET("/stats/funnel", s.applicationFunnel)
 		protected.GET("/system/info", s.systemInfo)
 		protected.GET("/system/device", s.deviceInfo)
+		protected.GET("/system/platform", s.platformInfo)
+		protected.GET("/system/preferences", s.getPreferences)
+		protected.PUT("/system/preferences", s.updatePreferences)
+		protected.POST("/system/data-transfer", s.openDataTransfer)
 		protected.GET("/system/database", s.getDatabaseSettings)
 		protected.POST("/system/database/test", s.testDatabaseSettings)
 		protected.PUT("/system/database", s.updateDatabaseSettings)
@@ -242,6 +297,7 @@ func (s *Server) newEngine() *gin.Engine {
 		protected.POST("/system/quick-entry", s.openQuickEntry)
 		protected.GET("/system/quick-entry/defaults", s.quickEntryDefaults)
 		protected.POST("/system/application-edit", s.openApplicationEdit)
+		protected.POST("/system/application-view", s.openApplicationView)
 		protected.POST("/system/resume-preview", s.openResumePreview)
 	}
 
@@ -307,7 +363,7 @@ func (s *Server) Stop(ctx context.Context) error {
 func (s *Server) health(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"status":  "ok",
-		"version": Version,
+		"version": appinfo.Version(),
 		"time":    time.Now(),
 	})
 }
@@ -325,7 +381,7 @@ func (s *Server) systemInfo(c *gin.Context) {
 		location = dsn
 	}
 	c.JSON(http.StatusOK, gin.H{
-		"version":     Version,
+		"version":     appinfo.Version(),
 		"goVersion":   runtime.Version(),
 		"driver":      driver,
 		"database":    databaseLabel(driver),

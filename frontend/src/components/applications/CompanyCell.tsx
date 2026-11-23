@@ -1,56 +1,36 @@
-import { Input } from "antd";
 import { PushpinFilled } from "@ant-design/icons";
 import type { Application } from "../../api/types";
-import type { InlineEditController } from "../../hooks/useInlineEdit";
 import { useI18n } from "../../i18n";
 import { avatarTone, companyInitial } from "../../utils/display";
 import { CategoryBadge } from "../badges";
 
 interface CompanyCellProps {
   application: Application;
-  inline: InlineEditController;
+  onView?: (application: Application) => void;
 }
 
-export function CompanyCell({ application, inline }: CompanyCellProps) {
+export function CompanyCell({ application, onView }: CompanyCellProps) {
   const { t } = useI18n();
-  const isEditing =
-    inline.editing?.id === application.id &&
-    inline.editing.field === "companyName";
 
   return (
     <div className="company-cell">
-      <span
-        className={`company-avatar avatar-tone-${avatarTone(application.companyName)}`}
+      <button
+        type="button"
+        className={`company-avatar company-avatar-button avatar-tone-${avatarTone(application.companyName)}`}
+        aria-label={application.companyName}
+        title={application.companyName}
+        onClick={(event) => {
+          event.stopPropagation();
+          onView?.(application);
+        }}
       >
         {companyInitial(application.companyName)}
-      </span>
+      </button>
       <div className="company-copy">
         <div className="company-name-row">
-          {isEditing ? (
-            <Input
-              autoFocus
-              size="small"
-              className="inline-edit-input"
-              value={inline.value}
-              maxLength={255}
-              disabled={inline.saving}
-              onChange={(event) => inline.setValue(event.target.value)}
-              onBlur={() => void inline.commit()}
-              onFocus={(event) => event.target.select()}
-              onPressEnter={(event) => event.currentTarget.blur()}
-              onKeyDown={(event) => {
-                if (event.key === "Escape") inline.cancel();
-              }}
-            />
-          ) : (
-            <button
-              type="button"
-              className="company-name-button"
-              onClick={() => inline.start(application, "companyName")}
-            >
-              {application.companyName}
-            </button>
-          )}
+          <span className="company-name-button is-static">
+            {application.companyName}
+          </span>
           {application.pinned && (
             <span className="pinned-marker" title={t("action.pin")}>
               <PushpinFilled />

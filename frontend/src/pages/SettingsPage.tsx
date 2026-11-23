@@ -6,6 +6,8 @@ import { AppearanceSettings } from "../components/settings/AppearanceSettings";
 import { SecuritySettings } from "../components/settings/SecuritySettings";
 import { StorageSettings } from "../components/settings/StorageSettings";
 import { ShortcutSettings } from "../components/settings/ShortcutSettings";
+import { DesktopSettings } from "../components/settings/DesktopSettings";
+import { DataTransferSettings } from "../components/settings/DataTransferSettings";
 import { AboutSettings } from "../components/settings/AboutSettings";
 
 export function SettingsPage() {
@@ -39,9 +41,11 @@ export function SettingsPage() {
             onPasswordEnabledChange={onPasswordEnabledChange}
             onLock={onLock}
           />
+          <DataTransferSettings />
         </div>
         <div className="settings-page-column">
           <StorageSettings />
+          <DesktopSettings />
           <ShortcutSettings />
           <AboutSettings />
         </div>

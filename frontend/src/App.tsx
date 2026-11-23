@@ -1,10 +1,18 @@
-import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from "react";
-import { App as AntdApp, Button, ConfigProvider, Spin } from "antd";
+import {
+  Suspense,
+  lazy,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
+import { App as AntdApp, Button, ConfigProvider, Spin, Watermark } from "antd";
 import { CloudServerOutlined, ReloadOutlined } from "@ant-design/icons";
 import { Navigate, Route, Routes } from "react-router-dom";
 import { Events } from "@wailsio/runtime";
-import { ApiError, api } from "./api/client";
-import type { AuthSession, Stats } from "./api/types";
+import { ApiError, api, clearToken } from "./api/client";
+import type { AuthSession, Preferences, Stats } from "./api/types";
 import { LockScreen } from "./components/LockScreen";
 import { Logo } from "./components/Logo";
 import { ResizeHandles } from "./components/ResizeHandles";
@@ -13,11 +21,15 @@ import { I18nProvider, useI18n } from "./i18n";
 import { WorkspaceLayout } from "./layouts/WorkspaceLayout";
 import { Dashboard } from "./pages/Dashboard";
 import { ApplicationEditWindowPage } from "./pages/ApplicationEditWindowPage";
+import { ApplicationViewWindowPage } from "./pages/ApplicationViewWindowPage";
+import { ClosePromptWindowPage } from "./pages/ClosePromptWindowPage";
+import { DataTransferWindowPage } from "./pages/DataTransferWindowPage";
 import { QuickEntryWindowPage } from "./pages/QuickEntryWindowPage";
 import { ResumeLibraryPage } from "./pages/ResumeLibraryPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { ShortcutPromptWindowPage } from "./pages/ShortcutPromptWindowPage";
 import { StatisticsPage } from "./pages/StatisticsPage";
+import { TrashPage } from "./pages/TrashPage";
 import { createTheme, type ThemeMode } from "./theme";
 
 const ResumePreviewWindowPage = lazy(() =>
@@ -27,6 +39,12 @@ const ResumePreviewWindowPage = lazy(() =>
 );
 
 const THEME_KEY = "resumetrail.theme";
+
+// 开发中水印开关：在 frontend/.env 中配置
+// VITE_SHOW_DEVELOPMENT_WATERMARK=true / false
+const SHOW_DEVELOPMENT_WATERMARK =
+  String(import.meta.env.VITE_SHOW_DEVELOPMENT_WATERMARK).toLowerCase() ===
+  "true";
 
 function getInitialTheme(): ThemeMode {
   const saved = localStorage.getItem(THEME_KEY);
@@ -38,12 +56,51 @@ function getInitialTheme(): ThemeMode {
 
 type Stage = "checking" | "locked" | "ready" | "error";
 
+function AppContentFrame({
+  children,
+  themeMode,
+}: {
+  children: ReactNode;
+  themeMode: ThemeMode;
+}) {
+  if (!SHOW_DEVELOPMENT_WATERMARK) {
+    return <>{children}</>;
+  }
+
+  return (
+    <Watermark
+      className="app-watermark"
+      content="开发中品质，请谅解"
+      gap={[120, 120]}
+      rotate={-22}
+      zIndex={6}
+      font={{
+        color:
+          themeMode === "dark"
+            ? "rgba(226, 232, 240, 0.12)"
+            : "rgba(15, 23, 42, 0.09)",
+        fontSize: 16,
+      }}
+      style={{
+        flex: 1,
+        minHeight: 0,
+        display: "flex",
+        flexDirection: "column",
+        width: "100%",
+      }}
+    >
+      {children}
+    </Watermark>
+  );
+}
+
 function AppRoot() {
   const { t, antdLocale } = useI18n();
   const [themeMode, setThemeMode] = useState<ThemeMode>(getInitialTheme);
   const [stage, setStage] = useState<Stage>("checking");
   const [passwordEnabled, setPasswordEnabled] = useState(false);
   const [stats, setStats] = useState<Stats | null>(null);
+  const [preferences, setPreferences] = useState<Preferences | null>(null);
 
   const checkAuth = useCallback(async () => {
     setStage("checking");
@@ -60,6 +117,26 @@ function AppRoot() {
     void checkAuth();
   }, [checkAuth]);
 
+  const loadPreferences = useCallback(async () => {
+    try {
+      setPreferences(await api.preferences());
+    } catch {
+      // Preferences are optional; locking still follows the password state.
+    }
+  }, []);
+
+  useEffect(() => {
+    if (stage === "ready") {
+      void loadPreferences();
+    }
+  }, [loadPreferences, stage]);
+
+  useEffect(() => {
+    const refresh = () => void loadPreferences();
+    window.addEventListener("resumetrail:preferences-changed", refresh);
+    return () => window.removeEventListener("resumetrail:preferences-changed", refresh);
+  }, [loadPreferences]);
+
   useEffect(() => {
     document.documentElement.dataset.theme = themeMode;
     localStorage.setItem(THEME_KEY, themeMode);
@@ -70,6 +147,55 @@ function AppRoot() {
     window.addEventListener("resumetrail:unauthorized", handler);
     return () => window.removeEventListener("resumetrail:unauthorized", handler);
   }, []);
+
+  // Idle auto-lock. Activity is tracked on the window because every screen of
+  // the main window shares the same session.
+  useEffect(() => {
+    if (
+      stage !== "ready" ||
+      !passwordEnabled ||
+      !preferences?.idleLockEnabled ||
+      preferences.idleLockMinutes <= 0
+    ) {
+      return;
+    }
+
+    let timer = 0;
+    const lock = () => {
+      void (async () => {
+        try {
+          await api.logout();
+        } catch {
+          // Locking locally is still the safe outcome.
+        }
+        clearToken();
+        setStage("locked");
+      })();
+    };
+    const reset = () => {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(lock, preferences.idleLockMinutes * 60_000);
+    };
+
+    const events: Array<keyof WindowEventMap> = [
+      "mousemove",
+      "mousedown",
+      "keydown",
+      "wheel",
+      "touchstart",
+      "scroll",
+    ];
+    for (const event of events) {
+      window.addEventListener(event, reset, { passive: true });
+    }
+    reset();
+    return () => {
+      window.clearTimeout(timer);
+      for (const event of events) {
+        window.removeEventListener(event, reset);
+      }
+    };
+  }, [passwordEnabled, preferences, stage]);
 
   const loadStats = useCallback(async () => {
     try {
@@ -127,11 +253,41 @@ function AppRoot() {
     );
   }
 
+  if (window.location.pathname === "/close-prompt") {
+    return (
+      <ConfigProvider locale={antdLocale} theme={themeConfig}>
+        <AntdApp>
+          <ClosePromptWindowPage />
+        </AntdApp>
+      </ConfigProvider>
+    );
+  }
+
+  if (window.location.pathname === "/data-transfer") {
+    return (
+      <ConfigProvider locale={antdLocale} theme={themeConfig}>
+        <AntdApp>
+          <DataTransferWindowPage />
+        </AntdApp>
+      </ConfigProvider>
+    );
+  }
+
   if (window.location.pathname === "/application-edit") {
     return (
       <ConfigProvider locale={antdLocale} theme={themeConfig}>
         <AntdApp>
           <ApplicationEditWindowPage />
+        </AntdApp>
+      </ConfigProvider>
+    );
+  }
+
+  if (window.location.pathname === "/application-view") {
+    return (
+      <ConfigProvider locale={antdLocale} theme={themeConfig}>
+        <AntdApp>
+          <ApplicationViewWindowPage />
         </AntdApp>
       </ConfigProvider>
     );
@@ -179,6 +335,7 @@ function AppRoot() {
           />
           <ResizeHandles />
 
+          <AppContentFrame themeMode={themeMode}>
           <div className="app-content">
             {stage === "checking" && (
               <div className="boot-screen">
@@ -235,12 +392,14 @@ function AppRoot() {
                   <Route path="social" element={<Dashboard category="social" />} />
                   <Route path="resumes" element={<ResumeLibraryPage />} />
                   <Route path="statistics" element={<StatisticsPage />} />
+                  <Route path="trash" element={<TrashPage />} />
                   <Route path="settings" element={<SettingsPage />} />
                   <Route path="*" element={<Navigate to="/" replace />} />
                 </Route>
               </Routes>
             )}
           </div>
+          </AppContentFrame>
         </div>
       </AntdApp>
     </ConfigProvider>

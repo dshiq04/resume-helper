@@ -10,10 +10,14 @@ import (
 	"strings"
 	"syscall"
 
+	"resume-helper/internal/appinfo"
+
 	"golang.org/x/sys/windows"
 )
 
-const shortcutFileName = "履途 ResumeTrail.lnk"
+func shortcutFileName() string {
+	return appinfo.Title() + ".lnk"
+}
 
 func ShortcutSupported() bool {
 	return true
@@ -24,7 +28,7 @@ func ShortcutPath() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("locate desktop folder: %w", err)
 	}
-	return filepath.Join(desktopDir, shortcutFileName), nil
+	return filepath.Join(desktopDir, shortcutFileName()), nil
 }
 
 func ShortcutExists() (bool, error) {
@@ -60,10 +64,11 @@ func CreateShortcut() error {
 	}
 
 	script := fmt.Sprintf(
-		`$ErrorActionPreference='Stop'; try { $shell = New-Object -ComObject WScript.Shell; $shortcut = $shell.CreateShortcut(%s); $shortcut.TargetPath = %s; $shortcut.WorkingDirectory = %s; $shortcut.Description = 'ResumeTrail'; $shortcut.IconLocation = %s; $shortcut.Save(); exit 0 } catch { Write-Error $_.Exception.Message; exit 1 }`,
+		`$ErrorActionPreference='Stop'; try { $shell = New-Object -ComObject WScript.Shell; $shortcut = $shell.CreateShortcut(%s); $shortcut.TargetPath = %s; $shortcut.WorkingDirectory = %s; $shortcut.Description = %s; $shortcut.IconLocation = %s; $shortcut.Save(); exit 0 } catch { Write-Error $_.Exception.Message; exit 1 }`,
 		powerShellQuote(shortcutPath),
 		powerShellQuote(executable),
 		powerShellQuote(workingDir),
+		powerShellQuote(appinfo.Title()),
 		powerShellQuote(iconLocation),
 	)
 	cmd := exec.Command(

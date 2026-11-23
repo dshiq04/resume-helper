@@ -26,6 +26,8 @@ func Open(cfg config.DatabaseConfig) (*gorm.DB, error) {
 	}
 	if err := db.AutoMigrate(
 		&models.Application{},
+		&models.ApplicationChange{},
+		&models.DeletedApplication{},
 		&models.Resume{},
 		&models.Setting{},
 	); err != nil {

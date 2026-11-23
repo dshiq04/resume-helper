@@ -31,6 +31,39 @@ CREATE TABLE IF NOT EXISTS applications (
   DEFAULT CHARSET=utf8mb4
   COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS application_changes (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  application_id BIGINT UNSIGNED NOT NULL,
+  status VARCHAR(32) NOT NULL,
+  changed_at DATETIME(3) NOT NULL,
+  created_at DATETIME(3) NULL,
+  PRIMARY KEY (id),
+  UNIQUE KEY idx_application_change_status (application_id, status),
+  KEY idx_application_changes_changed_at (changed_at)
+) ENGINE=InnoDB
+  DEFAULT CHARSET=utf8mb4
+  COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS deleted_applications (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  original_id BIGINT UNSIGNED NOT NULL,
+  category VARCHAR(32) NOT NULL,
+  company_name VARCHAR(255) NOT NULL,
+  link TEXT NULL,
+  status VARCHAR(32) NOT NULL,
+  pinned BOOLEAN NOT NULL DEFAULT FALSE,
+  applied_at DATETIME(3) NULL,
+  created_at DATETIME(3) NULL,
+  updated_at DATETIME(3) NULL,
+  history TEXT NULL,
+  deleted_at DATETIME(3) NOT NULL,
+  PRIMARY KEY (id),
+  KEY idx_deleted_applications_original_id (original_id),
+  KEY idx_deleted_applications_deleted_at (deleted_at)
+) ENGINE=InnoDB
+  DEFAULT CHARSET=utf8mb4
+  COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS settings (
   `key` VARCHAR(64) NOT NULL,
   `value` TEXT NULL,

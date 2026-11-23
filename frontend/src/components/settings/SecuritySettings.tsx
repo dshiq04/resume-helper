@@ -1,6 +1,10 @@
-import { useState } from "react";
-import { App as AntdApp, Button, Tooltip } from "antd";
-import { LockOutlined, SafetyCertificateOutlined } from "@ant-design/icons";
+import { useEffect, useState } from "react";
+import { App as AntdApp, Button, InputNumber, Switch, Tooltip } from "antd";
+import {
+  ClockCircleOutlined,
+  LockOutlined,
+  SafetyCertificateOutlined,
+} from "@ant-design/icons";
 import { api, clearToken, setToken } from "../../api/client";
 import { useI18n } from "../../i18n";
 import { apiErrorMessage } from "../../utils/errors";
@@ -22,6 +26,44 @@ export function SecuritySettings({
   const { message } = AntdApp.useApp();
   const [mode, setMode] = useState<SecurityMode | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [idleEnabled, setIdleEnabled] = useState(false);
+  const [idleMinutes, setIdleMinutes] = useState(15);
+  const [idleSaving, setIdleSaving] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    void api
+      .preferences()
+      .then((data) => {
+        if (!active) return;
+        setIdleEnabled(data.idleLockEnabled);
+        setIdleMinutes(data.idleLockMinutes);
+      })
+      .catch(() => {
+        // Preferences are optional; the security card still works.
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const saveIdleLock = async (enabled: boolean, minutes: number) => {
+    setIdleSaving(true);
+    try {
+      const updated = await api.updatePreferences({
+        idleLockEnabled: enabled,
+        idleLockMinutes: minutes,
+      });
+      setIdleEnabled(updated.idleLockEnabled);
+      setIdleMinutes(updated.idleLockMinutes);
+      window.dispatchEvent(new Event("resumetrail:preferences-changed"));
+      message.success(t("settings.idleSaved"));
+    } catch (error) {
+      message.error(apiErrorMessage(error, t));
+    } finally {
+      setIdleSaving(false);
+    }
+  };
 
   const submit = async (values: SecurityFormValues) => {
     if (!mode) return;
@@ -116,6 +158,43 @@ export function SecuritySettings({
               </Button>
             )}
           </div>
+        </div>
+
+        <div className={`idle-lock-block${idleEnabled ? " is-on" : ""}`}>
+          <div className="idle-lock-head">
+            <span className="security-shield idle-lock-icon">
+              <ClockCircleOutlined />
+            </span>
+            <div className="idle-lock-copy">
+              <strong>{t("settings.idleLock")}</strong>
+              <span>{t("settings.idleLockHint")}</span>
+            </div>
+            <Switch
+              checked={idleEnabled}
+              disabled={!passwordEnabled || idleSaving}
+              onChange={(checked) => void saveIdleLock(checked, idleMinutes)}
+            />
+          </div>
+          <div className="idle-lock-controls">
+            <span>{t("settings.idleMinutes")}</span>
+            <InputNumber
+              min={1}
+              max={240}
+              value={idleMinutes}
+              disabled={!passwordEnabled || idleSaving}
+              onChange={(value) => {
+                if (typeof value === "number") setIdleMinutes(value);
+              }}
+            />
+            <Button
+              size="small"
+              disabled={!passwordEnabled || idleSaving}
+              onClick={() => void saveIdleLock(idleEnabled, idleMinutes)}
+            >
+              {t("action.save")}
+            </Button>
+          </div>
+          <p className="settings-field-hint">{t("settings.idleRange")}</p>
         </div>
       </SettingsCard>
 

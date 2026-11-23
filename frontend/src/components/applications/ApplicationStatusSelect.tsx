@@ -21,17 +21,27 @@ export function ApplicationStatusSelect({
   const { t } = useI18n();
 
   return (
-    <Select
-      value={application.status}
-      className={`status-select ${mobile ? "mobile-status-select" : ""}`}
-      variant="borderless"
-      aria-label={t("table.status")}
-      options={options}
-      loading={saving}
-      popupMatchSelectWidth={190}
-      labelRender={({ value }) => <StatusBadge status={value as Status} />}
-      optionRender={(option) => <StatusBadge status={option.value as Status} />}
-      onChange={(value) => onChange(application, value as Status)}
-    />
+    <div className="status-cell">
+      <Select
+        value={application.status}
+        className={`status-select ${mobile ? "mobile-status-select" : ""}`}
+        variant="borderless"
+        aria-label={t("table.status")}
+        options={options}
+        loading={saving}
+        popupMatchSelectWidth={190}
+        labelRender={({ value }) => <StatusBadge status={value as Status} />}
+        optionRender={(option) => <StatusBadge status={option.value as Status} />}
+        onChange={(value) => onChange(application, value as Status)}
+      />
+      {typeof application.statusDays === "number" && (
+        <span className="screening-age">
+          {t("table.statusAge", {
+            status: t(`status.${application.status}`),
+            count: application.statusDays,
+          })}
+        </span>
+      )}
+    </div>
   );
 }

@@ -14,6 +14,7 @@ import type {
   Status,
 } from "../api/types";
 import { useCategoryOptions, useStatusOptions, StatusBadge } from "./badges";
+import { CompanyAutoComplete } from "./CompanyAutoComplete";
 import { useI18n } from "../i18n";
 import { apiErrorMessage } from "../utils/errors";
 
@@ -118,9 +119,9 @@ export function ApplicationModal({
             },
           ]}
         >
-          <Input
-            size="large"
+          <CompanyAutoComplete
             autoFocus
+            size="large"
             maxLength={255}
             prefix={<BankOutlined className="field-icon" />}
             placeholder={t("form.companyPlaceholder")}

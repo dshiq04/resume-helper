@@ -14,10 +14,10 @@ export const CATEGORIES: Category[] = [
   "social",
 ];
 export const STATUSES: Status[] = [
+  "pending",
   "screening",
   "written",
   "interview",
-  "pending",
   "offer",
   "rejected",
 ];
@@ -39,6 +39,8 @@ export interface Application {
   appliedAt: string;
   createdAt: string;
   updatedAt: string;
+  screeningDays?: number;
+  statusDays?: number;
 }
 
 export interface ApplicationList {
@@ -75,6 +77,111 @@ export interface Stats {
   byCategory: Record<Category, number>;
   byStatus: Record<Status, number>;
   byCategoryStatus: Record<Category, Record<Status, number>>;
+  stuckScreening?: {
+    count: number;
+    averageDays: number;
+    maxDays: number;
+  };
+}
+
+export interface ApplicationChange {
+  id: number;
+  applicationId: number;
+  status: Status;
+  changedAt: string;
+  createdAt: string;
+  daysSincePrevious?: number;
+  daysInStatus?: number;
+}
+
+export interface ApplicationHistory {
+  items: ApplicationChange[];
+  missingStatuses: Status[];
+  screeningDays: number;
+  appliedAt: string;
+}
+
+export interface DeletedApplication {
+  id: number;
+  originalId: number;
+  category: Category;
+  companyName: string;
+  link: string;
+  status: Status;
+  pinned: boolean;
+  appliedAt: string;
+  createdAt: string;
+  updatedAt: string;
+  history: ApplicationChange[];
+  deletedAt: string;
+}
+
+export interface TrashList {
+  items: DeletedApplication[];
+  total: number;
+}
+
+export interface CompanySuggestions {
+  items: string[];
+}
+
+export interface Preferences {
+  closeAction: "ask" | "tray" | "quit";
+  idleLockEnabled: boolean;
+  idleLockMinutes: number;
+  shortcutPromptEnabled: boolean;
+}
+
+export interface FunnelStage {
+  key: "applied" | Status;
+  count: number;
+  conversion: number;
+}
+
+export interface CompanyFunnel {
+  company: string;
+  total: number;
+  interviews: number;
+  offers: number;
+  interviewRate: number;
+  interviewToOfferRate: number;
+  offerRate: number;
+}
+
+export interface FunnelStats {
+  total: number;
+  stages: FunnelStage[];
+  averageDaysToInterview: number;
+  averageInterviewToOffer: number;
+  companies: CompanyFunnel[];
+  interviewCount: number;
+  offerCount: number;
+}
+
+export interface BackupCounts {
+  applications: number;
+  resumes: number;
+  settings: number;
+  changes: number;
+  trash: number;
+  files: number;
+  bytes: number;
+}
+
+export interface BackupResult {
+  path: string;
+  exportedAt: string;
+  version: string;
+  appVersion: string;
+  importBlocked: boolean;
+  counts: BackupCounts;
+  warnings: string[];
+}
+
+export interface DeleteResult {
+  deleted: number;
+  trashId?: number;
+  trashIds?: number[];
 }
 
 export interface DailyStat {
@@ -99,6 +206,13 @@ export interface AuthSession {
 }
 
 export type DatabaseDriver = "sqlite" | "mysql" | "postgres";
+
+export interface AppInfoInput {
+  version: string;
+  name: string;
+  title: string;
+  defaultLanguage: string;
+}
 
 export interface SystemInfo {
   version: string;
@@ -145,6 +259,13 @@ export interface DatabaseTestResult {
   message: string;
 }
 
+export interface PlatformInfo {
+  kind: "computer" | "tablet" | "phone" | string;
+  os: string;
+  name: string;
+  version: string;
+}
+
 export interface DeviceInfo {
   deviceId: string;
   algorithm: string;
@@ -169,6 +290,8 @@ export interface ListParams {
   search?: string;
   category?: Category | "all";
   status?: Status | "all";
+  from?: string;
+  to?: string;
   page?: number;
   pageSize?: number;
 }

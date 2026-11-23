@@ -5,7 +5,8 @@ import {
   type Dispatch,
   type SetStateAction,
 } from "react";
-import { App as AntdApp } from "antd";
+import { App as AntdApp, Button } from "antd";
+import type { Dayjs } from "dayjs";
 import { Events } from "@wailsio/runtime";
 import { api, ApiError } from "../api/client";
 import type {
@@ -34,6 +35,8 @@ export interface ApplicationsBoard {
   setSearchInput: (value: string) => void;
   statusFilter: Status | "all";
   setStatusFilter: (value: Status | "all") => void;
+  dateRange: [Dayjs, Dayjs] | null;
+  setDateRange: (value: [Dayjs, Dayjs] | null) => void;
   selectedKeys: number[];
   setSelectedKeys: Dispatch<SetStateAction<number[]>>;
   toggleSelection: (id: number, checked: boolean) => void;
@@ -68,6 +71,7 @@ export function useApplications({
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<Status | "all">("all");
+  const [dateRange, setDateRange] = useState<[Dayjs, Dayjs] | null>(null);
   const [selectedKeys, setSelectedKeys] = useState<number[]>([]);
   const [loading, setLoading] = useState(true);
   const [reloadToken, setReloadToken] = useState(0);
@@ -103,7 +107,7 @@ export function useApplications({
   useEffect(() => {
     setPage(1);
     setSelectedKeys([]);
-  }, [category, statusFilter]);
+  }, [category, statusFilter, dateRange]);
 
   useEffect(() => {
     setSelectedKeys([]);
@@ -116,6 +120,8 @@ export function useApplications({
         category,
         status: statusFilter,
         search,
+        from: dateRange?.[0].startOf("day").toISOString(),
+        to: dateRange?.[1].endOf("day").toISOString(),
         page,
         pageSize,
       });
@@ -131,7 +137,7 @@ export function useApplications({
     } finally {
       setLoading(false);
     }
-  }, [category, message, page, pageSize, search, statusFilter, t]);
+  }, [category, dateRange, message, page, pageSize, search, statusFilter, t]);
 
   useEffect(() => {
     void load();
@@ -195,11 +201,53 @@ export function useApplications({
     [message, refresh, t, updateField],
   );
 
+  const undoDelete = useCallback(
+    async (trashIds: number[]) => {
+      if (trashIds.length === 0) return;
+      try {
+        await Promise.all(trashIds.map((id) => api.restoreTrash(id)));
+        message.success(t("trash.undoSuccess"));
+        onDataChanged();
+        refresh();
+      } catch (error) {
+        message.error(apiErrorMessage(error, t));
+      }
+    },
+    [message, onDataChanged, refresh, t],
+  );
+
+  const showDeletedToast = useCallback(
+    (count: number, trashIds: number[]) => {
+      const text =
+        count === 1
+          ? t("toast.deleted")
+          : t("toast.batchDeleted", { count });
+      message.success({
+        duration: 6,
+        content: (
+          <span className="undo-toast">
+            {text}
+            {trashIds.length > 0 && (
+              <Button
+                type="link"
+                size="small"
+                onClick={() => void undoDelete(trashIds)}
+              >
+                {t("trash.undo")}
+              </Button>
+            )}
+          </span>
+        ),
+      });
+    },
+    [message, t, undoDelete],
+  );
+
   const deleteRecord = useCallback(
     async (record: Application) => {
       try {
-        await api.deleteApplication(record.id);
-        message.success(t("toast.deleted"));
+        const result = await api.deleteApplication(record.id);
+        showDeletedToast(1, result.trashId ? [result.trashId] : []);
         setSelectedKeys((keys) => keys.filter((key) => key !== record.id));
         onDataChanged();
         if (items.length === 1 && page > 1) {
@@ -211,14 +259,14 @@ export function useApplications({
         message.error(apiErrorMessage(error, t));
       }
     },
-    [items.length, message, onDataChanged, page, refresh, t],
+    [items.length, message, onDataChanged, page, refresh, showDeletedToast, t],
   );
 
   const deleteSelected = useCallback(async () => {
     if (selectedKeys.length === 0) return;
     try {
       const result = await api.batchDelete(selectedKeys);
-      message.success(t("toast.batchDeleted", { count: result.deleted }));
+      showDeletedToast(result.deleted, result.trashIds ?? []);
       const deletingAll = selectedKeys.length === items.length;
       setSelectedKeys([]);
       onDataChanged();
@@ -237,6 +285,7 @@ export function useApplications({
     page,
     refresh,
     selectedKeys,
+    showDeletedToast,
     t,
   ]);
 
@@ -304,6 +353,8 @@ export function useApplications({
     setSearchInput,
     statusFilter,
     setStatusFilter,
+    dateRange,
+    setDateRange,
     selectedKeys,
     setSelectedKeys,
     toggleSelection,
@@ -311,7 +362,7 @@ export function useApplications({
     loading,
     statusSavingId,
     pinSavingId,
-    hasFilters: Boolean(search) || statusFilter !== "all",
+    hasFilters: Boolean(search) || statusFilter !== "all" || dateRange !== null,
     refresh,
     updateField,
     updateStatus,

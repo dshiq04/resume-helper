@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { LeftOutlined, RightOutlined } from "@ant-design/icons";
-import { Outlet } from "react-router-dom";
+import { Outlet, useLocation } from "react-router-dom";
 import type { Stats } from "../api/types";
 import { Sidebar } from "../components/Sidebar";
 import { useMediaQuery } from "../hooks/useMediaQuery";
@@ -21,6 +21,8 @@ const SIDEBAR_COLLAPSED_KEY = "resumetrail.sidebarCollapsed";
 
 export function WorkspaceLayout(props: WorkspaceOutletContext) {
   const { t } = useI18n();
+  const location = useLocation();
+  const pageRef = useRef<HTMLDivElement>(null);
   const isMobile = useMediaQuery("(max-width: 767px)");
   const isTablet = useMediaQuery("(min-width: 768px) and (max-width: 1199px)");
   const [collapsed, setCollapsed] = useState(
@@ -30,6 +32,16 @@ export function WorkspaceLayout(props: WorkspaceOutletContext) {
   useEffect(() => {
     localStorage.setItem(SIDEBAR_COLLAPSED_KEY, collapsed ? "1" : "0");
   }, [collapsed]);
+
+  // Restart the enter animation on every route change without remounting the
+  // page, so in-page state (filters, scroll position) survives navigation.
+  useLayoutEffect(() => {
+    const node = pageRef.current;
+    if (!node) return;
+    node.classList.remove("is-page-entering");
+    void node.offsetWidth;
+    node.classList.add("is-page-entering");
+  }, [location.pathname]);
 
   // Tablets already use the compact rail, so only desktop windows need to
   // honour the persisted toggle.
@@ -56,7 +68,9 @@ export function WorkspaceLayout(props: WorkspaceOutletContext) {
         </button>
       )}
       <main className="main-content">
-        <Outlet context={props} />
+        <div className="page-view" ref={pageRef}>
+          <Outlet context={props} />
+        </div>
       </main>
     </div>
   );

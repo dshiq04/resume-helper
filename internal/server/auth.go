@@ -8,20 +8,17 @@ import (
 	"strings"
 	"sync"
 	"time"
-	"unicode/utf8"
 
 	"resume-helper/internal/models"
+	"resume-helper/internal/security"
 
 	"github.com/gin-gonic/gin"
-	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
 
 const (
 	passwordSettingKey = "auth.password_hash"
 	sessionTTL         = 24 * time.Hour
-	minPasswordRunes   = 4
-	maxPasswordRunes   = 64
 )
 
 type authManager struct {
@@ -71,13 +68,13 @@ func (a *authManager) enabled() (bool, error) {
 }
 
 func (a *authManager) savePassword(password string) error {
-	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	hash, err := security.HashPassword(password)
 	if err != nil {
 		return err
 	}
 	return a.database().Save(&models.Setting{
 		Key:   passwordSettingKey,
-		Value: string(hash),
+		Value: hash,
 	}).Error
 }
 
@@ -93,13 +90,7 @@ func (a *authManager) verifyPassword(password string) (bool, error) {
 	if hash == "" {
 		return false, nil
 	}
-	if err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password)); err != nil {
-		if errors.Is(err, bcrypt.ErrMismatchedHashAndPassword) {
-			return false, nil
-		}
-		return false, err
-	}
-	return true, nil
+	return security.VerifyPassword(hash, password), nil
 }
 
 func (a *authManager) createSession() (string, time.Time, error) {
@@ -246,7 +237,7 @@ func (s *Server) authSetup(c *gin.Context) {
 		apiError(c, http.StatusBadRequest, "invalid_body", "Invalid request body.")
 		return
 	}
-	if code, message := validatePassword(input.Password); code != "" {
+	if code, message := security.ValidatePassword(input.Password); code != "" {
 		apiError(c, http.StatusBadRequest, code, message)
 		return
 	}
@@ -303,7 +294,7 @@ func (s *Server) authChangePassword(c *gin.Context) {
 		apiError(c, http.StatusUnauthorized, "invalid_password", "Current password is incorrect.")
 		return
 	}
-	if code, message := validatePassword(input.NewPassword); code != "" {
+	if code, message := security.ValidatePassword(input.NewPassword); code != "" {
 		apiError(c, http.StatusBadRequest, code, message)
 		return
 	}
@@ -358,20 +349,6 @@ func (s *Server) authDisable(c *gin.Context) {
 	}
 	s.auth.invalidateAllSessions()
 	c.JSON(http.StatusOK, gin.H{"enabled": false})
-}
-
-func validatePassword(password string) (string, string) {
-	if password == "" {
-		return "password_required", "Password is required."
-	}
-	runes := utf8.RuneCountInString(password)
-	if runes < minPasswordRunes {
-		return "password_too_short", "Password must be at least 4 characters."
-	}
-	if runes > maxPasswordRunes || len(password) > 72 {
-		return "password_too_long", "Password is too long."
-	}
-	return "", ""
 }
 
 func bearerToken(c *gin.Context) string {

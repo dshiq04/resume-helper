@@ -2,6 +2,7 @@ import {
   AppstoreOutlined,
   BarChartOutlined,
   CloudOutlined,
+  DeleteOutlined,
   FileTextOutlined,
   IdcardOutlined,
   RocketOutlined,
@@ -61,6 +62,8 @@ export function Sidebar({ stats, passwordEnabled, collapsed }: SidebarProps) {
 
   const total = stats?.total ?? 0;
   const offers = stats?.byStatus.offer ?? 0;
+  const active =
+    (stats?.byStatus.screening ?? 0) + (stats?.byStatus.written ?? 0);
   const rate = total > 0 ? Math.round((offers / total) * 100) : 0;
 
   return (
@@ -129,6 +132,18 @@ export function Sidebar({ stats, passwordEnabled, collapsed }: SidebarProps) {
           </span>
           <span className="sidebar-nav-label">{t("nav.statistics")}</span>
         </NavLink>
+        <NavLink
+          to="/trash"
+          className={({ isActive }) =>
+            `sidebar-nav-item ${isActive ? "is-active" : ""}`
+          }
+          title={t("nav.trash")}
+        >
+          <span className="sidebar-nav-icon" style={{ color: "#fb7185" }}>
+            <DeleteOutlined />
+          </span>
+          <span className="sidebar-nav-label">{t("nav.trash")}</span>
+        </NavLink>
       </nav>
 
       <div className="sidebar-spacer" />
@@ -142,7 +157,7 @@ export function Sidebar({ stats, passwordEnabled, collapsed }: SidebarProps) {
           <span style={{ width: `${Math.max(rate, total > 0 && offers > 0 ? 3 : 0)}%` }} />
         </div>
         <p>
-          {offers} / {total} {t("stats.offer")}
+          {active} {t("stats.active")}
         </p>
       </div>
 

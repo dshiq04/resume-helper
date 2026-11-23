@@ -7,6 +7,7 @@ import {
 import type { Status } from "../../api/types";
 import type { ApplicationDraft } from "../../hooks/useApplicationDraft";
 import { useI18n } from "../../i18n";
+import { CompanyAutoComplete } from "../CompanyAutoComplete";
 import { CategoryBadge, StatusBadge, useCategoryOptions, useStatusOptions } from "../badges";
 
 interface DraftFieldProps {
@@ -37,7 +38,7 @@ export function DraftCompanyCell({
         <PlusOutlined />
       </span>
       <div className="company-copy">
-        <Input
+        <CompanyAutoComplete
           autoFocus
           size="small"
           className="inline-edit-input draft-input"
@@ -45,7 +46,7 @@ export function DraftCompanyCell({
           maxLength={255}
           disabled={saving}
           placeholder={t("form.companyPlaceholder")}
-          onChange={(event) => onChange({ companyName: event.target.value })}
+          onChange={(companyName) => onChange({ companyName })}
           onPressEnter={() => void onSave()}
           onKeyDown={(event) => {
             if (event.key === "Escape") onCancel();
@@ -181,13 +182,13 @@ export function DraftCard({
       <div className="draft-card-fields">
         <label>
           <span>{t("form.company")}</span>
-          <Input
+          <CompanyAutoComplete
             autoFocus
             value={draft.companyName}
             maxLength={255}
             disabled={saving}
             placeholder={t("form.companyPlaceholder")}
-            onChange={(event) => onChange({ companyName: event.target.value })}
+            onChange={(companyName) => onChange({ companyName })}
             onPressEnter={() => void onSave()}
             onKeyDown={(event) => {
               if (event.key === "Escape") onCancel();

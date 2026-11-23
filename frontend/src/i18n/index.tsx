@@ -12,6 +12,11 @@ import jaJP from "antd/locale/ja_JP";
 import koKR from "antd/locale/ko_KR";
 import zhCN from "antd/locale/zh_CN";
 import zhTW from "antd/locale/zh_TW";
+import dayjs from "dayjs";
+import "dayjs/locale/ja";
+import "dayjs/locale/ko";
+import "dayjs/locale/zh-cn";
+import "dayjs/locale/zh-tw";
 
 const en = {
   "app.brand": "ResumeTrail",
@@ -59,6 +64,8 @@ const en = {
   "search.placeholder": "Search company or link...",
   "filter.status": "Status",
   "filter.allStatuses": "All statuses",
+  "filter.dateFrom": "Start date",
+  "filter.dateTo": "End date",
   "action.add": "Add application",
   "action.quickAdd": "Quick entry",
   "action.import": "Import Excel",
@@ -110,7 +117,6 @@ const en = {
   "table.noLink": "No link",
   "table.searchEmptyTitle": "No matching applications",
   "table.searchEmptyDescription": "Try another keyword or clear the filters.",
-  "table.editHint": "Click a value to edit",
   "table.totalItems": "{{count}} total",
   "delete.title": "Delete this application?",
   "delete.content": "This will permanently remove {{company}} from your board.",
@@ -189,6 +195,11 @@ const en = {
   "settings.deviceId": "Device ID",
   "settings.deviceEncryption":
     "Resume files are encrypted at rest with {{algorithm}} using a key derived from this device ID.",
+  "settings.platform": "Current platform",
+  "settings.platform.computer": "Computer",
+  "settings.platform.tablet": "Tablet",
+  "settings.platform.phone": "Phone",
+  "settings.operatingSystem": "System",
   "settings.shortcut": "Desktop shortcut",
   "settings.shortcutHint":
     "Create a shortcut so ResumeTrail can be opened directly from the desktop.",
@@ -328,6 +339,142 @@ const en = {
   "resumes.previewError": "This resume could not be opened.",
   "resumes.previewUnauthorized": "Your session has expired. Go back to the main window and unlock again.",
   "resumes.openFailed": "Unable to open the preview window.",
+  "action.undo": "Undo",
+  "action.confirm": "Confirm",
+  "common.days": "{{count}} days",
+  "table.screeningAge": "{{count}}d in screening",
+  "table.statusAge": "{{status}} · {{count}}d",
+  "history.title": "Status timeline",
+  "history.hint": "Every stage change is recorded. Gaps show how long each stage took.",
+  "history.empty": "No status history yet.",
+  "history.add": "Add milestone",
+  "history.date": "Changed on",
+  "history.status": "Status",
+  "history.saved": "Status history updated.",
+  "history.missingTitle": "Complete the history",
+  "history.missingHint": "This record was created before history tracking. Add the dates of its stages so the timeline and interval statistics are accurate.",
+  "history.missingButton": "Fill in dates",
+  "history.missingRequired": "Choose a date for every stage.",
+  "history.supplementTitle": "Fill in status dates",
+  "history.interval": "{{count}} days since previous",
+  "history.screeningAge": "{{count}} days in screening",
+  "history.current": "Current stage",
+  "history.viewTitle": "Application details",
+  "history.viewHint": "Company, application time, link and how long each stage lasted.",
+  "history.daysInStatus": "{{count}} days in this stage",
+  "nav.trash": "Recycle bin",
+  "trash.title": "Recycle bin",
+  "trash.subtitle": "Deleted applications are kept here and can be restored.",
+  "trash.emptyTitle": "The recycle bin is empty",
+  "trash.emptyDescription": "Deleted applications will appear here.",
+  "trash.deletedAt": "Deleted at",
+  "trash.restore": "Restore",
+  "trash.restoreSuccess": "Application restored.",
+  "trash.deleteTitle": "Delete permanently?",
+  "trash.deleteContent": "“{{company}}” will be removed forever.",
+  "trash.deleteSuccess": "Recycle bin item deleted.",
+  "trash.empty": "Empty recycle bin",
+  "trash.emptyTitleConfirm": "Empty the recycle bin?",
+  "trash.emptyContent": "All deleted applications will be removed forever.",
+  "trash.emptySuccess": "Recycle bin emptied.",
+  "trash.count": "{{count}} deleted",
+  "trash.undo": "Undo",
+  "trash.undoSuccess": "Deletion undone.",
+  "trash.undoFailed": "Could not undo the deletion.",
+  "close.title": "Close ResumeTrail",
+  "close.message": "What should happen when the main window closes?",
+  "close.tray": "Keep in system tray",
+  "close.trayHint": "ResumeTrail keeps running in the tray for quick entry.",
+  "close.quit": "Quit application",
+  "close.quitHint": "Stop ResumeTrail completely.",
+  "close.remember": "Remember my choice",
+  "close.rememberHint": "You can change this in Settings → Desktop & tray.",
+  "settings.desktop": "Desktop & tray",
+  "settings.closeAction": "When closing the main window",
+  "settings.closeActionHint": "The app stays in the system tray so quick entry is always one click away.",
+  "settings.closeAsk": "Ask every time",
+  "settings.closeAskHint": "Show a small prompt with both options.",
+  "settings.closeTray": "Minimise to tray",
+  "settings.closeTrayHint": "Hide the window and keep running in the tray.",
+  "settings.closeQuit": "Quit directly",
+  "settings.closeQuitHint": "Close the window and stop the application.",
+  "settings.trayNote": "The system tray is always on. Click the tray icon to reopen the main window.",
+  "settings.idleLock": "Auto-lock when idle",
+  "settings.idleLockHint": "Lock the app after a period without mouse or keyboard activity.",
+  "settings.idleMinutes": "Idle minutes",
+  "settings.idleRange": "Choose between 1 and 240 minutes.",
+  "settings.idleSaved": "Auto-lock setting saved.",
+  "settings.preferencesSaved": "Preference saved.",
+  "settings.dataTransfer": "Data import & export",
+  "settings.dataTransferHint": "Move your applications, resumes and settings to another device or a new version.",
+  "settings.exportData": "Export data",
+  "settings.importData": "Import data",
+  "settings.openTransferWindow": "Open transfer window",
+  "transfer.title": "Import & export",
+  "transfer.subtitle": "A single ZIP contains applications, decrypted resume files and database settings.",
+  "transfer.exportTitle": "Export data",
+  "transfer.importTitle": "Import data",
+  "transfer.exportDescription": "Export the current applications, decrypted resumes and settings into one ZIP file. The device code is never included.",
+  "transfer.importDescription": "Choose a ResumeTrail ZIP backup. The current database will be replaced and resumes will be re-encrypted with this device code.",
+  "transfer.chooseSave": "Choose location & export",
+  "transfer.chooseFile": "Choose backup file",
+  "transfer.inspecting": "Reading backup...",
+  "transfer.exporting": "Exporting...",
+  "transfer.importing": "Importing...",
+  "transfer.exportSuccess": "Export completed.",
+  "transfer.importSuccess": "Import completed.",
+  "transfer.failed": "Operation failed.",
+  "transfer.cancelled": "Cancelled.",
+  "transfer.contains": "This backup contains",
+  "transfer.applications": "Applications",
+  "transfer.resumes": "Resumes",
+  "transfer.settings": "Settings",
+  "transfer.changes": "Status history",
+  "transfer.trash": "Recycle bin",
+  "transfer.files": "Resume files",
+  "transfer.size": "Total file size",
+  "transfer.path": "File",
+  "transfer.exportedAt": "Exported at",
+  "transfer.appVersion": "App version",
+  "transfer.devBetaWarning": "This client is a dev or beta build. Dev and beta versions are for development and testing only; only exporting is recommended, and importing may not work correctly.",
+  "transfer.devBetaBackupBlocked": "This backup was exported by a different dev or beta version. Dev and beta versions support export only, so this backup cannot be imported. Backups from the exact same version can still be imported.",
+  "transfer.overwriteTitle": "Import this backup?",
+  "transfer.overwriteMessage": "The current applications, resumes and settings will be replaced. This cannot be undone.",
+  "transfer.confirmImport": "Confirm import",
+  "transfer.warnings": "Warnings",
+  "transfer.deviceNote": "The device code is excluded. Resume files in the ZIP are decrypted and are re-encrypted with the current device code on import.",
+  "transfer.passwordNote": "The backup includes the password hash from the source database. Your current password will be replaced.",
+  "transfer.desktopOnly": "Import and export are available in the desktop app.",
+  "transfer.close": "Close",
+  "transfer.unknownError": "Unknown error",
+  "stats.range": "Date range",
+  "stats.rangeAll": "All time",
+  "stats.thisMonth": "This month",
+  "stats.thisQuarter": "This quarter",
+  "stats.thisYear": "This year",
+  "stats.exportImage": "Export image",
+  "stats.exportingImage": "Exporting image...",
+  "stats.exportedImage": "Image exported.",
+  "stats.exportFailed": "Could not export the image.",
+  "stats.stuckScreening": "Stuck in screening",
+  "stats.stuckScreeningHint": "Applications currently at the screening stage",
+  "stats.stuckAverage": "Average",
+  "stats.stuckMax": "Longest",
+  "stats.daysUnit": "days",
+  "stats.funnel": "Stage funnel",
+  "stats.funnelHint": "How many applications reached each stage",
+  "stats.avgToInterview": "Application → interview",
+  "stats.avgInterviewToOffer": "Interview → offer",
+  "stats.companyComparison": "Interview → offer by company",
+  "stats.companyHint": "Offer conversion after reaching the interview stage",
+  "stats.interviewToOfferRate": "Interview → offer rate",
+  "stats.offerRateShort": "Offer rate",
+  "stats.interviewRate": "Interview rate",
+  "stats.totalApplications": "Applications",
+  "stats.noData": "No data for this range.",
+  "stats.rangeHint": "Filter every chart by application date",
+  "stats.filteredTotal": "{{count}} applications in range",
+  "funnel.applied": "Applied",
 } as const;
 
 export type MessageKey = keyof typeof en;
@@ -378,6 +525,8 @@ const zhCNMessages: Record<MessageKey, string> = {
   "search.placeholder": "搜索企业名称或链接...",
   "filter.status": "状态",
   "filter.allStatuses": "全部状态",
+  "filter.dateFrom": "开始日期",
+  "filter.dateTo": "结束日期",
   "action.add": "新增投递",
   "action.quickAdd": "快速录入",
   "action.import": "导入 Excel",
@@ -428,7 +577,6 @@ const zhCNMessages: Record<MessageKey, string> = {
   "table.noLink": "暂无链接",
   "table.searchEmptyTitle": "没有匹配的投递",
   "table.searchEmptyDescription": "换个关键词，或清空筛选条件试试。",
-  "table.editHint": "点击内容即可修改",
   "table.totalItems": "共 {{count}} 条",
   "delete.title": "删除这条投递？",
   "delete.content": "将从投递看板中永久移除「{{company}}」。",
@@ -504,6 +652,11 @@ const zhCNMessages: Record<MessageKey, string> = {
   "settings.deviceId": "设备标识码",
   "settings.deviceEncryption":
     "简历文件使用由该设备标识码派生的密钥，通过 {{algorithm}} 加密后保存。",
+  "settings.platform": "当前平台",
+  "settings.platform.computer": "电脑",
+  "settings.platform.tablet": "平板",
+  "settings.platform.phone": "手机",
+  "settings.operatingSystem": "系统",
   "settings.shortcut": "桌面快捷方式",
   "settings.shortcutHint": "创建后可以直接从桌面打开履途。",
   "settings.shortcutExists": "桌面快捷方式已存在",
@@ -633,9 +786,145 @@ const zhCNMessages: Record<MessageKey, string> = {
   "resumes.previewError": "无法打开这份简历。",
   "resumes.previewUnauthorized": "登录已过期，请回到主窗口重新解锁。",
   "resumes.openFailed": "无法打开预览窗口。",
+  "action.undo": "撤销",
+  "action.confirm": "确认",
+  "common.days": "{{count}} 天",
+  "table.screeningAge": "初筛 {{count}} 天",
+  "table.statusAge": "{{status}} {{count}} 天",
+  "history.title": "状态时间线",
+  "history.hint": "每次阶段变更都会留痕，间隔展示每个阶段停留了多久。",
+  "history.empty": "还没有状态变更记录。",
+  "history.add": "补充记录",
+  "history.date": "变更日期",
+  "history.status": "状态",
+  "history.saved": "状态记录已更新。",
+  "history.missingTitle": "补全状态历史",
+  "history.missingHint": "这条记录创建于历史功能上线之前。补充各阶段日期后，时间线与间隔统计会更准确。",
+  "history.missingButton": "补全日期",
+  "history.missingRequired": "请为每个阶段选择日期。",
+  "history.supplementTitle": "补全状态日期",
+  "history.interval": "距上一阶段 {{count}} 天",
+  "history.screeningAge": "已在初筛停留 {{count}} 天",
+  "history.current": "当前阶段",
+  "history.viewTitle": "投递详情",
+  "history.viewHint": "按顺序展示企业名称、投递时间、链接以及每个阶段停留的天数。",
+  "history.daysInStatus": "该状态停留 {{count}} 天",
+  "nav.trash": "回收站",
+  "trash.title": "回收站",
+  "trash.subtitle": "删除的投递会保留在这里，可以随时恢复。",
+  "trash.emptyTitle": "回收站是空的",
+  "trash.emptyDescription": "删除的投递会出现在这里。",
+  "trash.deletedAt": "删除时间",
+  "trash.restore": "恢复",
+  "trash.restoreSuccess": "投递已恢复。",
+  "trash.deleteTitle": "永久删除？",
+  "trash.deleteContent": "“{{company}}”将被永久删除，无法恢复。",
+  "trash.deleteSuccess": "回收站记录已删除。",
+  "trash.empty": "清空回收站",
+  "trash.emptyTitleConfirm": "清空回收站？",
+  "trash.emptyContent": "所有已删除的投递都会被永久删除。",
+  "trash.emptySuccess": "回收站已清空。",
+  "trash.count": "{{count}} 条已删除",
+  "trash.undo": "撤销",
+  "trash.undoSuccess": "已撤销删除。",
+  "trash.undoFailed": "撤销删除失败。",
+  "close.title": "关闭履途",
+  "close.message": "关闭主窗口时要怎么做？",
+  "close.tray": "保留在系统托盘",
+  "close.trayHint": "履途会继续在托盘中运行，随时快速录入。",
+  "close.quit": "退出应用",
+  "close.quitHint": "完全停止履途。",
+  "close.remember": "记住以上选择",
+  "close.rememberHint": "之后可以在“设置 → 桌面与托盘”中修改。",
+  "settings.desktop": "桌面与托盘",
+  "settings.closeAction": "关闭主窗口时",
+  "settings.closeActionHint": "应用会常驻系统托盘，快速录入始终一键可达。",
+  "settings.closeAsk": "每次询问",
+  "settings.closeAskHint": "弹出一个包含两个选项的小提示。",
+  "settings.closeTray": "最小化到托盘",
+  "settings.closeTrayHint": "隐藏窗口，继续在托盘运行。",
+  "settings.closeQuit": "直接退出",
+  "settings.closeQuitHint": "关闭窗口并停止应用。",
+  "settings.trayNote": "系统托盘常驻已开启。点击托盘图标即可重新打开主窗口。",
+  "settings.idleLock": "闲置自动锁屏",
+  "settings.idleLockHint": "一段时间没有鼠标或键盘操作后自动锁定应用。",
+  "settings.idleMinutes": "闲置分钟数",
+  "settings.idleRange": "请选择 1 到 240 分钟。",
+  "settings.idleSaved": "自动锁屏设置已保存。",
+  "settings.preferencesSaved": "设置已保存。",
+  "settings.dataTransfer": "数据导入与导出",
+  "settings.dataTransferHint": "把投递、简历和设置迁移到另一台设备或新版本。",
+  "settings.exportData": "导出数据",
+  "settings.importData": "导入数据",
+  "settings.openTransferWindow": "打开迁移窗口",
+  "transfer.title": "导入与导出",
+  "transfer.subtitle": "一个 ZIP 包内含投递记录、解密后的简历文件和数据库设置。",
+  "transfer.exportTitle": "导出数据",
+  "transfer.importTitle": "导入数据",
+  "transfer.exportDescription": "把当前投递、解密后的简历和设置导出为一个 ZIP 文件。设备码不会被导出。",
+  "transfer.importDescription": "选择履途 ZIP 备份。当前数据库会被替换，简历会使用本机设备码重新加密。",
+  "transfer.chooseSave": "选择位置并导出",
+  "transfer.chooseFile": "选择备份文件",
+  "transfer.inspecting": "正在读取备份...",
+  "transfer.exporting": "正在导出...",
+  "transfer.importing": "正在导入...",
+  "transfer.exportSuccess": "导出完成。",
+  "transfer.importSuccess": "导入完成。",
+  "transfer.failed": "操作失败。",
+  "transfer.cancelled": "已取消。",
+  "transfer.contains": "此备份包含",
+  "transfer.applications": "投递记录",
+  "transfer.resumes": "简历",
+  "transfer.settings": "设置",
+  "transfer.changes": "状态记录",
+  "transfer.trash": "回收站",
+  "transfer.files": "简历文件",
+  "transfer.size": "文件总大小",
+  "transfer.path": "文件",
+  "transfer.exportedAt": "导出时间",
+  "transfer.appVersion": "应用版本",
+  "transfer.devBetaWarning": "当前客户端为 dev / beta 版本。dev、beta 版本仅供开发、测试使用，建议仅使用导出功能，导入可能无法正常工作。",
+  "transfer.devBetaBackupBlocked": "该备份由其他版本的 dev / beta 版本导出。dev、beta 版本仅支持导出，无法导入此备份；相同版本导出的备份仍可正常导入。",
+  "transfer.overwriteTitle": "导入此备份？",
+  "transfer.overwriteMessage": "当前投递、简历和设置会被替换，此操作无法撤销。",
+  "transfer.confirmImport": "确认导入",
+  "transfer.warnings": "提示",
+  "transfer.deviceNote": "设备码不会被导出。ZIP 中的简历是解密后的原文件，导入时会使用当前设备码重新加密。",
+  "transfer.passwordNote": "备份包含来源数据库中的密码哈希，导入后会替换当前密码。",
+  "transfer.desktopOnly": "导入和导出仅支持桌面应用。",
+  "transfer.close": "关闭",
+  "transfer.unknownError": "未知错误",
+  "stats.range": "时间范围",
+  "stats.rangeAll": "全部时间",
+  "stats.thisMonth": "本月",
+  "stats.thisQuarter": "本季",
+  "stats.thisYear": "本年",
+  "stats.exportImage": "导出图片",
+  "stats.exportingImage": "正在导出图片...",
+  "stats.exportedImage": "图片已导出。",
+  "stats.exportFailed": "导出图片失败。",
+  "stats.stuckScreening": "卡在初筛",
+  "stats.stuckScreeningHint": "当前仍处于初筛阶段的投递",
+  "stats.stuckAverage": "平均停留",
+  "stats.stuckMax": "最长停留",
+  "stats.daysUnit": "天",
+  "stats.funnel": "阶段转化漏斗",
+  "stats.funnelHint": "查看各阶段有多少投递到达",
+  "stats.avgToInterview": "投递 → 面试",
+  "stats.avgInterviewToOffer": "面试 → Offer",
+  "stats.companyComparison": "各企业面试 → Offer 率",
+  "stats.companyHint": "进入面试阶段后的 Offer 转化情况",
+  "stats.interviewToOfferRate": "面试 → Offer 率",
+  "stats.offerRateShort": "Offer 率",
+  "stats.interviewRate": "面试率",
+  "stats.totalApplications": "投递数量",
+  "stats.noData": "该时间范围内没有数据。",
+  "stats.rangeHint": "按投递日期筛选所有图表",
+  "stats.filteredTotal": "范围内共 {{count}} 条投递",
+  "funnel.applied": "已投递",
 };
 
-const zhTWMessages: Record<MessageKey, string> = {
+const zhTWMessages: Partial<Record<MessageKey, string>> = {
   ...zhCNMessages,
   "app.brand": "履途",
   "app.tagline": "履歷投遞管理",
@@ -729,7 +1018,6 @@ const zhTWMessages: Record<MessageKey, string> = {
   "table.noLink": "暫無連結",
   "table.searchEmptyTitle": "沒有符合的投遞",
   "table.searchEmptyDescription": "換個關鍵字，或清空篩選條件試試。",
-  "table.editHint": "點擊內容即可修改",
   "table.totalItems": "共 {{count}} 條",
   "delete.title": "刪除這條投遞？",
   "delete.content": "將從投遞看板中永久移除「{{company}}」。",
@@ -802,6 +1090,11 @@ const zhTWMessages: Record<MessageKey, string> = {
   "settings.deviceId": "裝置識別碼",
   "settings.deviceEncryption":
     "履歷檔案使用由該裝置識別碼衍生的金鑰，透過 {{algorithm}} 加密後儲存。",
+  "settings.platform": "目前平台",
+  "settings.platform.computer": "電腦",
+  "settings.platform.tablet": "平板",
+  "settings.platform.phone": "手機",
+  "settings.operatingSystem": "系統",
   "settings.shortcut": "桌面捷徑",
   "settings.shortcutHint": "建立後可以直接從桌面開啟履途。",
   "settings.shortcutExists": "桌面捷徑已存在",
@@ -933,7 +1226,7 @@ const zhTWMessages: Record<MessageKey, string> = {
   "resumes.openFailed": "無法開啟預覽視窗。",
 };
 
-const jaMessages: Record<MessageKey, string> = {
+const jaMessages: Partial<Record<MessageKey, string>> = {
   "app.brand": "ResumeTrail",
   "app.tagline": "応募管理",
   "nav.workspace": "ワークスペース",
@@ -1030,7 +1323,6 @@ const jaMessages: Record<MessageKey, string> = {
   "table.noLink": "リンクなし",
   "table.searchEmptyTitle": "一致する応募がありません",
   "table.searchEmptyDescription": "キーワードを変えるか、フィルターを解除してください。",
-  "table.editHint": "クリックして編集",
   "table.totalItems": "全 {{count}} 件",
   "delete.title": "この応募を削除しますか？",
   "delete.content": "「{{company}}」をボードから完全に削除します。",
@@ -1107,6 +1399,11 @@ const jaMessages: Record<MessageKey, string> = {
   "settings.deviceId": "デバイス識別子",
   "settings.deviceEncryption":
     "履歴書ファイルは、このデバイス識別子から派生したキーで {{algorithm}} により暗号化して保存されます。",
+  "settings.platform": "現在のプラットフォーム",
+  "settings.platform.computer": "パソコン",
+  "settings.platform.tablet": "タブレット",
+  "settings.platform.phone": "スマートフォン",
+  "settings.operatingSystem": "システム",
   "settings.shortcut": "デスクトップショートカット",
   "settings.shortcutHint":
     "ショートカットを作成すると、デスクトップから直接 ResumeTrail を開けます。",
@@ -1243,7 +1540,7 @@ const jaMessages: Record<MessageKey, string> = {
   "resumes.openFailed": "プレビューウィンドウを開けませんでした。",
 };
 
-const koMessages: Record<MessageKey, string> = {
+const koMessages: Partial<Record<MessageKey, string>> = {
   "app.brand": "ResumeTrail",
   "app.tagline": "지원 관리",
   "nav.workspace": "워크스페이스",
@@ -1340,7 +1637,6 @@ const koMessages: Record<MessageKey, string> = {
   "table.noLink": "링크 없음",
   "table.searchEmptyTitle": "일치하는 지원이 없습니다",
   "table.searchEmptyDescription": "다른 키워드를 입력하거나 필터를 해제해 보세요.",
-  "table.editHint": "클릭하여 수정",
   "table.totalItems": "총 {{count}}개",
   "delete.title": "이 지원을 삭제할까요?",
   "delete.content": "보드에서 {{company}} 지원을 영구적으로 삭제합니다.",
@@ -1417,6 +1713,11 @@ const koMessages: Record<MessageKey, string> = {
   "settings.deviceId": "장치 식별자",
   "settings.deviceEncryption":
     "이력서 파일은 이 장치 식별자에서 파생된 키로 {{algorithm}} 암호화되어 저장됩니다.",
+  "settings.platform": "현재 플랫폼",
+  "settings.platform.computer": "컴퓨터",
+  "settings.platform.tablet": "태블릿",
+  "settings.platform.phone": "휴대폰",
+  "settings.operatingSystem": "시스템",
   "settings.shortcut": "바탕 화면 바로가기",
   "settings.shortcutHint":
     "바로가기를 만들면 바탕 화면에서 ResumeTrail을 바로 열 수 있습니다.",
@@ -1552,7 +1853,7 @@ const koMessages: Record<MessageKey, string> = {
   "resumes.openFailed": "미리보기 창을 열 수 없습니다.",
 };
 
-const messages: Record<Locale, Record<MessageKey, string>> = {
+const messages: Record<Locale, Partial<Record<MessageKey, string>>> = {
   "zh-CN": zhCNMessages,
   "zh-TW": zhTWMessages,
   en,
@@ -1589,7 +1890,24 @@ const antdLocales = {
   ko: resolveAntdLocale(koKR),
 } as const;
 
+// antd date and time components format their panels with dayjs, so the dayjs
+// locale has to follow the UI language as well. ConfigProvider's locale alone
+// only covers the surrounding component texts.
+const dayjsLocales: Record<Locale, string> = {
+  "zh-CN": "zh-cn",
+  "zh-TW": "zh-tw",
+  en: "en",
+  ja: "ja",
+  ko: "ko",
+};
+
 const LOCALE_KEY = "resumetrail.locale";
+
+// Default language from frontend/.env, injected by vite.config.ts.
+function defaultLocale(): Locale {
+  const value = String(__APP_DEFAULT_LANGUAGE__).trim();
+  return isLocale(value) ? value : "zh-CN";
+}
 
 function detectLocale(): Locale {
   const saved = localStorage.getItem(LOCALE_KEY);
@@ -1612,7 +1930,7 @@ function detectLocale(): Locale {
     if (normalized.startsWith("ko")) return "ko";
     if (normalized.startsWith("en")) return "en";
   }
-  return "zh-CN";
+  return defaultLocale();
 }
 
 function isLocale(value: string): value is Locale {
@@ -1624,6 +1942,7 @@ interface I18nContextValue {
   setLocale: (locale: Locale) => void;
   t: (key: MessageKey, params?: Record<string, string | number>) => string;
   formatDate: (value: string | Date) => string;
+  formatFullDate: (value: string | Date) => string;
   antdLocale: (typeof antdLocales)[Locale];
   localeLabel: string;
 }
@@ -1632,6 +1951,10 @@ const I18nContext = createContext<I18nContextValue | null>(null);
 
 export function I18nProvider({ children }: { children: ReactNode }) {
   const [locale, setLocaleState] = useState<Locale>(() => detectLocale());
+
+  // Applied during render so the date panels of the current render already use
+  // the new language.
+  dayjs.locale(dayjsLocales[locale]);
 
   useEffect(() => {
     localStorage.setItem(LOCALE_KEY, locale);
@@ -1667,17 +1990,37 @@ export function I18nProvider({ children }: { children: ReactNode }) {
     [locale],
   );
 
+  const formatFullDate = useCallback(
+    (value: string | Date) => {
+      const date = value instanceof Date ? value : new Date(value);
+      if (Number.isNaN(date.getTime())) return "—";
+      if (locale === "zh-CN" || locale === "zh-TW") {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, "0");
+        const day = String(date.getDate()).padStart(2, "0");
+        return `${year}年${month}月${day}日`;
+      }
+      return new Intl.DateTimeFormat(locale, {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      }).format(date);
+    },
+    [locale],
+  );
+
   const value = useMemo<I18nContextValue>(
     () => ({
       locale,
       setLocale,
       t,
       formatDate,
+      formatFullDate,
       antdLocale: antdLocales[locale],
       localeLabel:
         localeOptions.find((option) => option.value === locale)?.label ?? "English",
     }),
-    [locale, setLocale, t, formatDate],
+    [locale, setLocale, t, formatDate, formatFullDate],
   );
 
   return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;

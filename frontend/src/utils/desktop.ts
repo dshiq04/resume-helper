@@ -5,6 +5,18 @@ interface WailsWindow {
     environment?: unknown;
     invoke?: (message: string) => void;
   };
+  chrome?: {
+    webview?: {
+      postMessage?: (message: string) => void;
+    };
+  };
+  webkit?: {
+    messageHandlers?: {
+      external?: {
+        postMessage?: (message: string) => void;
+      };
+    };
+  };
 }
 
 export type ResizeEdge =
@@ -23,8 +35,14 @@ export interface DesktopWindowState {
 }
 
 export function isDesktopRuntime(): boolean {
+  const target = window as unknown as WailsWindow;
+  // WebView2 / WKWebView are injected before the frontend bundle runs, so
+  // checking the native bridge in addition to _wails.environment keeps custom
+  // Wails windows from being mistaken for a normal browser tab.
   return Boolean(
-    (window as unknown as WailsWindow)._wails?.environment,
+    target._wails?.environment ||
+      target.chrome?.webview?.postMessage ||
+      target.webkit?.messageHandlers?.external?.postMessage,
   );
 }
 

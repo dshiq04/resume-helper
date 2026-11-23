@@ -1,13 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import {
-  Alert,
-  App as AntdApp,
-  Button,
-  Form,
-  Input,
-  Select,
-  Spin,
-} from "antd";
+import { Alert, App as AntdApp, Button, Form, Input, Select, Spin } from "antd";
 import {
   BankOutlined,
   CloseOutlined,
@@ -19,6 +11,7 @@ import { Events } from "@wailsio/runtime";
 import { api, ApiError } from "../api/client";
 import type { Category, Status } from "../api/types";
 import { useCategoryOptions, useStatusOptions, StatusBadge } from "../components/badges";
+import { CompanyAutoComplete } from "../components/CompanyAutoComplete";
 import { useI18n } from "../i18n";
 import { apiErrorMessage } from "../utils/errors";
 import { closeWindow, isDesktopRuntime, minimiseWindow } from "../utils/desktop";
@@ -184,7 +177,7 @@ export function ApplicationEditWindowPage() {
                   },
                 ]}
               >
-                <Input
+                <CompanyAutoComplete
                   maxLength={255}
                   prefix={<BankOutlined className="field-icon" />}
                   placeholder={t("form.companyPlaceholder")}

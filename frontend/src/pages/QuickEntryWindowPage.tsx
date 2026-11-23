@@ -17,6 +17,7 @@ import { CATEGORIES, type Category } from "../api/types";
 import { useI18n, type MessageKey } from "../i18n";
 import { apiErrorMessage } from "../utils/errors";
 import { closeWindow, isDesktopRuntime } from "../utils/desktop";
+import { CompanyAutoComplete } from "../components/CompanyAutoComplete";
 
 function readCategory(): Category | null {
   const value = new URLSearchParams(window.location.search).get("category");
@@ -162,15 +163,16 @@ export function QuickEntryWindowPage() {
       </header>
 
       <div className="quick-window-body">
-        <Input
-          ref={companyRef}
+        <CompanyAutoComplete
+          inputRef={companyRef}
           size="small"
           maxLength={255}
           value={companyName}
           allowClear
+          suggestOnEmpty={false}
           prefix={<BankOutlined className="field-icon" />}
           placeholder={t("form.companyPlaceholder")}
-          onChange={(event) => setCompanyName(event.target.value)}
+          onChange={setCompanyName}
           onPressEnter={() => void handleAdd()}
         />
 

@@ -1,8 +1,7 @@
-import { Checkbox, Pagination, Spin } from "antd";
+import { Checkbox, Pagination, Spin, Tooltip } from "antd";
 import { PushpinFilled } from "@ant-design/icons";
 import type { Application, Status, StatusOption } from "../../api/types";
 import type { ApplicationDraft } from "../../hooks/useApplicationDraft";
-import type { InlineEditController } from "../../hooks/useInlineEdit";
 import { useI18n } from "../../i18n";
 import { CompanyCell } from "./CompanyCell";
 import { LinkCell } from "./LinkCell";
@@ -21,7 +20,6 @@ interface ApplicationCardsProps {
   statusSavingId: number | null;
   pinSavingId: number | null;
   statusOptions: StatusOption[];
-  inline: InlineEditController;
   hasFilters: boolean;
   draft: ApplicationDraft | null;
   draftSaving: boolean;
@@ -33,6 +31,7 @@ interface ApplicationCardsProps {
   onPageChange: (page: number) => void;
   onStatusChange: (record: Application, status: Status) => void;
   onPin: (record: Application) => void;
+  onView: (record: Application) => void;
   onEdit: (record: Application) => void;
   onDelete: (record: Application) => void;
   onAdd: () => void;
@@ -48,7 +47,6 @@ export function ApplicationCards({
   statusSavingId,
   pinSavingId,
   statusOptions,
-  inline,
   hasFilters,
   draft,
   draftSaving,
@@ -60,11 +58,12 @@ export function ApplicationCards({
   onPageChange,
   onStatusChange,
   onPin,
+  onView,
   onEdit,
   onDelete,
   onAdd,
 }: ApplicationCardsProps) {
-  const { t, formatDate } = useI18n();
+  const { t, formatDate, formatFullDate } = useI18n();
 
   if (loading && items.length === 0 && !draft) {
     return (
@@ -98,6 +97,7 @@ export function ApplicationCards({
           className={`mobile-app-card ${record.pinned ? "is-pinned" : ""} ${
             selectedKeys.includes(record.id) ? "is-selected" : ""
           }`}
+
         >
           <div className="mobile-card-top">
             <Checkbox
@@ -108,7 +108,7 @@ export function ApplicationCards({
                 onToggleSelection(record.id, event.target.checked)
               }
             />
-            <CompanyCell application={record} inline={inline} />
+            <CompanyCell application={record} onView={onView} />
             <div className="mobile-card-actions">
               <ApplicationActions
                 application={record}
@@ -123,7 +123,7 @@ export function ApplicationCards({
 
           <div className="mobile-card-body">
             <div className="mobile-card-link-row">
-              <LinkCell application={record} inline={inline} mobile />
+              <LinkCell application={record} mobile />
             </div>
             <ApplicationStatusSelect
               application={record}
@@ -135,9 +135,11 @@ export function ApplicationCards({
           </div>
 
           <div className="mobile-card-footer">
-            <span>
-              {t("table.appliedAt")}: {formatDate(record.appliedAt)}
-            </span>
+            <Tooltip title={formatFullDate(record.appliedAt)} placement="top">
+              <span>
+                {t("table.appliedAt")}: {formatDate(record.appliedAt)}
+              </span>
+            </Tooltip>
             {record.pinned && (
               <span className="mobile-pinned-badge">
                 <PushpinFilled /> {t("action.pin")}

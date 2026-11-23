@@ -14,6 +14,7 @@ import (
 	"syscall"
 	"time"
 
+	"resume-helper/internal/appinfo"
 	"resume-helper/internal/config"
 	"resume-helper/internal/database"
 	"resume-helper/internal/desktop"
@@ -50,7 +51,7 @@ func main() {
 		log.Fatalf("setup logging: %v", err)
 	}
 	defer closeLog()
-	appLogger.Info("ResumeTrail starting", zap.String("logFile", logPath))
+	appLogger.Info(appinfo.Name()+" starting", zap.String("logFile", logPath))
 	appLogger.Debug("configuration loaded",
 		zap.String("dataDir", cfg.DataDir),
 		zap.String("config", cfg.SourcePath),
@@ -77,8 +78,8 @@ func main() {
 	if err != nil {
 		appLogger.Fatal("start HTTP server", zap.Error(err))
 	}
-	appLogger.Info("ResumeTrail is serving",
-		zap.String("version", server.Version),
+	appLogger.Info(appinfo.Name()+" is serving",
+		zap.String("version", appinfo.Version()),
 		zap.String("url", baseURL),
 		zap.String("database", database.DatabaseLabel(cfg.Database.Driver)),
 		zap.String("dsn", database.SafeDSN(cfg.Database.Driver, cfg.Database.DSN)),
@@ -95,11 +96,12 @@ func main() {
 	// fullscreen / close) and resize handling on the Wails origin, while the
 	// Gin engine continues to handle both the static files and /api requests.
 	app := application.New(application.Options{
-		Name:        "ResumeTrail",
+		Name:        appinfo.Name(),
 		Description: "A beautiful resume application tracker",
 		Icon:        appIconPNG,
 		Services: []application.Service{
 			application.NewService(&DropImporter{server: httpServer}),
+			application.NewService(&BackupService{server: httpServer}),
 		},
 		Assets: application.AssetOptions{
 			Handler: httpServer.Handler(),
@@ -107,7 +109,7 @@ func main() {
 	})
 
 	mainWindow := app.Window.NewWithOptions(application.WebviewWindowOptions{
-		Title:            "履途 ResumeTrail",
+		Title:            appinfo.Title(),
 		Width:            1360,
 		Height:           860,
 		MinWidth:         360,
@@ -117,11 +119,24 @@ func main() {
 		EnableFileDrop:   true,
 		BackgroundColour: application.NewRGB(15, 23, 42),
 	})
-	shortcutPrompt := &shortcutPromptState{}
-	registerShortcutClosePrompt(app, mainWindow, shortcutPrompt, httpServer.ShortcutPromptEnabled)
+	closeState := &closePromptState{}
+	tray, trayOpenItem := createSystemTray(app, mainWindow, closeState)
+	registerCloseBehavior(app, mainWindow, tray, closeState, httpServer)
 	registerFileDropEvent(appLogger, mainWindow)
+	httpServer.SetAppInfoHandler(func() {
+		// The frontend sends frontend/.env once it has loaded so the window and
+		// tray can switch from the built-in defaults to the configured values.
+		application.InvokeAsync(func() {
+			mainWindow.SetTitle(appinfo.Title())
+			tray.SetTooltip(appinfo.Title())
+			trayOpenItem.SetLabel(trayOpenLabel())
+		})
+	})
 	httpServer.SetShortcutPromptHandler(func(create bool) error {
-		return resolveShortcutPrompt(app, mainWindow, shortcutPrompt, create)
+		return resolveShortcutPrompt(app, mainWindow, tray, closeState, create)
+	})
+	httpServer.SetClosePromptHandler(func(action string, remember bool) error {
+		return resolveClosePrompt(app, mainWindow, tray, closeState, httpServer, action)
 	})
 	httpServer.SetQuickEntryOpener(func(category string) {
 		openQuickEntryWindow(app, category)
@@ -129,8 +144,14 @@ func main() {
 	httpServer.SetApplicationEditOpener(func(id uint) {
 		openApplicationEditWindow(app, id)
 	})
+	httpServer.SetApplicationViewOpener(func(id uint) {
+		openApplicationViewWindow(app, id)
+	})
 	httpServer.SetResumePreviewOpener(func(id uint, title string) {
 		openResumePreviewWindow(app, id, title)
+	})
+	httpServer.SetDataTransferOpener(func(mode string) {
+		openDataTransferWindow(app, mode)
 	})
 
 	if err := app.Run(); err != nil {
@@ -159,6 +180,24 @@ func (d *DropImporter) ProbeExcelFile(path string) (*server.ExcelFileInfo, error
 
 func (d *DropImporter) ImportExcel(path string) (*server.ImportResult, error) {
 	return d.server.ImportExcelFromPath(path)
+}
+
+// BackupService exposes the JSON/ZIP backup operations to the independent
+// data-transfer window through Wails bindings.
+type BackupService struct {
+	server *server.Server
+}
+
+func (b *BackupService) ExportBackup(path string) (*server.BackupResult, error) {
+	return b.server.ExportBackup(path)
+}
+
+func (b *BackupService) InspectBackup(path string) (*server.BackupResult, error) {
+	return b.server.InspectBackup(path)
+}
+
+func (b *BackupService) ImportBackup(path string) (*server.BackupResult, error) {
+	return b.server.ImportBackup(path)
 }
 
 // registerFileDropEvent forwards file drops that land on a known upload area
@@ -255,6 +294,37 @@ func openApplicationEditWindow(app *application.App, id uint) {
 	})
 }
 
+func openApplicationViewWindow(app *application.App, id uint) {
+	application.InvokeAsync(func() {
+		target := "/application-view?id=" + strconv.FormatUint(uint64(id), 10)
+		windowTitle := "投递详情"
+
+		if existing, ok := app.Window.Get("application-view"); ok {
+			existing.SetTitle(windowTitle)
+			existing.SetURL(target)
+			existing.Show()
+			existing.Focus()
+			return
+		}
+
+		window := app.Window.NewWithOptions(application.WebviewWindowOptions{
+			Name:             "application-view",
+			Title:            windowTitle,
+			URL:              target,
+			Width:            680,
+			Height:           760,
+			MinWidth:         520,
+			MinHeight:        520,
+			Frameless:        true,
+			DisableResize:    false,
+			InitialPosition:  application.WindowCentered,
+			BackgroundColour: application.NewRGB(15, 23, 42),
+		})
+		window.Show()
+		window.Focus()
+	})
+}
+
 func openQuickEntryWindow(app *application.App, category string) {
 	application.InvokeAsync(func() {
 		if existing, ok := app.Window.Get("quick-entry"); ok {
@@ -284,48 +354,183 @@ func openQuickEntryWindow(app *application.App, category string) {
 	})
 }
 
-type shortcutPromptState struct {
-	allowClose atomic.Bool
-	prompting  atomic.Bool
+type closePromptState struct {
+	allowClose    atomic.Bool
+	prompting     atomic.Bool
+	pendingQuit   atomic.Bool
+	quitPrompting atomic.Bool
 }
 
-func registerShortcutClosePrompt(
+func trayOpenLabel() string {
+	return "打开 " + appinfo.Title() + " / Open " + appinfo.Name()
+}
+
+func createSystemTray(
+	app *application.App,
+	mainWindow *application.WebviewWindow,
+	state *closePromptState,
+) (*application.SystemTray, *application.MenuItem) {
+	tray := app.SystemTray.New()
+	tray.SetIcon(appIconPNG)
+	tray.SetTooltip(appinfo.Title())
+	menu := app.NewMenu()
+	openItem := menu.Add(trayOpenLabel())
+	openItem.OnClick(func(*application.Context) {
+		application.InvokeAsync(func() {
+			mainWindow.Show()
+			mainWindow.Focus()
+		})
+	})
+	menu.Add("快速录入 / Quick entry").OnClick(func(*application.Context) {
+		openQuickEntryWindow(app, "all")
+	})
+	menu.AddSeparator()
+	menu.Add("退出 / Quit").OnClick(func(*application.Context) {
+		quitApplication(app, tray, state)
+	})
+	tray.SetMenu(menu)
+	tray.OnClick(func() {
+		application.InvokeAsync(func() {
+			mainWindow.Show()
+			mainWindow.Focus()
+		})
+	})
+	return tray, openItem
+}
+
+func registerCloseBehavior(
 	app *application.App,
 	window *application.WebviewWindow,
-	state *shortcutPromptState,
-	promptEnabled func() bool,
+	tray *application.SystemTray,
+	state *closePromptState,
+	httpServer *server.Server,
 ) {
-	if !desktop.ShortcutSupported() {
-		return
-	}
-
 	window.RegisterHook(events.Common.WindowClosing, func(event *application.WindowEvent) {
 		if state.allowClose.Load() {
 			return
 		}
-		if !promptEnabled() {
+
+		switch httpServer.CloseAction() {
+		case server.CloseActionTray:
+			event.Cancel()
+			application.InvokeAsync(func() {
+				window.Hide()
+			})
 			return
-		}
-		exists, err := desktop.ShortcutExists()
-		if err != nil || exists {
+		case server.CloseActionQuit:
+			event.Cancel()
+			application.InvokeAsync(func() {
+				proceedQuit(app, window, tray, state, httpServer.ShortcutPromptEnabled)
+			})
 			return
 		}
 
+		// Ask the user whether "close" means hiding to the tray or quitting.
 		event.Cancel()
 		if !state.prompting.CompareAndSwap(false, true) {
 			application.InvokeAsync(func() {
-				if existing, ok := app.Window.Get("shortcut-prompt"); ok {
+				if existing, ok := app.Window.Get("close-prompt"); ok {
 					existing.Show()
 					existing.Focus()
 				}
 			})
 			return
 		}
-		openShortcutPromptWindow(app, state)
+		openClosePromptWindow(app, state)
 	})
 }
 
-func openShortcutPromptWindow(app *application.App, state *shortcutPromptState) {
+func openClosePromptWindow(app *application.App, state *closePromptState) {
+	application.InvokeAsync(func() {
+		if existing, ok := app.Window.Get("close-prompt"); ok {
+			existing.Show()
+			existing.Focus()
+			return
+		}
+
+		window := app.Window.NewWithOptions(application.WebviewWindowOptions{
+			Name:             "close-prompt",
+			Title:            "关闭 " + appinfo.Title(),
+			URL:              "/close-prompt",
+			Width:            470,
+			Height:           336,
+			MinWidth:         470,
+			MinHeight:        336,
+			MaxWidth:         470,
+			MaxHeight:        336,
+			Frameless:        true,
+			DisableResize:    true,
+			InitialPosition:  application.WindowCentered,
+			BackgroundColour: application.NewRGB(15, 23, 42),
+		})
+		window.OnWindowEvent(events.Common.WindowClosing, func(*application.WindowEvent) {
+			state.prompting.Store(false)
+		})
+		window.Show()
+		window.Focus()
+	})
+}
+
+func resolveClosePrompt(
+	app *application.App,
+	mainWindow *application.WebviewWindow,
+	tray *application.SystemTray,
+	state *closePromptState,
+	httpServer *server.Server,
+	action string,
+) error {
+	application.InvokeAsync(func() {
+		if promptWindow, ok := app.Window.Get("close-prompt"); ok {
+			promptWindow.Close()
+		}
+		state.prompting.Store(false)
+
+		if action == server.CloseActionTray {
+			mainWindow.Hide()
+			return
+		}
+		proceedQuit(app, mainWindow, tray, state, httpServer.ShortcutPromptEnabled)
+	})
+	return nil
+}
+
+// proceedQuit keeps the legacy "create a desktop shortcut" prompt when it is
+// still enabled; otherwise the application quits immediately.
+func proceedQuit(
+	app *application.App,
+	mainWindow *application.WebviewWindow,
+	tray *application.SystemTray,
+	state *closePromptState,
+	shortcutPromptEnabled func() bool,
+) {
+	if shortcutPromptEnabled != nil && shortcutPromptEnabled() && desktop.ShortcutSupported() {
+		if exists, err := desktop.ShortcutExists(); err == nil && !exists {
+			state.pendingQuit.Store(true)
+			if !state.quitPrompting.CompareAndSwap(false, true) {
+				if existing, ok := app.Window.Get("shortcut-prompt"); ok {
+					existing.Show()
+					existing.Focus()
+				}
+				return
+			}
+			openShortcutPromptWindow(app, state)
+			return
+		}
+	}
+	quitApplication(app, tray, state)
+}
+
+func quitApplication(app *application.App, tray *application.SystemTray, state *closePromptState) {
+	state.allowClose.Store(true)
+	if tray != nil {
+		tray.Destroy()
+	}
+	application.InvokeAsync(func() {
+		app.Quit()
+	})
+}
+
+func openShortcutPromptWindow(app *application.App, state *closePromptState) {
 	application.InvokeAsync(func() {
 		if existing, ok := app.Window.Get("shortcut-prompt"); ok {
 			existing.Show()
@@ -349,7 +554,7 @@ func openShortcutPromptWindow(app *application.App, state *shortcutPromptState) 
 			BackgroundColour: application.NewRGB(15, 23, 42),
 		})
 		window.OnWindowEvent(events.Common.WindowClosing, func(*application.WindowEvent) {
-			state.prompting.Store(false)
+			state.quitPrompting.Store(false)
 		})
 		window.Show()
 		window.Focus()
@@ -359,7 +564,8 @@ func openShortcutPromptWindow(app *application.App, state *shortcutPromptState) 
 func resolveShortcutPrompt(
 	app *application.App,
 	mainWindow *application.WebviewWindow,
-	state *shortcutPromptState,
+	tray *application.SystemTray,
+	state *closePromptState,
 	create bool,
 ) error {
 	if create {
@@ -372,11 +578,45 @@ func resolveShortcutPrompt(
 		if promptWindow, ok := app.Window.Get("shortcut-prompt"); ok {
 			promptWindow.Close()
 		}
+		state.quitPrompting.Store(false)
+		if state.pendingQuit.Load() {
+			quitApplication(app, tray, state)
+			return
+		}
 		state.allowClose.Store(true)
-		state.prompting.Store(false)
 		mainWindow.Close()
 	})
 	return nil
+}
+
+func openDataTransferWindow(app *application.App, mode string) {
+	application.InvokeAsync(func() {
+		target := "/data-transfer?mode=" + mode
+		title := "导入 / 导出数据"
+		if existing, ok := app.Window.Get("data-transfer"); ok {
+			existing.SetTitle(title)
+			existing.SetURL(target)
+			existing.Show()
+			existing.Focus()
+			return
+		}
+
+		window := app.Window.NewWithOptions(application.WebviewWindowOptions{
+			Name:             "data-transfer",
+			Title:            title,
+			URL:              target,
+			Width:            560,
+			Height:           560,
+			MinWidth:         480,
+			MinHeight:        480,
+			Frameless:        true,
+			DisableResize:    false,
+			InitialPosition:  application.WindowCentered,
+			BackgroundColour: application.NewRGB(15, 23, 42),
+		})
+		window.Show()
+		window.Focus()
+	})
 }
 
 func isHeadless() bool {

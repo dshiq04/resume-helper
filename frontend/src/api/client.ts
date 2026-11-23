@@ -1,20 +1,27 @@
 import axios, { type AxiosRequestConfig } from "axios";
 import type {
   Application,
+  ApplicationHistory,
+  AppInfoInput,
   ApplicationInput,
   ApplicationList,
   ApplicationUpdate,
   AuthSession,
   AuthStatus,
   CategoryFilter,
+  CompanySuggestions,
   DatabaseInput,
   DatabaseSettingsResponse,
   DatabaseTestResult,
   DatabaseUpdateResult,
   DailyStats,
+  DeleteResult,
   DeviceInfo,
+  FunnelStats,
   ImportResult,
   ListParams,
+  PlatformInfo,
+  Preferences,
   QuickEntryDefaults,
   Resume,
   ResumeCreateInput,
@@ -23,6 +30,7 @@ import type {
   ShortcutStatus,
   Stats,
   SystemInfo,
+  TrashList,
 } from "./types";
 
 const TOKEN_KEY = "resumetrail.token";
@@ -166,6 +174,8 @@ export const api = {
     if (params.status && params.status !== "all") {
       query.status = params.status;
     }
+    if (params.from) query.from = params.from;
+    if (params.to) query.to = params.to;
     return request<ApplicationList>("/applications", { params: query });
   },
   createApplication(input: ApplicationInput) {
@@ -184,14 +194,49 @@ export const api = {
     });
   },
   deleteApplication(id: number) {
-    return request<{ deleted: number }>(`/application/${id}`, {
+    return request<DeleteResult>(`/application/${id}`, {
       method: "DELETE",
     });
   },
   batchDelete(ids: number[]) {
-    return request<{ deleted: number }>("/applications/batch-delete", {
+    return request<DeleteResult>("/applications/batch-delete", {
       method: "POST",
       data: { ids },
+    });
+  },
+  companySuggestions(search?: string) {
+    return request<CompanySuggestions>("/applications/companies", {
+      params: search ? { search } : undefined,
+    });
+  },
+  applicationHistory(id: number) {
+    return request<ApplicationHistory>(`/application/${id}/history`);
+  },
+  addApplicationHistory(id: number, status: string, changedAt: string) {
+    return request<{ items: ApplicationHistory["items"] }>(
+      `/application/${id}/history`,
+      {
+        method: "POST",
+        data: { status, changedAt },
+      },
+    );
+  },
+  listTrash() {
+    return request<TrashList>("/trash");
+  },
+  restoreTrash(id: number) {
+    return request<Application>(`/trash/${id}/restore`, {
+      method: "POST",
+    });
+  },
+  deleteTrash(id: number) {
+    return request<{ deleted: number }>(`/trash/${id}`, {
+      method: "DELETE",
+    });
+  },
+  emptyTrash() {
+    return request<{ deleted: number }>("/trash", {
+      method: "DELETE",
     });
   },
   batchStatus(ids: number[], status: string) {
@@ -227,17 +272,30 @@ export const api = {
     anchor.remove();
     window.setTimeout(() => URL.revokeObjectURL(url), 1000);
   },
-  stats() {
-    return request<Stats>("/stats");
+  stats(range?: { from?: string; to?: string }) {
+    return request<Stats>("/stats", { params: range });
   },
-  dailyStats() {
-    return request<DailyStats>("/stats/daily");
+  dailyStats(range?: { from?: string; to?: string }) {
+    return request<DailyStats>("/stats/daily", { params: range });
+  },
+  funnel(range?: { from?: string; to?: string }) {
+    return request<FunnelStats>("/stats/funnel", { params: range });
+  },
+  applyAppInfo(input: AppInfoInput) {
+    return request<{ applied: boolean }>("/app-info", {
+      method: "POST",
+      data: input,
+      handleUnauthorized: false,
+    });
   },
   systemInfo() {
     return request<SystemInfo>("/system/info");
   },
   deviceInfo() {
     return request<DeviceInfo>("/system/device");
+  },
+  platformInfo() {
+    return request<PlatformInfo>("/system/platform");
   },
   databaseSettings() {
     return request<DatabaseSettingsResponse>("/system/database");
@@ -272,6 +330,29 @@ export const api = {
       timeout: 20_000,
     });
   },
+  preferences() {
+    return request<Preferences>("/system/preferences");
+  },
+  updatePreferences(input: Partial<Preferences>) {
+    return request<Preferences>("/system/preferences", {
+      method: "PUT",
+      data: input,
+    });
+  },
+  openDataTransfer(mode: "export" | "import") {
+    return request<{ opened: boolean }>("/system/data-transfer", {
+      method: "POST",
+      data: { mode },
+      timeout: 10_000,
+    });
+  },
+  resolveClosePrompt(action: "tray" | "quit", remember = false) {
+    return request<{ resolved: boolean }>("/system/close-prompt", {
+      method: "POST",
+      data: { action, remember },
+      timeout: 20_000,
+    });
+  },
   resolveShortcutPrompt(create: boolean, remember = false) {
     return request<{ resolved: boolean }>("/system/shortcut/prompt", {
       method: "POST",
@@ -288,6 +369,13 @@ export const api = {
   },
   openApplicationEdit(id: number) {
     return request<{ opened: boolean }>("/system/application-edit", {
+      method: "POST",
+      data: { id },
+      timeout: 10_000,
+    });
+  },
+  openApplicationView(id: number) {
+    return request<{ opened: boolean }>("/system/application-view", {
       method: "POST",
       data: { id },
       timeout: 10_000,

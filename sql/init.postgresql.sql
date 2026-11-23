@@ -29,6 +29,39 @@ CREATE INDEX IF NOT EXISTS idx_applications_pinned
 CREATE INDEX IF NOT EXISTS idx_applications_applied_at
   ON applications (applied_at);
 
+CREATE TABLE IF NOT EXISTS application_changes (
+  id BIGSERIAL PRIMARY KEY,
+  application_id BIGINT NOT NULL,
+  status VARCHAR(32) NOT NULL,
+  changed_at TIMESTAMPTZ NOT NULL,
+  created_at TIMESTAMPTZ NULL
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_application_change_status
+  ON application_changes (application_id, status);
+CREATE INDEX IF NOT EXISTS idx_application_changes_changed_at
+  ON application_changes (changed_at);
+
+CREATE TABLE IF NOT EXISTS deleted_applications (
+  id BIGSERIAL PRIMARY KEY,
+  original_id BIGINT NOT NULL,
+  category VARCHAR(32) NOT NULL,
+  company_name VARCHAR(255) NOT NULL,
+  link TEXT NULL,
+  status VARCHAR(32) NOT NULL,
+  pinned BOOLEAN NOT NULL DEFAULT FALSE,
+  applied_at TIMESTAMPTZ NULL,
+  created_at TIMESTAMPTZ NULL,
+  updated_at TIMESTAMPTZ NULL,
+  history TEXT NULL,
+  deleted_at TIMESTAMPTZ NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_deleted_applications_original_id
+  ON deleted_applications (original_id);
+CREATE INDEX IF NOT EXISTS idx_deleted_applications_deleted_at
+  ON deleted_applications (deleted_at);
+
 CREATE TABLE IF NOT EXISTS settings (
   key VARCHAR(64) NOT NULL,
   value TEXT NULL,
