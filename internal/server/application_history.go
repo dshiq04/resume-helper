@@ -42,7 +42,7 @@ func recordStatusChange(db *gorm.DB, applicationID uint, status string, changedA
 		return nil
 	}
 	if changedAt.IsZero() {
-		changedAt = time.Now()
+		changedAt = time.Now().UTC()
 	}
 	return db.Clauses(clause.OnConflict{DoNothing: true}).Create(&models.ApplicationChange{
 		ApplicationID: applicationID,
@@ -61,7 +61,7 @@ func updateStatusChange(db *gorm.DB, applicationID uint, _ string, status string
 		return nil
 	}
 	if changedAt.IsZero() {
-		changedAt = time.Now()
+		changedAt = time.Now().UTC()
 	}
 
 	var existing models.ApplicationChange
@@ -105,7 +105,7 @@ func isTerminalStatus(status string) bool {
 func (s *Server) loadChanges(db *gorm.DB, applicationID uint) ([]models.ApplicationChange, error) {
 	var items []models.ApplicationChange
 	err := db.Where("application_id = ?", applicationID).
-		Order("changed_at ASC, id ASC").
+		Order("datetime(changed_at) ASC, id ASC").
 		Find(&items).Error
 	return items, err
 }
@@ -232,7 +232,7 @@ func (s *Server) createApplicationHistory(c *gin.Context) {
 		return
 	}
 
-	changedAt := time.Now()
+	changedAt := time.Now().UTC()
 	if strings.TrimSpace(input.ChangedAt) != "" {
 		parsed, err := parseFlexibleTime(input.ChangedAt)
 		if err != nil {
@@ -285,6 +285,32 @@ func parseFlexibleTime(value string) (time.Time, error) {
 	return time.Time{}, lastErr
 }
 
+// parseFlexibleRangeTime parses a range bound. A bare date used as the upper
+// bound means the whole day, so it is extended to the end of that day instead
+// of silently excluding every record created after midnight.
+func parseFlexibleRangeTime(value string, upperBound bool) (time.Time, error) {
+	parsed, err := parseFlexibleTime(value)
+	if err != nil {
+		return time.Time{}, err
+	}
+	if upperBound && isDateOnly(value) {
+		// AddDate keeps the end of day correct across DST transitions.
+		parsed = parsed.AddDate(0, 0, 1).Add(-time.Nanosecond)
+	}
+	return parsed, nil
+}
+
+// isDateOnly reports whether value is exactly a "YYYY-MM-DD" date without a
+// time or timezone component.
+func isDateOnly(value string) bool {
+	value = strings.TrimSpace(value)
+	if len(value) != len("2006-01-02") {
+		return false
+	}
+	_, err := time.ParseInLocation("2006-01-02", value, time.Local)
+	return err == nil
+}
+
 func daysSince(value time.Time) int {
 	if value.IsZero() {
 		return 0
@@ -331,7 +357,7 @@ func reconcileApplicationChanges(record models.Application, changes []models.App
 	if !foundCurrent {
 		changedAt := record.UpdatedAt
 		if changedAt.IsZero() || (len(filtered) > 0 && changedAt.Before(filtered[len(filtered)-1].ChangedAt)) {
-			changedAt = time.Now()
+			changedAt = time.Now().UTC()
 		}
 		if changedAt.IsZero() {
 			changedAt = record.AppliedAt
@@ -360,7 +386,7 @@ func (s *Server) attachStatusDays(db *gorm.DB, items []models.Application) []app
 	if len(ids) > 0 {
 		var changes []models.ApplicationChange
 		if err := db.Where("application_id IN ?", ids).
-			Order("changed_at ASC, id ASC").
+			Order("datetime(changed_at) ASC, id ASC").
 			Find(&changes).Error; err == nil {
 			for _, change := range changes {
 				key := statusKey(change.ApplicationID, change.Status)

@@ -25,6 +25,7 @@ import { Events } from "@wailsio/runtime";
 import { api, ApiError } from "../api/client";
 import type { Application, ApplicationHistory, Status } from "../api/types";
 import { CategoryBadge, StatusBadge } from "../components/badges";
+import { ResizeHandles } from "../components/ResizeHandles";
 import { useI18n } from "../i18n";
 import { apiErrorMessage } from "../utils/errors";
 import { isWebLink, withProtocol } from "../utils/display";
@@ -406,6 +407,7 @@ export function ApplicationViewWindowPage() {
           ))}
         </Form>
       </Modal>
+      <ResizeHandles />
     </div>
   );
 }

@@ -10,6 +10,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"strconv"
@@ -388,9 +389,15 @@ func openApplicationViewWindow(app *application.App, id uint) {
 	})
 }
 
+func quickEntryTarget(category string) string {
+	return "/quick-entry?category=" + url.QueryEscape(category)
+}
+
 func openQuickEntryWindow(app *application.App, category string) {
 	application.InvokeAsync(func() {
+		target := quickEntryTarget(category)
 		if existing, ok := app.Window.Get("quick-entry"); ok {
+			existing.SetURL(target)
 			existing.Show()
 			existing.Focus()
 			return
@@ -399,7 +406,7 @@ func openQuickEntryWindow(app *application.App, category string) {
 		window := app.Window.NewWithOptions(application.WebviewWindowOptions{
 			Name:             "quick-entry",
 			Title:            "快速录入",
-			URL:              "/quick-entry?category=" + category,
+			URL:              target,
 			Width:            400,
 			Height:           170,
 			MinWidth:         400,

@@ -84,7 +84,11 @@ func connect(cfg config.DatabaseConfig) (*gorm.DB, error) {
 		Logger:                                   dbLogger,
 		DisableForeignKeyConstraintWhenMigrating: true,
 		NowFunc: func() time.Time {
-			return time.Now().Local()
+			// Store timestamps as UTC. SQLite keeps time values as text, and
+			// text comparisons only stay meaningful when every row uses the
+			// same offset. Date filters additionally normalise legacy rows
+			// with datetime() so existing local-offset data keeps working.
+			return time.Now().UTC()
 		},
 	})
 	if err != nil {

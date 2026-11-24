@@ -9,6 +9,7 @@ import {
 } from "@ant-design/icons";
 import { Events } from "@wailsio/runtime";
 import { api, ApiError } from "../api/client";
+import { ResizeHandles } from "../components/ResizeHandles";
 import type { Category, Status } from "../api/types";
 import { useCategoryOptions, useStatusOptions, StatusBadge } from "../components/badges";
 import { CompanyAutoComplete } from "../components/CompanyAutoComplete";
@@ -232,6 +233,7 @@ export function ApplicationEditWindowPage() {
           {t("action.modify")}
         </Button>
       </footer>
+      <ResizeHandles />
     </div>
   );
 }

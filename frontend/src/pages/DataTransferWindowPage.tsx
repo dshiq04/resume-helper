@@ -17,6 +17,7 @@ import {
 } from "@ant-design/icons";
 import { Call, Dialogs, Events } from "@wailsio/runtime";
 import type { BackupResult } from "../api/types";
+import { ResizeHandles } from "../components/ResizeHandles";
 import { getToken } from "../api/client";
 import { useI18n } from "../i18n";
 import { closeWindow, isDesktopRuntime } from "../utils/desktop";
@@ -448,6 +449,7 @@ export function DataTransferWindowPage() {
           </div>
         )}
       </div>
+      <ResizeHandles />
     </div>
   );
 }

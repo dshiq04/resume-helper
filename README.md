@@ -352,7 +352,7 @@ database:
 X-ResumeTrail-Token: <process token>
 ```
 
-该 Token 用于阻止其他网页或本机进程直接访问本地 API。开启密码后，除认证接口外还需要额外的会话 Token：
+该 Token 用于阻止其他网页直接访问本地 API，并减少误调用；它不等同于本机进程隔离（同一用户下的进程仍可能读取注入到页面中的 Token）。开启密码后，除认证接口外还需要额外的会话 Token：
 
 ```http
 Authorization: Bearer <token>

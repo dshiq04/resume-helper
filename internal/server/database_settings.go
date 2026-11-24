@@ -73,6 +73,10 @@ func (s *Server) updateDatabaseSettings(c *gin.Context) {
 		return
 	}
 
+	s.dbMu.RLock()
+	oldDSN := s.cfg.Database.DSN
+	s.dbMu.RUnlock()
+
 	newDB, err := database.Open(runtimeCfg)
 	if err != nil {
 		apiError(c, http.StatusBadRequest, "connection_failed", err.Error())
@@ -97,6 +101,12 @@ func (s *Server) updateDatabaseSettings(c *gin.Context) {
 	s.cfg.Database = runtimeCfg
 	s.dbMu.Unlock()
 	s.auth.setDB(newDB)
+
+	// Sessions belong to the previous database. Switching files may bring a
+	// different password hash, so force every window to authenticate again.
+	if oldDSN != runtimeCfg.DSN {
+		s.auth.invalidateAllSessions()
+	}
 
 	// Keep the device identifier (and therefore the resume encryption key)
 	// available after switching databases. An identifier already present in the

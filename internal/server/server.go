@@ -336,14 +336,16 @@ func (s *Server) newEngine() *gin.Engine {
 }
 
 // Start binds the HTTP listener and serves in a background goroutine. It
-// returns the URL clients should use. If the configured port is unavailable,
-// an ephemeral port is selected instead.
+// returns the URL clients should use. When the configured port is already in
+// use it returns an error instead of silently moving to another port, because
+// two processes must never share the SQLite file and resume folder.
 func (s *Server) Start() (string, error) {
 	// Create the installation identifier on first launch. It is written to the
 	// settings table and used to derive the resume encryption key.
 	if _, err := s.ensureDeviceID(false); err != nil {
 		return "", fmt.Errorf("initialize device identifier: %w", err)
 	}
+	s.cleanupDeletedResumeFiles()
 
 	host := strings.TrimSpace(s.cfg.Server.Host)
 	if host == "" {

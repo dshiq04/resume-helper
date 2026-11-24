@@ -123,7 +123,7 @@ func (s *Server) ExportBackup(target string) (*BackupResult, error) {
 		Format:        backupFormat,
 		FormatVersion: backupFormatVersion,
 		AppVersion:    appinfo.Version(),
-		ExportedAt:    time.Now(),
+		ExportedAt:    time.Now().UTC(),
 		Applications:  []models.Application{},
 		Resumes:       []backupResume{},
 		Settings:      []backupSetting{},
@@ -800,6 +800,14 @@ func (s *Server) ImportBackup(source string) (*BackupResult, error) {
 
 	trash := make([]models.DeletedApplication, 0, len(manifest.Trash))
 	for _, item := range manifest.Trash {
+		if !models.IsValidCategory(item.Category) || !models.IsValidStatus(item.Status) {
+			cleanup()
+			return nil, fmt.Errorf("recycle bin item %q has an invalid category or status", item.CompanyName)
+		}
+		if strings.TrimSpace(item.CompanyName) == "" {
+			cleanup()
+			return nil, fmt.Errorf("recycle bin item %d is missing a company name", item.OriginalID)
+		}
 		item.ID = 0
 		trash = append(trash, item)
 	}

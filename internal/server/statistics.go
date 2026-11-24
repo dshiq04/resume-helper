@@ -21,7 +21,7 @@ func parseStatsRange(c *gin.Context) (*time.Time, *time.Time, bool) {
 		if raw == "" {
 			return nil, true
 		}
-		value, err := parseFlexibleTime(raw)
+		value, err := parseFlexibleRangeTime(raw, key == "to")
 		if err != nil {
 			apiError(c, http.StatusBadRequest, "invalid_range", "Invalid statistics date range.")
 			return nil, false
@@ -65,13 +65,13 @@ func (s *Server) applicationsInRange(db *gorm.DB, from, to *time.Time, category 
 		query = query.Where("category = ?", category)
 	}
 	if from != nil {
-		query = query.Where("applied_at >= ?", *from)
+		query = query.Where("datetime(applied_at) >= datetime(?)", *from)
 	}
 	if to != nil {
-		query = query.Where("applied_at <= ?", *to)
+		query = query.Where("datetime(applied_at) <= datetime(?)", *to)
 	}
 	var items []models.Application
-	err := query.Order("applied_at ASC, id ASC").Find(&items).Error
+	err := query.Order("datetime(applied_at) ASC, id ASC").Find(&items).Error
 	return items, err
 }
 

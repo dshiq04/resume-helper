@@ -360,42 +360,69 @@ func (s *Server) parseAndImportWorkbook(file *excelize.File) (*ImportResult, err
 	if len(sheets) == 0 {
 		return nil, fmt.Errorf("the workbook has no sheets")
 	}
-	rows, err := file.GetRows(sheets[0])
+
+	// Stream the first sheet instead of loading every row into memory. A
+	// compressed xlsx can expand to millions of rows, so the row limit has to
+	// be enforced while reading rather than after GetRows returns.
+	stream, err := file.Rows(sheets[0])
 	if err != nil {
 		return nil, fmt.Errorf("read the first sheet: %w", err)
 	}
-	if len(rows) == 0 {
+	defer func() {
+		_ = stream.Close()
+	}()
+
+	// Header detection still only inspects the first ten rows. Rows read while
+	// searching for the header that come after it are buffered data rows.
+	headerRows := make([][]string, 0, 10)
+	headerRow := -1
+	var columns importColumns
+	for len(headerRows) < 10 && stream.Next() {
+		row, err := stream.Columns()
+		if err != nil {
+			return nil, fmt.Errorf("read the first sheet: %w", err)
+		}
+		headerRows = append(headerRows, row)
+		if found, foundColumns := findImportHeader(headerRows); found >= 0 {
+			headerRow = found
+			columns = foundColumns
+			break
+		}
+	}
+	if err := stream.Error(); err != nil {
+		return nil, fmt.Errorf("read the first sheet: %w", err)
+	}
+	if len(headerRows) == 0 {
 		return nil, fmt.Errorf("the first sheet is empty")
 	}
-
-	headerRow, columns := findImportHeader(rows)
 	if headerRow < 0 {
 		return nil, fmt.Errorf("could not find a valid header row (company name column is required)")
 	}
-	if len(rows)-headerRow-1 > maxExcelRows {
-		return nil, fmt.Errorf("the workbook contains more than %d data rows", maxExcelRows)
-	}
 
 	result := &ImportResult{Errors: []string{}}
-	records := make([]models.Application, 0, len(rows))
-	appliedAt := time.Now()
-	for index := headerRow + 1; index < len(rows); index++ {
-		row := rows[index]
-		rowNumber := index + 1
+	records := make([]models.Application, 0, maxExcelRows)
+	appliedAt := time.Now().UTC()
+	dataRows := 0
+
+	process := func(row []string, rowNumber int) error {
 		if rowIsEmpty(row) {
-			continue
+			return nil
+		}
+		dataRows++
+		if dataRows > maxExcelRows {
+			return fmt.Errorf("the workbook contains more than %d data rows", maxExcelRows)
 		}
 
 		company := strings.TrimSpace(cellAt(row, columns.Company))
 		if company == "" {
 			result.Skipped++
 			addImportError(result, rowNumber, "company name is required")
-			continue
+			return nil
 		}
 		if utf8.RuneCountInString(company) > 255 {
 			result.Skipped++
 			addImportError(result, rowNumber, "company name is too long")
-			continue
+			return nil
 		}
 
 		category := models.CategorySpring
@@ -404,7 +431,7 @@ func (s *Server) parseAndImportWorkbook(file *excelize.File) (*ImportResult, err
 			if !ok {
 				result.Skipped++
 				addImportError(result, rowNumber, "unknown category: "+raw)
-				continue
+				return nil
 			}
 			category = value
 		}
@@ -415,7 +442,7 @@ func (s *Server) parseAndImportWorkbook(file *excelize.File) (*ImportResult, err
 			if !ok {
 				result.Skipped++
 				addImportError(result, rowNumber, "unknown status: "+raw)
-				continue
+				return nil
 			}
 			status = value
 		}
@@ -424,7 +451,7 @@ func (s *Server) parseAndImportWorkbook(file *excelize.File) (*ImportResult, err
 		if len(link) > 2048 {
 			result.Skipped++
 			addImportError(result, rowNumber, "application link is too long")
-			continue
+			return nil
 		}
 
 		records = append(records, models.Application{
@@ -434,6 +461,27 @@ func (s *Server) parseAndImportWorkbook(file *excelize.File) (*ImportResult, err
 			Status:      status,
 			AppliedAt:   appliedAt,
 		})
+		return nil
+	}
+
+	for index := headerRow + 1; index < len(headerRows); index++ {
+		if err := process(headerRows[index], index+1); err != nil {
+			return nil, err
+		}
+	}
+	nextIndex := len(headerRows)
+	for stream.Next() {
+		row, err := stream.Columns()
+		if err != nil {
+			return nil, fmt.Errorf("read the first sheet: %w", err)
+		}
+		if err := process(row, nextIndex+1); err != nil {
+			return nil, err
+		}
+		nextIndex++
+	}
+	if err := stream.Error(); err != nil {
+		return nil, fmt.Errorf("read the first sheet: %w", err)
 	}
 
 	if len(records) > 0 {

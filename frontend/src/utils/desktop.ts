@@ -128,7 +128,18 @@ export function startWindowResize(edge: ResizeEdge) {
 
 export async function closeWindow() {
   if (!isDesktopRuntime()) {
-    window.close();
+    // Browsers ignore window.close() unless the script opened the tab, so the
+    // headless preview needs the same graceful fallback as the resume preview:
+    // go back when possible, otherwise return to the dashboard.
+    if (window.opener) {
+      window.close();
+      return;
+    }
+    if (document.referrer.startsWith(window.location.origin)) {
+      window.history.back();
+      return;
+    }
+    window.location.assign("/");
     return;
   }
   try {

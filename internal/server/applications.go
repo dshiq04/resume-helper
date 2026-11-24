@@ -89,7 +89,7 @@ func (s *Server) listApplications(c *gin.Context) {
 
 	var from, to *time.Time
 	if strings.TrimSpace(params.From) != "" {
-		parsed, err := parseFlexibleTime(params.From)
+		parsed, err := parseFlexibleRangeTime(params.From, false)
 		if err != nil {
 			apiError(c, http.StatusBadRequest, "invalid_range", "Invalid date range.")
 			return
@@ -97,7 +97,7 @@ func (s *Server) listApplications(c *gin.Context) {
 		from = &parsed
 	}
 	if strings.TrimSpace(params.To) != "" {
-		parsed, err := parseFlexibleTime(params.To)
+		parsed, err := parseFlexibleRangeTime(params.To, true)
 		if err != nil {
 			apiError(c, http.StatusBadRequest, "invalid_range", "Invalid date range.")
 			return
@@ -123,10 +123,10 @@ func (s *Server) listApplications(c *gin.Context) {
 			query = query.Where("LOWER(company_name) LIKE ? OR LOWER(link) LIKE ?", like, like)
 		}
 		if from != nil {
-			query = query.Where("applied_at >= ?", *from)
+			query = query.Where("datetime(applied_at) >= datetime(?)", *from)
 		}
 		if to != nil {
-			query = query.Where("applied_at <= ?", *to)
+			query = query.Where("datetime(applied_at) <= datetime(?)", *to)
 		}
 		return query
 	}
@@ -139,7 +139,7 @@ func (s *Server) listApplications(c *gin.Context) {
 
 	var items []models.Application
 	if err := build().
-		Order("pinned DESC, applied_at DESC, id DESC").
+		Order("pinned DESC, datetime(applied_at) DESC, id DESC").
 		Offset((params.Page - 1) * params.PageSize).
 		Limit(params.PageSize).
 		Find(&items).Error; err != nil {
@@ -172,7 +172,7 @@ func (s *Server) createApplication(c *gin.Context) {
 	}
 	// The application timestamp always comes from the server clock, never
 	// from the client payload.
-	record.AppliedAt = time.Now()
+	record.AppliedAt = time.Now().UTC()
 
 	db := s.database()
 	if err := db.Transaction(func(tx *gorm.DB) error {
@@ -288,7 +288,7 @@ func (s *Server) updateApplication(c *gin.Context) {
 				return err
 			}
 			if newStatus != "" && newStatus != previousStatus {
-				return updateStatusChange(tx, record.ID, previousStatus, newStatus, time.Now())
+				return updateStatusChange(tx, record.ID, previousStatus, newStatus, time.Now().UTC())
 			}
 			return nil
 		}); err != nil {
@@ -383,6 +383,10 @@ func (s *Server) batchUpdateStatus(c *gin.Context) {
 		apiError(c, http.StatusBadRequest, "ids_required", "Select at least one application.")
 		return
 	}
+	if len(ids) > 2000 {
+		apiError(c, http.StatusBadRequest, "too_many_ids", "Too many applications selected.")
+		return
+	}
 	status := models.NormalizeStatus(input.Status)
 	if !models.IsValidStatus(status) {
 		apiError(c, http.StatusBadRequest, "invalid_status", "Unknown application status.")
@@ -405,7 +409,7 @@ func (s *Server) batchUpdateStatus(c *gin.Context) {
 				Update("status", status).Error; err != nil {
 				return err
 			}
-			if err := updateStatusChange(tx, record.ID, record.Status, status, time.Now()); err != nil {
+			if err := updateStatusChange(tx, record.ID, record.Status, status, time.Now().UTC()); err != nil {
 				return err
 			}
 			changed = append(changed, record)
@@ -428,6 +432,10 @@ func (s *Server) batchUpdateCategory(c *gin.Context) {
 	ids := uniqueIDs(input.IDs)
 	if len(ids) == 0 {
 		apiError(c, http.StatusBadRequest, "ids_required", "Select at least one application.")
+		return
+	}
+	if len(ids) > 2000 {
+		apiError(c, http.StatusBadRequest, "too_many_ids", "Too many applications selected.")
 		return
 	}
 	category := models.NormalizeCategory(input.Category)
@@ -524,10 +532,10 @@ func (s *Server) stats(c *gin.Context) {
 			query = query.Where("category = ?", category)
 		}
 		if from != nil {
-			query = query.Where("applied_at >= ?", *from)
+			query = query.Where("datetime(applied_at) >= datetime(?)", *from)
 		}
 		if to != nil {
-			query = query.Where("applied_at <= ?", *to)
+			query = query.Where("datetime(applied_at) <= datetime(?)", *to)
 		}
 		return query
 	}
@@ -631,10 +639,10 @@ func (s *Server) dailyStats(c *gin.Context) {
 	}
 	query := s.database().Model(&models.Application{}).Select("category, applied_at")
 	if from != nil {
-		query = query.Where("applied_at >= ?", *from)
+		query = query.Where("datetime(applied_at) >= datetime(?)", *from)
 	}
 	if to != nil {
-		query = query.Where("applied_at <= ?", *to)
+		query = query.Where("datetime(applied_at) <= datetime(?)", *to)
 	}
 	var rows []struct {
 		Category  string

@@ -90,7 +90,7 @@ func (s *Server) listResumes(c *gin.Context) {
 	}
 
 	items := []models.Resume{}
-	if err := build().Order("pinned DESC, created_at DESC, id DESC").Find(&items).Error; err != nil {
+	if err := build().Order("pinned DESC, datetime(created_at) DESC, id DESC").Find(&items).Error; err != nil {
 		apiError(c, http.StatusInternalServerError, "query_failed", "Failed to load resumes.")
 		return
 	}
@@ -314,6 +314,23 @@ func (s *Server) deleteResume(c *gin.Context) {
 	}
 	s.logInfo("resume deleted", zap.Uint("id", record.ID), zap.String("name", record.Name))
 	c.JSON(http.StatusOK, gin.H{"deleted": 1})
+}
+
+// cleanupDeletedResumeFiles removes temporary ".deleting" files left behind
+// when a previous delete could not remove the renamed file (for example a
+// transient Windows lock). These files no longer belong to any database row.
+func (s *Server) cleanupDeletedResumeFiles() {
+	dir := s.resumeDirectory()
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return
+	}
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".deleting") {
+			continue
+		}
+		_ = os.Remove(filepath.Join(dir, entry.Name()))
+	}
 }
 
 func (s *Server) serveResumeFile(c *gin.Context) {
