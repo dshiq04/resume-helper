@@ -27,12 +27,22 @@ import type { Application, ApplicationHistory, Status } from "../api/types";
 import { CategoryBadge, StatusBadge } from "../components/badges";
 import { useI18n } from "../i18n";
 import { apiErrorMessage } from "../utils/errors";
+import { isWebLink, withProtocol } from "../utils/display";
 import {
   closeWindow,
   isDesktopRuntime,
   minimiseWindow,
   openExternal,
 } from "../utils/desktop";
+
+const STATUS_TIMELINE_COLORS: Record<string, string> = {
+  pending: "gray",
+  screening: "blue",
+  written: "geekblue",
+  interview: "cyan",
+  offer: "green",
+  rejected: "red",
+};
 
 function readRecordId(): number | null {
   const raw = new URLSearchParams(window.location.search).get("id");
@@ -247,13 +257,19 @@ export function ApplicationViewWindowPage() {
                       </span>
                     ),
                     children: record.link ? (
-                      <button
-                        type="button"
-                        className="application-view-link"
-                        onClick={() => void openExternal(record.link)}
-                      >
-                        {record.link}
-                      </button>
+                      isWebLink(record.link) ? (
+                        <button
+                          type="button"
+                          className="application-view-link"
+                          onClick={() =>
+                            void openExternal(withProtocol(record.link))
+                          }
+                        >
+                          {record.link}
+                        </button>
+                      ) : (
+                        <span>{record.link}</span>
+                      )
                     ) : (
                       <span className="link-empty">{t("table.noLink")}</span>
                     ),
@@ -316,7 +332,7 @@ export function ApplicationViewWindowPage() {
                 <Timeline
                   className="application-timeline application-view-timeline-list"
                   items={history.items.map((change, index) => ({
-                    color: change.status,
+                    color: STATUS_TIMELINE_COLORS[change.status] ?? "blue",
                     children: (
                       <div className="timeline-entry application-view-timeline-entry">
                         <div className="timeline-entry-head">

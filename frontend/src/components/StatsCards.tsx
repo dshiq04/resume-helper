@@ -23,7 +23,10 @@ export function StatsCards({ stats, category }: StatsCardsProps) {
     if (category === "all") {
       return {
         total: stats.total,
-        active: stats.byStatus.screening + stats.byStatus.written,
+        active:
+          stats.byStatus.screening +
+          stats.byStatus.written +
+          stats.byStatus.pending,
         interview: stats.byStatus.interview,
         offer: stats.byStatus.offer,
       };
@@ -31,7 +34,10 @@ export function StatsCards({ stats, category }: StatsCardsProps) {
     const byStatus = stats.byCategoryStatus[category];
     return {
       total: stats.byCategory[category] ?? 0,
-      active: (byStatus?.screening ?? 0) + (byStatus?.written ?? 0),
+      active:
+        (byStatus?.screening ?? 0) +
+        (byStatus?.written ?? 0) +
+        (byStatus?.pending ?? 0),
       interview: byStatus?.interview ?? 0,
       offer: byStatus?.offer ?? 0,
     };

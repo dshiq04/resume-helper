@@ -3,9 +3,13 @@ package main
 import (
 	"context"
 	"embed"
+	"encoding/json"
 	"errors"
+	"io"
 	"io/fs"
 	"log"
+	"net"
+	"net/http"
 	"os"
 	"os/signal"
 	"strconv"
@@ -57,6 +61,15 @@ func main() {
 		zap.String("config", cfg.SourcePath),
 		zap.String("driver", cfg.Database.Driver),
 	)
+
+	// Refuse to start a second instance. Two processes sharing the SQLite
+	// file, resume folder and log file would silently diverge, so an already
+	// healthy instance wins and the duplicate exits.
+	if endpoint := runningInstanceURL(cfg); endpoint != "" {
+		appLogger.Warn("another instance is already running; exiting", zap.String("url", endpoint))
+		log.Printf("%s is already running at %s", appinfo.Name(), endpoint)
+		return
+	}
 
 	db, err := database.Open(cfg.Database)
 	if err != nil {
@@ -188,16 +201,66 @@ type BackupService struct {
 	server *server.Server
 }
 
-func (b *BackupService) ExportBackup(path string) (*server.BackupResult, error) {
+func (b *BackupService) authorize(token string) error {
+	if !b.server.SessionValid(token) {
+		return errors.New("unlock the application before importing or exporting data")
+	}
+	return nil
+}
+
+func (b *BackupService) ExportBackup(path string, token string) (*server.BackupResult, error) {
+	if err := b.authorize(token); err != nil {
+		return nil, err
+	}
 	return b.server.ExportBackup(path)
 }
 
-func (b *BackupService) InspectBackup(path string) (*server.BackupResult, error) {
+func (b *BackupService) InspectBackup(path string, token string) (*server.BackupResult, error) {
+	if err := b.authorize(token); err != nil {
+		return nil, err
+	}
 	return b.server.InspectBackup(path)
 }
 
-func (b *BackupService) ImportBackup(path string) (*server.BackupResult, error) {
+func (b *BackupService) ImportBackup(path string, token string) (*server.BackupResult, error) {
+	if err := b.authorize(token); err != nil {
+		return nil, err
+	}
 	return b.server.ImportBackup(path)
+}
+
+// runningInstanceURL probes the configured port for a healthy ResumeTrail
+// instance. It returns the health URL when one is found.
+func runningInstanceURL(cfg *config.Config) string {
+	if cfg.Server.Port <= 0 {
+		return ""
+	}
+	host := strings.TrimSpace(cfg.Server.Host)
+	switch host {
+	case "", "0.0.0.0", "::", "[::]":
+		host = "127.0.0.1"
+	}
+	host = strings.TrimSuffix(strings.TrimPrefix(host, "["), "]")
+	endpoint := "http://" + net.JoinHostPort(host, strconv.Itoa(cfg.Server.Port)) + "/api/health"
+	client := &http.Client{Timeout: 700 * time.Millisecond}
+	response, err := client.Get(endpoint)
+	if err != nil {
+		return ""
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		return ""
+	}
+	var payload struct {
+		Status string `json:"status"`
+	}
+	if err := json.NewDecoder(io.LimitReader(response.Body, 4096)).Decode(&payload); err != nil {
+		return ""
+	}
+	if payload.Status != "ok" {
+		return ""
+	}
+	return endpoint
 }
 
 // registerFileDropEvent forwards file drops that land on a known upload area

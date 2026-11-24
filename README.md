@@ -15,7 +15,7 @@
 - **Zap 日志**：使用 `go.uber.org/zap` 记录启动、数据库、HTTP 请求与错误信息，日志按天写入程序目录下的 `logs/` 文件夹。日志级别包含 DEBUG（调试）、INFO（常规操作）、WARN（可恢复异常）与 ERROR（需要关注的错误）。
 - **三类投递看板**：春招、秋招、实习，侧边栏可快速切换并显示数量；分类使用 React Router 路由页面（`/spring`、`/autumn`、`/internship`）。
 - **完整投递字段**：企业名称、投递链接、状态、投递时间；状态默认「初筛」，投递时间由后端服务器在落库时生成。
-- **内联编辑**：点击企业名称或链接即可直接修改；状态下拉框即时更新。
+- **修改投递**：企业名称、链接等字段默认只读展示，点击行尾「修改」打开独立编辑窗口；状态下拉框可在表格内即时更新。
 - **表格内新增**：点击「新增投递」后直接在表格 / 卡片顶部生成可编辑草稿行，最右侧的对勾按钮保存成功后才写入数据库；取消按钮可丢弃草稿。
 - **独立快速录入窗口**：约 400×170 的原生独立窗口，默认保持在其他窗口上方（标题栏可切换窗口置顶），填写企业名称与投递链接后点「加入」直接落库；成功后自动清空并提示，适合连续录入，主窗口保持原样。记录的置顶仍可在主列表中操作。
 - **官网直达**：鼠标悬浮到投递链接时出现打开按钮，点击后通过系统默认浏览器打开（Wails 桌面环境）。链接按原始内容保存，不会自动添加 `http://` 或 `https://`。
@@ -77,15 +77,20 @@
 | `/spring` | 春招投递 |
 | `/autumn` | 秋招投递 |
 | `/internship` | 实习投递 |
+| `/social` | 社会招聘投递 |
 | `/resumes` | 简历库 |
-| `/application-view` | 投递详情窗口（点击企业头像打开） |
+| `/statistics` | 数据统计 |
+| `/application-view` | 投递详情窗口（点击企业头像打开；浏览器模式下在当前标签页打开） |
+| `/application-edit` | 修改投递窗口（点击行尾「修改」打开；浏览器模式下在当前标签页打开） |
+| `/quick-entry` | 独立快速录入窗口（由应用自动打开） |
+| `/shortcut-prompt` | 桌面快捷方式提示窗口（由应用自动打开） |
 | `/resume-preview` | 独立简历预览窗口（由应用自动打开） |
 | `/settings` | 设置页 |
 | `/trash` | 回收站 |
 | `/close-prompt` | 关闭行为提示窗口（由应用自动打开） |
 | `/data-transfer` | 数据导入 / 导出窗口（由应用自动打开） |
 
-所有 API 请求统一通过 `src/api/client.ts` 中的 Axios 实例发送，自动附加 Bearer Token，并统一处理 401 会话过期。
+所有 API 请求统一通过 `src/api/client.ts` 中的 Axios 实例发送，自动附加 Bearer Token 与进程级 `X-ResumeTrail-Token`，并统一处理 401 会话过期。
 
 ## 快速开始
 
@@ -215,11 +220,11 @@ SQLite 的 `dsn` 为空时默认使用程序目录下的 `resume-helper.db`；�
 
 | 变量 | 说明 | 默认值 |
 | --- | --- | --- |
-| `APP_VERSION` | 版本号：设置页、健康检查 / 系统信息接口和备份文件 | `1.2` |
+| `APP_VERSION` | 版本号：设置页、健康检查 / 系统信息接口和备份文件 | `1.2.1` |
 | `APP_NAME` | 英文应用名称：窗口与进程标识 | `ResumeTrail` |
 | `APP_TITLE` | 显示名称：窗口标题、托盘菜单、桌面快捷方式名称 | `履途 ResumeTrail` |
 | `APP_DEFAULT_LANGUAGE` | 默认界面语言：`zh-CN` / `zh-TW` / `en` / `ja` / `ko` | `zh-CN` |
-| `VITE_SHOW_DEVELOPMENT_WATERMARK` | 开发中水印开关：`true` 开启，`false` 关闭 | `true` |
+| `VITE_SHOW_DEVELOPMENT_WATERMARK` | 开发中水印开关：`true` 开启，`false` 关闭（开发环境默认开启，生产构建默认关闭，分别见 `.env.development` / `.env.production`） | 生产 `false` |
 
 - 修改后需要重新构建前端。
 - 前端启动后会通过 `POST /api/app-info` 把元信息发送给后端；后端在收到之前使用内置默认值。
@@ -255,7 +260,7 @@ database:
 手动初始化数据库：
 
 ```bash
-mysql -u root -p < init.mysql.sql
+mysql -u root -p < sql/init.mysql.sql
 ```
 
 ### PostgreSQL
@@ -270,13 +275,13 @@ database:
 
 ```bash
 createdb resume_helper
-psql -d resume_helper -f init.postgresql.sql
+psql -d resume_helper -f sql/init.postgresql.sql
 ```
 
-项目根目录提供：
+项目根目录的 `sql/` 文件夹提供：
 
-- `init.mysql.sql`（项目根目录）：创建 `resume_helper` 数据库、`applications`、`resumes` 与 `settings` 表及索引。
-- `init.postgresql.sql`（项目根目录）：创建 `applications`、`resumes` 与 `settings` 表及索引（在目标数据库中执行）。
+- `init.mysql.sql`：创建 `resume_helper` 数据库、`applications`、`resumes` 与 `settings` 表及索引。
+- `init.postgresql.sql`：创建 `applications`、`resumes` 与 `settings` 表及索引（在目标数据库中执行）。
 
 > 应用启动时仍会自动执行 GORM `AutoMigrate`。初始化 SQL 主要用于手动建库、DBA 审核或查看实体结构。
 
@@ -287,7 +292,7 @@ psql -d resume_helper -f init.postgresql.sql
 | `RESUME_HELPER_CONFIG` | 指定 config.yaml 路径（必须存在） |
 | `RESUME_HELPER_DATA_DIR` | 指定配置与默认数据库所在目录 |
 | `RESUME_HELPER_HOST` | 监听地址，默认 `127.0.0.1` |
-| `RESUME_HELPER_PORT` | 监听端口，默认 `19876`；端口被占用时会自动使用随机端口 |
+| `RESUME_HELPER_PORT` | 监听端口，默认 `19876`；端口被占用时不再启动第二个实例，旧实例会继续运行 |
 | `RESUME_HELPER_DB_DRIVER` | `sqlite` / `mysql` / `postgres` |
 | `RESUME_HELPER_DB_DSN` | 数据库 DSN |
 | `RESUME_HELPER_HEADLESS` | `true` / `1` 时仅启动 Gin 服务 |
@@ -337,6 +342,10 @@ psql -d resume_helper -f init.postgresql.sql
 | `POST` | `/api/auth/logout` | 注销会话 |
 | `GET` | `/api/applications` | 分页列表，支持 `search`、`category`、`status`；置顶记录优先 |
 | `POST` | `/api/applications` | 新增投递 |
+| `GET` | `/api/application/:id` | 单条投递详情（含当前状态天数） |
+| `GET` | `/api/application/:id/history` | 状态时间线与缺失阶段 |
+| `POST` | `/api/application/:id/history` | 补全某个阶段的发生日期 |
+| `GET` | `/api/applications/companies` | 企业名称自动补全（支持 `search`） |
 | `PUT` | `/api/application/:id` | 局部更新（企业、链接、状态、分类、置顶） |
 | `DELETE` | `/api/application/:id` | 删除单条 |
 | `POST` | `/api/applications/batch-delete` | 批量删除 |
@@ -350,7 +359,9 @@ psql -d resume_helper -f init.postgresql.sql
 | `PUT` | `/api/resume/:id` | 更新名称 / 标签 / 置顶 |
 | `DELETE` | `/api/resume/:id` | 删除简历记录与文件 |
 | `GET` | `/api/resume/:id/file` | 读取原始文件（后端用设备标识码解密后返回，`download=1` 强制下载） |
-| `GET` | `/api/stats` | 分类 / 状态 / 简历数量统计 |
+| `GET` | `/api/stats` | 分类 / 状态 / 简历数量统计（支持 `from`、`to`、`category`） |
+| `GET` | `/api/stats/daily` | 按日期与分类的投递数量趋势 |
+| `GET` | `/api/stats/funnel` | 阶段转化漏斗、平均间隔与企业对比（支持 `category`） |
 | `GET` | `/api/system/info` | 数据库、配置文件、版本信息 |
 | `GET` | `/api/system/device` | 当前设备标识码与简历加密算法 |
 | `GET` | `/api/system/platform` | 当前运行平台（电脑 / 平板 / 手机）与操作系统版本 |
@@ -360,11 +371,24 @@ psql -d resume_helper -f init.postgresql.sql
 | `GET` | `/api/system/shortcut` | 查询桌面快捷方式状态 |
 | `POST` | `/api/system/shortcut` | 创建桌面快捷方式 |
 | `POST` | `/api/system/shortcut/prompt` | 处理关闭时的快捷方式提示窗口选择 |
+| `PUT` | `/api/system/shortcut/prompt-setting` | 保存是否在关闭时显示快捷方式提示 |
+| `POST` | `/api/system/close-prompt` | 处理关闭行为提示窗口选择（最小化到托盘 / 退出） |
+| `POST` | `/api/system/data-transfer` | 打开数据导入 / 导出窗口 |
+| `POST` | `/api/system/application-edit` | 打开独立修改投递窗口 |
+| `POST` | `/api/system/application-view` | 打开独立投递详情窗口 |
+| `GET` | `/api/system/preferences` | 读取关闭行为与闲置锁屏设置 |
+| `PUT` | `/api/system/preferences` | 更新关闭行为与闲置锁屏设置 |
 | `POST` | `/api/system/quick-entry` | 打开独立的快速录入窗口 |
 | `GET` | `/api/system/quick-entry/defaults` | 按服务器时间返回默认投递位置（秋招 / 春招 / 实习） |
 | `POST` | `/api/system/resume-preview` | 打开独立的简历预览窗口 |
 
-开启密码后，除健康检查、认证接口和静态资源外，其余 `/api` 请求需要携带：
+服务端每次启动都会生成一个随机的进程级 Token，并注入到页面 `index.html`；除健康检查外，所有 `/api` 请求都必须携带：
+
+```http
+X-ResumeTrail-Token: <process token>
+```
+
+该 Token 用于阻止其他网页或本机进程直接访问本地 API。开启密码后，除认证接口外还需要额外的会话 Token：
 
 ```http
 Authorization: Bearer <token>
@@ -410,8 +434,9 @@ go test ./...
 ```text
 .
 ├── main.go                              # Wails 窗口 + Gin 启动入口
-├── init.mysql.sql                       # MySQL 初始化脚本
-├── init.postgresql.sql                  # PostgreSQL 初始化脚本
+├── sql/
+│   ├── init.mysql.sql                   # MySQL 初始化脚本
+│   └── init.postgresql.sql              # PostgreSQL 初始化脚本
 ├── config.example.yaml
 ├── internal/
 │   ├── config/                          # 便携式配置加载与环境变量

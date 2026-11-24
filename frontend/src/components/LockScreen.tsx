@@ -28,6 +28,8 @@ export function LockScreen({ onAuthenticated }: LockScreenProps) {
     } catch (err) {
       if (err instanceof ApiError && err.code === "invalid_password") {
         setError(t("auth.error"));
+      } else if (err instanceof ApiError && err.code === "too_many_attempts") {
+        setError(t("error.tooManyAttempts"));
       } else if (err instanceof ApiError && err.code === "network_error") {
         setError(t("error.network"));
       } else {

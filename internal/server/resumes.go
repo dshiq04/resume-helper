@@ -4,8 +4,10 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"mime/multipart"
 	"net/http"
 	"net/url"
@@ -287,11 +289,29 @@ func (s *Server) deleteResume(c *gin.Context) {
 		return
 	}
 
+	// Remove the file before the database row. Renaming it first keeps the
+	// record usable if the database delete fails, and reports a locked file
+	// (common on Windows) instead of leaving an orphan behind.
+	filePath := filepath.Join(s.resumeDirectory(), record.StoredName)
+	trashPath := filePath + ".deleting"
+	renamed := false
+	if err := os.Rename(filePath, trashPath); err == nil {
+		renamed = true
+	} else if !errors.Is(err, fs.ErrNotExist) {
+		apiError(c, http.StatusInternalServerError, "delete_failed", "Failed to delete the resume file.")
+		return
+	}
+
 	if err := s.database().Delete(&models.Resume{}, id).Error; err != nil {
+		if renamed {
+			_ = os.Rename(trashPath, filePath)
+		}
 		apiError(c, http.StatusInternalServerError, "delete_failed", "Failed to delete the resume.")
 		return
 	}
-	_ = os.Remove(filepath.Join(s.resumeDirectory(), record.StoredName))
+	if renamed {
+		_ = os.Remove(trashPath)
+	}
 	s.logInfo("resume deleted", zap.Uint("id", record.ID), zap.String("name", record.Name))
 	c.JSON(http.StatusOK, gin.H{"deleted": 1})
 }

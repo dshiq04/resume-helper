@@ -2,12 +2,17 @@ package server
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/sha256"
+	"crypto/subtle"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io/fs"
 	"log"
 	"net"
 	"net/http"
+	"net/url"
 	"runtime"
 	"strconv"
 	"strings"
@@ -28,6 +33,12 @@ type Server struct {
 	auth   *authManager
 	engine *gin.Engine
 	http   *http.Server
+
+	// apiToken is generated once per process and injected into the served
+	// index.html. Every /api request (except the health check) must carry it,
+	// which stops arbitrary web pages and other local processes from reaching
+	// the API even when password protection is disabled.
+	apiToken string
 
 	loggerMu sync.RWMutex
 	logger   *zap.Logger
@@ -70,13 +81,32 @@ type Server struct {
 func New(cfg *config.Config, db *gorm.DB, assets fs.FS) *Server {
 	gin.SetMode(gin.ReleaseMode)
 	s := &Server{
-		cfg:    cfg,
-		db:     db,
-		assets: assets,
-		auth:   newAuthManager(db),
+		cfg:      cfg,
+		db:       db,
+		assets:   assets,
+		auth:     newAuthManager(db),
+		apiToken: newAPIToken(),
 	}
 	s.engine = s.newEngine()
 	return s
+}
+
+// newAPIToken returns a random per-process bearer value. crypto/rand should
+// always succeed; the hash fallback only keeps the server usable if the
+// operating system entropy source is broken.
+func newAPIToken() string {
+	raw := make([]byte, 32)
+	if _, err := rand.Read(raw); err != nil {
+		sum := sha256.Sum256([]byte(fmt.Sprintf("%d-%d", time.Now().UnixNano(), time.Now().Unix())))
+		return hex.EncodeToString(sum[:])
+	}
+	return hex.EncodeToString(raw)
+}
+
+// APIToken exposes the process token so the desktop layer and tests can
+// authenticate requests sent outside the embedded frontend.
+func (s *Server) APIToken() string {
+	return s.apiToken
 }
 
 // Handler exposes the Gin engine so the Wails asset server can serve both the
@@ -229,7 +259,7 @@ func (s *Server) requestLogger() gin.HandlerFunc {
 
 func (s *Server) newEngine() *gin.Engine {
 	r := gin.New()
-	r.Use(s.requestLogger(), gin.Recovery(), apiErrorHandler(), corsMiddleware(), securityHeaders())
+	r.Use(s.requestLogger(), gin.Recovery(), apiErrorHandler(), s.corsMiddleware(), s.apiTokenAuth(), securityHeaders())
 
 	api := r.Group("/api")
 	{
@@ -325,12 +355,10 @@ func (s *Server) Start() (string, error) {
 	}
 
 	listener, err := listen(s.cfg.Server.Port)
-	if err != nil && s.cfg.Server.Port != 0 {
-		s.logWarn("port is unavailable; falling back to an ephemeral port",
-			zap.Int("port", s.cfg.Server.Port), zap.Error(err))
-		listener, err = listen(0)
-	}
 	if err != nil {
+		// Sharing the SQLite file and resume folder between two processes is
+		// unsafe, so refuse to start instead of silently moving to a random
+		// port when the configured one is already taken.
 		return "", fmt.Errorf("listen on %s: %w", host, err)
 	}
 	s.listener = listener
@@ -403,21 +431,92 @@ func databaseLabel(driver string) string {
 	}
 }
 
-func corsMiddleware() gin.HandlerFunc {
+// corsMiddleware only grants cross-origin access to the Wails webview and the
+// application's own loopback origin. Reflecting arbitrary Origins turned the
+// local API into a cross-site data leak, so unknown origins are rejected for
+// API calls and never receive CORS headers.
+func (s *Server) corsMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		origin := c.GetHeader("Origin")
-		if origin != "" {
+		origin := strings.TrimSpace(c.GetHeader("Origin"))
+		allowed := origin != "" && s.allowedOrigin(origin)
+		if origin != "" && !allowed && strings.HasPrefix(c.Request.URL.Path, "/api/") {
+			apiError(c, http.StatusForbidden, "origin_not_allowed", "This origin is not allowed to access the local API.")
+			return
+		}
+		if allowed {
 			c.Header("Access-Control-Allow-Origin", origin)
 			c.Header("Vary", "Origin")
 			c.Header("Access-Control-Allow-Credentials", "true")
-		} else {
-			c.Header("Access-Control-Allow-Origin", "*")
+			c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
+			c.Header("Access-Control-Allow-Headers", "Origin, Content-Type, Accept, Authorization, X-Requested-With, X-ResumeTrail-Token")
+			c.Header("Access-Control-Max-Age", "86400")
 		}
-		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
-		c.Header("Access-Control-Allow-Headers", "Origin, Content-Type, Accept, Authorization, X-Requested-With")
-		c.Header("Access-Control-Max-Age", "86400")
 		if c.Request.Method == http.MethodOptions {
+			if !allowed {
+				c.AbortWithStatus(http.StatusForbidden)
+				return
+			}
 			c.AbortWithStatus(http.StatusNoContent)
+			return
+		}
+		c.Next()
+	}
+}
+
+func (s *Server) allowedOrigin(origin string) bool {
+	parsed, err := url.Parse(strings.TrimSpace(origin))
+	if err != nil {
+		return false
+	}
+	scheme := strings.ToLower(parsed.Scheme)
+	host := strings.ToLower(parsed.Hostname())
+	switch scheme {
+	case "wails":
+		return host == "wails" || host == "localhost" || host == "wails.localhost"
+	case "http", "https":
+		if host == "wails.localhost" {
+			return true
+		}
+		if host != "127.0.0.1" && host != "localhost" && host != "::1" {
+			return false
+		}
+		return s.originPortAllowed(parsed.Port())
+	default:
+		return false
+	}
+}
+
+// originPortAllowed matches the loopback origin against the actual listener
+// port. Before Start (tests) the listener is unknown, so any loopback port is
+// accepted and the per-process API token still provides the real boundary.
+func (s *Server) originPortAllowed(port string) bool {
+	if s.listener == nil {
+		return true
+	}
+	address, ok := s.listener.Addr().(*net.TCPAddr)
+	if !ok {
+		return true
+	}
+	if port == "" {
+		return address.Port == 80 || address.Port == 443
+	}
+	return port == strconv.Itoa(address.Port)
+}
+
+// apiTokenAuth requires the per-process token on every API request except the
+// public health check. The frontend receives the value through the injected
+// index.html bootstrap script, so browser pages on other origins cannot read
+// it (CORS) or guess it.
+func (s *Server) apiTokenAuth() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		path := c.Request.URL.Path
+		if !strings.HasPrefix(path, "/api/") || path == "/api/health" {
+			c.Next()
+			return
+		}
+		token := strings.TrimSpace(c.GetHeader("X-ResumeTrail-Token"))
+		if token == "" || subtle.ConstantTimeCompare([]byte(token), []byte(s.apiToken)) != 1 {
+			apiError(c, http.StatusForbidden, "invalid_app_token", "Missing or invalid application token.")
 			return
 		}
 		c.Next()

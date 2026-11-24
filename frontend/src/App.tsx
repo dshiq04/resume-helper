@@ -218,16 +218,27 @@ function AppRoot() {
       void checkAuth();
       void loadStats();
     };
+    // Importing a backup replaces the settings table (including the password
+    // hash) and invalidates every session, so the window must re-read both
+    // auth status and preferences instead of trusting its cached state.
+    const handleAuthChanged = () => {
+      void checkAuth();
+      void loadPreferences();
+    };
     const refreshStats = () => void loadStats();
     const unsubscribe = Events.On("resumetrail:data-changed", refreshStats);
+    const unsubscribeAuth = Events.On("resumetrail:auth-changed", handleAuthChanged);
     window.addEventListener("resumetrail:database-changed", handleDatabaseChanged);
     window.addEventListener("resumetrail:data-changed", refreshStats);
+    window.addEventListener("resumetrail:auth-changed", handleAuthChanged);
     return () => {
       unsubscribe();
+      unsubscribeAuth();
       window.removeEventListener("resumetrail:database-changed", handleDatabaseChanged);
       window.removeEventListener("resumetrail:data-changed", refreshStats);
+      window.removeEventListener("resumetrail:auth-changed", handleAuthChanged);
     };
-  }, [checkAuth, loadStats]);
+  }, [checkAuth, loadPreferences, loadStats]);
 
   const handleAuthenticated = useCallback((_session: AuthSession) => {
     setStage("ready");

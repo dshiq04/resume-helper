@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -460,31 +461,57 @@ func (s *Server) parseAndImportWorkbook(file *excelize.File) (*ImportResult, err
 }
 
 func findImportHeader(rows [][]string) (int, importColumns) {
-	columns := importColumns{Category: -1, Company: -1, Link: -1, Status: -1}
 	limit := len(rows)
 	if limit > 10 {
 		limit = 10
 	}
 	for rowIndex := 0; rowIndex < limit; rowIndex++ {
-		columns = importColumns{Category: -1, Company: -1, Link: -1, Status: -1}
-		for colIndex, cell := range rows[rowIndex] {
+		row := rows[rowIndex]
+		columns := importColumns{Category: -1, Company: -1, Link: -1, Status: -1}
+
+		// Exact matches win so a "Company Size" column can never be mistaken
+		// for the company-name column when "Company Name" exists in the row.
+		for colIndex, cell := range row {
 			switch {
-			case columns.Company < 0 && matchesHeader(cell, []string{"company", "companyname", "企业名称", "公司名称", "企业", "公司", "会社名", "기업명", "회사명"}):
+			case columns.Company < 0 && matchesHeaderExact(cell, companyHeaderAliases):
 				columns.Company = colIndex
-			case columns.Category < 0 && matchesHeader(cell, []string{"category", "大分类", "分类", "类别", "招聘类型", "招聘類型", "採用区分", "채용유형"}):
+			case columns.Category < 0 && matchesHeaderExact(cell, categoryHeaderAliases):
 				columns.Category = colIndex
-			case columns.Link < 0 && matchesHeader(cell, []string{"link", "url", "applicationlink", "投递链接", "投遞連結", "链接", "連結", "网址", "網址", "応募リンク", "지원링크"}):
+			case columns.Link < 0 && matchesHeaderExact(cell, linkHeaderAliases):
 				columns.Link = colIndex
-			case columns.Status < 0 && matchesHeader(cell, []string{"status", "状态", "狀態", "进度", "進度", "進捗", "진행상태"}):
+			case columns.Status < 0 && matchesHeaderExact(cell, statusHeaderAliases):
 				columns.Status = colIndex
 			}
 		}
+
+		// Fall back to substring matching only for columns that are still
+		// unassigned (for example "企业名称（必填）").
+		for colIndex, cell := range row {
+			switch {
+			case columns.Company < 0 && matchesHeader(cell, companyHeaderAliases):
+				columns.Company = colIndex
+			case columns.Category < 0 && matchesHeader(cell, categoryHeaderAliases):
+				columns.Category = colIndex
+			case columns.Link < 0 && matchesHeader(cell, linkHeaderAliases):
+				columns.Link = colIndex
+			case columns.Status < 0 && matchesHeader(cell, statusHeaderAliases):
+				columns.Status = colIndex
+			}
+		}
+
 		if columns.Company >= 0 {
 			return rowIndex, columns
 		}
 	}
-	return -1, columns
+	return -1, importColumns{Category: -1, Company: -1, Link: -1, Status: -1}
 }
+
+var (
+	companyHeaderAliases  = []string{"company", "companyname", "企业名称", "公司名称", "企业", "公司", "会社名", "기업명", "회사명"}
+	categoryHeaderAliases = []string{"category", "大分类", "分类", "类别", "招聘类型", "招聘類型", "採用区分", "채용유형"}
+	linkHeaderAliases     = []string{"link", "url", "applicationlink", "投递链接", "投遞連結", "链接", "連結", "网址", "網址", "応募リンク", "지원링크"}
+	statusHeaderAliases   = []string{"status", "状态", "狀態", "进度", "進度", "進捗", "진행상태"}
+)
 
 func matchesHeader(value string, aliases []string) bool {
 	normalized := normalizeHeader(value)
@@ -493,6 +520,19 @@ func matchesHeader(value string, aliases []string) bool {
 	}
 	for _, alias := range aliases {
 		if strings.Contains(normalized, normalizeHeader(alias)) {
+			return true
+		}
+	}
+	return false
+}
+
+func matchesHeaderExact(value string, aliases []string) bool {
+	normalized := normalizeHeader(value)
+	if normalized == "" {
+		return false
+	}
+	for _, alias := range aliases {
+		if normalized == normalizeHeader(alias) {
 			return true
 		}
 	}
@@ -515,10 +555,11 @@ func parseCategory(value string) (string, bool) {
 	if category, ok := categoryAliases[key]; ok {
 		return category, true
 	}
-	// Accept values such as "Spring 2026".
-	for alias, category := range categoryAliases {
-		if strings.HasPrefix(key, alias) {
-			return category, true
+	// Accept values such as "Spring 2026", but never an arbitrary prefix:
+	// "international" must not be treated as "intern".
+	for _, alias := range categoryAliasKeys {
+		if aliasValueMatches(key, alias) {
+			return categoryAliases[alias], true
 		}
 	}
 	return "", false
@@ -529,12 +570,52 @@ func parseStatus(value string) (string, bool) {
 	if status, ok := statusAliases[key]; ok {
 		return status, true
 	}
-	for alias, status := range statusAliases {
-		if strings.HasPrefix(key, alias) {
-			return status, true
+	for _, alias := range statusAliasKeys {
+		if aliasValueMatches(key, alias) {
+			return statusAliases[alias], true
 		}
 	}
 	return "", false
+}
+
+// categoryAliasKeys and statusAliasKeys are sorted longest-first so that
+// "autumnrecruit" wins over "autumn" and the result does not depend on Go's
+// random map iteration order.
+var (
+	categoryAliasKeys = sortedAliasKeys(categoryAliases)
+	statusAliasKeys   = sortedAliasKeys(statusAliases)
+)
+
+func sortedAliasKeys(aliases map[string]string) []string {
+	keys := make([]string, 0, len(aliases))
+	for key := range aliases {
+		keys = append(keys, key)
+	}
+	sort.Slice(keys, func(left, right int) bool {
+		if len(keys[left]) == len(keys[right]) {
+			return keys[left] < keys[right]
+		}
+		return len(keys[left]) > len(keys[right])
+	})
+	return keys
+}
+
+func aliasValueMatches(key, alias string) bool {
+	if !strings.HasPrefix(key, alias) {
+		return false
+	}
+	remainder := key[len(alias):]
+	if remainder == "" {
+		return true
+	}
+	// Only a trailing year is accepted ("spring2026", "秋招2026"). This keeps
+	// "international" and "autumn festival" from matching shorter aliases.
+	for _, character := range remainder {
+		if character < '0' || character > '9' {
+			return false
+		}
+	}
+	return true
 }
 
 func cellAt(row []string, index int) string {

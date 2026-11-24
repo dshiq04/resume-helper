@@ -51,11 +51,12 @@ func recordStatusChange(db *gorm.DB, applicationID uint, status string, changedA
 	}).Error
 }
 
-// updateStatusChange records a normal status transition. When the new status
-// comes later in the timeline order than the previous status, an existing
-// milestone is refreshed with the server time so the timeline never keeps a
-// stale timestamp for a status the user just re-entered.
-func updateStatusChange(db *gorm.DB, applicationID uint, previousStatus, status string, changedAt time.Time) error {
+// updateStatusChange records a normal status transition. The timestamp of an
+// existing milestone is refreshed whenever the user enters that stage again,
+// including regressions such as interview → screening. Without this, the
+// "days in current status" values would keep counting from the first time the
+// stage was ever reached.
+func updateStatusChange(db *gorm.DB, applicationID uint, _ string, status string, changedAt time.Time) error {
 	if applicationID == 0 || status == "" {
 		return nil
 	}
@@ -76,7 +77,7 @@ func updateStatusChange(db *gorm.DB, applicationID uint, previousStatus, status 
 		return err
 	}
 
-	if timelineStatusRank(status) > timelineStatusRank(previousStatus) && changedAt.After(existing.ChangedAt) {
+	if changedAt.After(existing.ChangedAt) {
 		return db.Model(&existing).Update("changed_at", changedAt).Error
 	}
 	return nil
@@ -119,7 +120,7 @@ func (s *Server) getApplicationHistory(c *gin.Context) {
 	var record models.Application
 	if err := db.First(&record, id).Error; err != nil {
 		if isRecordNotFound(err) {
-			fail(c, http.StatusNotFound, "not_found", "原内容不存在")
+			fail(c, http.StatusNotFound, "not_found", "The record does not exist.")
 			return
 		}
 		apiError(c, http.StatusInternalServerError, "query_failed", "Failed to load the application.")
@@ -245,7 +246,7 @@ func (s *Server) createApplicationHistory(c *gin.Context) {
 	var record models.Application
 	if err := db.First(&record, id).Error; err != nil {
 		if isRecordNotFound(err) {
-			fail(c, http.StatusNotFound, "not_found", "原内容不存在")
+			fail(c, http.StatusNotFound, "not_found", "The record does not exist.")
 			return
 		}
 		apiError(c, http.StatusInternalServerError, "query_failed", "Failed to load the application.")

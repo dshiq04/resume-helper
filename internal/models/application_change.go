@@ -23,12 +23,16 @@ var StageOrder = []string{StatusScreening, StatusWritten, StatusInterview, Statu
 // terminal stages: offer or rejected. A record that reached one terminal stage
 // never requires the other one, which keeps the "complete the history" form
 // focused on the outcome that actually happened.
+//
+// Rejection can happen after any stage, so the rejected chain intentionally
+// stops at screening instead of assuming a written test and an interview took
+// place. Treating every rejection as interviewed skewed the funnel.
 func StageChainForStatus(status string) []string {
 	if status == StatusPending {
 		return []string{StatusPending}
 	}
 	if status == StatusRejected {
-		return []string{StatusPending, StatusScreening, StatusWritten, StatusInterview, StatusRejected}
+		return []string{StatusPending, StatusScreening, StatusRejected}
 	}
 	for index, stage := range StageOrder {
 		if stage == status {

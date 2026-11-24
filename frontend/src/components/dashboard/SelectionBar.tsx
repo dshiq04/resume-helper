@@ -55,7 +55,6 @@ export function SelectionBar({
   return (
     <div className="selection-bar">
       <div className="selection-info">
-        <span className="selection-count">{count}</span>
         <span>{t("table.selectedCount", { count })}</span>
       </div>
       <div className="selection-actions">

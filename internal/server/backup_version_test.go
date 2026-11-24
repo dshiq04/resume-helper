@@ -171,6 +171,9 @@ func TestCompareAppVersions(t *testing.T) {
 		{"1.2", "1.2-beta", 1},
 		{"1.2-beta", "1.2", -1},
 		{"1.2-beta", "1.2-alpha", 1},
+		{"1.2-beta.10", "1.2-beta.2", 1},
+		{"1.2-beta.2", "1.2-beta.10", -1},
+		{"1.2-beta.1", "1.2-beta", 1},
 		{"1.2.0+build", "1.2.0", 0},
 	}
 	for _, tc := range cases {

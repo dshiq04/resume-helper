@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	fallbackVersion  = "1.2"
+	fallbackVersion  = "1.2.1"
 	fallbackName     = "ResumeTrail"
 	fallbackTitle    = "履途 ResumeTrail"
 	fallbackLanguage = "zh-CN"

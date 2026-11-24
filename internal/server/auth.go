@@ -4,7 +4,9 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
+	"math"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -19,19 +21,36 @@ import (
 const (
 	passwordSettingKey = "auth.password_hash"
 	sessionTTL         = 24 * time.Hour
+
+	// Login throttling: after maxLoginFailures failed attempts the client is
+	// locked out with exponential backoff, capped at loginLockMax.
+	maxLoginFailures  = 5
+	loginLockBase     = 5 * time.Second
+	loginLockMax      = 5 * time.Minute
+	loginAttemptReset = time.Hour
 )
+
+type loginAttempts struct {
+	failures    int
+	lastFailure time.Time
+	lockedUntil time.Time
+}
 
 type authManager struct {
 	dbMu     sync.RWMutex
 	db       *gorm.DB
 	mu       sync.Mutex
 	sessions map[string]time.Time
+
+	loginMu       sync.Mutex
+	loginAttempts map[string]*loginAttempts
 }
 
 func newAuthManager(db *gorm.DB) *authManager {
 	return &authManager{
-		db:       db,
-		sessions: make(map[string]time.Time),
+		db:            db,
+		sessions:      make(map[string]time.Time),
+		loginAttempts: make(map[string]*loginAttempts),
 	}
 }
 
@@ -142,6 +161,59 @@ func (a *authManager) invalidateAllSessions() {
 	a.sessions = make(map[string]time.Time)
 }
 
+// loginRetryAfter reports how long the client still has to wait before
+// another password attempt is accepted.
+func (a *authManager) loginRetryAfter(key string) time.Duration {
+	a.loginMu.Lock()
+	defer a.loginMu.Unlock()
+	item, exists := a.loginAttempts[key]
+	if !exists {
+		return 0
+	}
+	now := time.Now()
+	if now.Before(item.lockedUntil) {
+		return item.lockedUntil.Sub(now)
+	}
+	if !item.lastFailure.IsZero() && now.Sub(item.lastFailure) > loginAttemptReset {
+		delete(a.loginAttempts, key)
+	}
+	return 0
+}
+
+func (a *authManager) registerLoginFailure(key string) {
+	a.loginMu.Lock()
+	defer a.loginMu.Unlock()
+	now := time.Now()
+	item, exists := a.loginAttempts[key]
+	if !exists {
+		item = &loginAttempts{}
+		a.loginAttempts[key] = item
+	}
+	if !item.lastFailure.IsZero() && now.Sub(item.lastFailure) > loginAttemptReset {
+		item.failures = 0
+		item.lockedUntil = time.Time{}
+	}
+	item.failures++
+	item.lastFailure = now
+	if item.failures >= maxLoginFailures {
+		exponent := item.failures - maxLoginFailures
+		if exponent > 10 {
+			exponent = 10
+		}
+		backoff := loginLockBase << exponent
+		if backoff > loginLockMax {
+			backoff = loginLockMax
+		}
+		item.lockedUntil = now.Add(backoff)
+	}
+}
+
+func (a *authManager) clearLoginFailures(key string) {
+	a.loginMu.Lock()
+	defer a.loginMu.Unlock()
+	delete(a.loginAttempts, key)
+}
+
 func (a *authManager) requireAuth() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		enabled, err := a.enabled()
@@ -190,6 +262,13 @@ func (s *Server) authLogin(c *gin.Context) {
 		return
 	}
 
+	attemptKey := c.ClientIP()
+	if wait := s.auth.loginRetryAfter(attemptKey); wait > 0 {
+		c.Header("Retry-After", strconv.Itoa(int(math.Ceil(wait.Seconds()))))
+		apiError(c, http.StatusTooManyRequests, "too_many_attempts", "Too many failed attempts. Try again later.")
+		return
+	}
+
 	var input struct {
 		Password string `json:"password"`
 	}
@@ -203,9 +282,11 @@ func (s *Server) authLogin(c *gin.Context) {
 		return
 	}
 	if !ok {
+		s.auth.registerLoginFailure(attemptKey)
 		apiError(c, http.StatusUnauthorized, "invalid_password", "Incorrect password.")
 		return
 	}
+	s.auth.clearLoginFailures(attemptKey)
 
 	token, expiresAt, err := s.auth.createSession()
 	if err != nil {
@@ -361,4 +442,17 @@ func bearerToken(c *gin.Context) string {
 		return ""
 	}
 	return parts[1]
+}
+
+// SessionValid reports whether the given token is an active session. When
+// password protection is disabled every local action is allowed.
+func (s *Server) SessionValid(token string) bool {
+	enabled, err := s.auth.enabled()
+	if err != nil {
+		return false
+	}
+	if !enabled {
+		return true
+	}
+	return s.auth.validateSession(strings.TrimSpace(token))
 }

@@ -15,7 +15,7 @@ func TestStageChainForStatus(t *testing.T) {
 		{StatusWritten, []string{StatusPending, StatusScreening, StatusWritten}},
 		{StatusInterview, []string{StatusPending, StatusScreening, StatusWritten, StatusInterview}},
 		{StatusOffer, []string{StatusPending, StatusScreening, StatusWritten, StatusInterview, StatusOffer}},
-		{StatusRejected, []string{StatusPending, StatusScreening, StatusWritten, StatusInterview, StatusRejected}},
+		{StatusRejected, []string{StatusPending, StatusScreening, StatusRejected}},
 	}
 
 	for _, test := range tests {

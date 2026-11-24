@@ -201,7 +201,7 @@ func (s *Server) getApplication(c *gin.Context) {
 	var record models.Application
 	if err := s.database().First(&record, id).Error; err != nil {
 		if isRecordNotFound(err) {
-			fail(c, http.StatusNotFound, "not_found", "原内容不存在")
+			fail(c, http.StatusNotFound, "not_found", "The record does not exist.")
 			return
 		}
 		apiError(c, http.StatusInternalServerError, "query_failed", "Failed to load the application.")
@@ -221,7 +221,7 @@ func (s *Server) updateApplication(c *gin.Context) {
 	var record models.Application
 	if err := db.First(&record, id).Error; err != nil {
 		if isRecordNotFound(err) {
-			fail(c, http.StatusNotFound, "not_found", "原内容不存在")
+			fail(c, http.StatusNotFound, "not_found", "The record does not exist.")
 			return
 		}
 		apiError(c, http.StatusInternalServerError, "query_failed", "Failed to load the application.")
@@ -513,9 +513,16 @@ func (s *Server) stats(c *gin.Context) {
 	if !ok {
 		return
 	}
+	category, ok := parseStatsCategory(c)
+	if !ok {
+		return
+	}
 	db := s.database()
 	base := func() *gorm.DB {
 		query := db.Model(&models.Application{})
+		if category != "" {
+			query = query.Where("category = ?", category)
+		}
 		if from != nil {
 			query = query.Where("applied_at >= ?", *from)
 		}

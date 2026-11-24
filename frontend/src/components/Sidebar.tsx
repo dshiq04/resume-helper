@@ -63,7 +63,9 @@ export function Sidebar({ stats, passwordEnabled, collapsed }: SidebarProps) {
   const total = stats?.total ?? 0;
   const offers = stats?.byStatus.offer ?? 0;
   const active =
-    (stats?.byStatus.screening ?? 0) + (stats?.byStatus.written ?? 0);
+    (stats?.byStatus.screening ?? 0) +
+    (stats?.byStatus.written ?? 0) +
+    (stats?.byStatus.pending ?? 0);
   const rate = total > 0 ? Math.round((offers / total) * 100) : 0;
 
   return (

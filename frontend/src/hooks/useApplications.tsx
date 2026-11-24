@@ -172,13 +172,18 @@ export function useApplications({
         await updateField(record.id, { status });
         message.success(t("toast.updated"));
         onDataChanged();
+        // A status filter is server-side, so a row that no longer matches it
+        // has to be removed from the current page immediately.
+        if (statusFilter !== "all") {
+          refresh();
+        }
       } catch (error) {
         message.error(apiErrorMessage(error, t));
       } finally {
         setStatusSavingId(null);
       }
     },
-    [message, onDataChanged, t, updateField],
+    [message, onDataChanged, refresh, statusFilter, t, updateField],
   );
 
   const togglePin = useCallback(

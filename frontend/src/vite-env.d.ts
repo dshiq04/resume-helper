@@ -13,3 +13,8 @@ declare const __APP_VERSION__: string;
 declare const __APP_NAME__: string;
 declare const __APP_TITLE__: string;
 declare const __APP_DEFAULT_LANGUAGE__: string;
+
+interface Window {
+  /** Per-process API token injected into index.html by the Go server. */
+  __RESUME_TRAIL_TOKEN__?: string;
+}
