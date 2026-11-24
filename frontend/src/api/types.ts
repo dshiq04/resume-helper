@@ -205,7 +205,7 @@ export interface AuthSession {
   enabled: boolean;
 }
 
-export type DatabaseDriver = "sqlite" | "mysql" | "postgres";
+export type DatabaseDriver = "sqlite";
 
 export interface AppInfoInput {
   version: string;
@@ -226,14 +226,7 @@ export interface SystemInfo {
 
 export interface DatabaseSettings {
   driver: DatabaseDriver;
-  dsn: string;
   sqlitePath: string;
-  host: string;
-  port: number;
-  user: string;
-  password: string;
-  database: string;
-  sslMode: string;
   parseError?: string;
 }
 
@@ -245,9 +238,7 @@ export interface DatabaseSettingsResponse {
   envOverride: boolean;
 }
 
-export interface DatabaseInput extends DatabaseSettings {
-  useDsn: boolean;
-}
+export type DatabaseInput = DatabaseSettings;
 
 export interface DatabaseUpdateResult extends DatabaseSettingsResponse {
   ok: boolean;

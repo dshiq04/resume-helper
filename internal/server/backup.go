@@ -894,22 +894,6 @@ func (s *Server) ImportBackup(source string) (*BackupResult, error) {
 				return err
 			}
 		}
-
-		// PostgreSQL sequences do not advance when rows are inserted with an
-		// explicit id. Move them past the restored ids so the next normal
-		// insert cannot collide with an imported row.
-		if tx.Dialector.Name() == "postgres" {
-			for _, table := range []string{"applications", "resumes"} {
-				statement := fmt.Sprintf(
-					"SELECT setval(pg_get_serial_sequence('%s','id'), COALESCE((SELECT MAX(id) FROM %s), 0) + 1, false)",
-					table,
-					table,
-				)
-				if err := tx.Exec(statement).Error; err != nil {
-					return err
-				}
-			}
-		}
 		return nil
 	})
 	if err != nil {

@@ -404,10 +404,7 @@ func (s *Server) systemInfo(c *gin.Context) {
 	dataDir := s.cfg.DataDir
 	s.dbMu.RUnlock()
 
-	location := ""
-	if driver == "sqlite" {
-		location = dsn
-	}
+	location := dsn
 	c.JSON(http.StatusOK, gin.H{
 		"version":     appinfo.Version(),
 		"goVersion":   runtime.Version(),
@@ -420,15 +417,8 @@ func (s *Server) systemInfo(c *gin.Context) {
 	})
 }
 
-func databaseLabel(driver string) string {
-	switch driver {
-	case "mysql":
-		return "MySQL"
-	case "postgres":
-		return "PostgreSQL"
-	default:
-		return "SQLite"
-	}
+func databaseLabel(_ string) string {
+	return "SQLite"
 }
 
 // corsMiddleware only grants cross-origin access to the Wails webview and the

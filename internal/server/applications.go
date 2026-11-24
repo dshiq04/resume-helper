@@ -623,8 +623,7 @@ type dailyStat struct {
 }
 
 // dailyStats returns per-day application counts grouped by category. The
-// aggregation happens in Go so the query stays portable across SQLite, MySQL
-// and PostgreSQL, which all format dates differently.
+// aggregation happens in Go so the query stays straightforward with SQLite.
 func (s *Server) dailyStats(c *gin.Context) {
 	from, to, ok := parseStatsRange(c)
 	if !ok {

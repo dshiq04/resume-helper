@@ -32,10 +32,10 @@ type ServerConfig struct {
 }
 
 type DatabaseConfig struct {
-	// Driver is one of: sqlite, mysql, postgres.
+	// Driver is always "sqlite"; the field is kept for forward compatibility.
 	Driver string `yaml:"driver"`
-	// DSN is the GORM driver DSN. When empty for sqlite, resume-helper.db is
-	// created next to the executable.
+	// DSN is the SQLite file path. When empty, resume-helper.db is created
+	// next to the executable.
 	DSN string `yaml:"dsn"`
 }
 
@@ -118,16 +118,13 @@ func Load() (*Config, error) {
 }
 
 // NormalizeDriver maps accepted driver aliases to their canonical names.
+// SQLite is the only supported storage backend.
 func NormalizeDriver(driver string) (string, error) {
 	switch strings.ToLower(strings.TrimSpace(driver)) {
 	case "", "sqlite", "sqlite3":
 		return "sqlite", nil
-	case "postgresql", "pg", "postgres":
-		return "postgres", nil
-	case "mysql":
-		return "mysql", nil
 	default:
-		return "", fmt.Errorf("unsupported database driver %q (use sqlite, mysql or postgres)", driver)
+		return "", fmt.Errorf("unsupported database driver %q (only sqlite is supported)", driver)
 	}
 }
 
@@ -143,40 +140,30 @@ func NormalizeDatabase(dataDir, driver, dsn string) (DatabaseConfig, DatabaseCon
 	}
 	raw := strings.TrimSpace(dsn)
 
-	if normalized == "sqlite" {
-		storage := DatabaseConfig{Driver: normalized}
-		runtime := DatabaseConfig{Driver: normalized}
-		switch {
-		case raw == "":
-			runtime.DSN = filepath.Join(dataDir, "resume-helper.db")
-		case raw == ":memory:" || strings.HasPrefix(raw, "file:"):
-			// Keep special SQLite DSNs untouched.
-			storage.DSN = raw
-			runtime.DSN = raw
-		case filepath.IsAbs(raw):
-			clean := filepath.Clean(raw)
-			runtime.DSN = clean
-			storage.DSN = clean
-			if rel, relErr := filepath.Rel(dataDir, clean); relErr == nil &&
-				rel != "." && rel != ".." &&
-				!strings.HasPrefix(rel, ".."+string(os.PathSeparator)) &&
-				!filepath.IsAbs(rel) {
-				storage.DSN = rel
-			}
-		default:
-			storage.DSN = raw
-			runtime.DSN = filepath.Join(dataDir, raw)
+	storage := DatabaseConfig{Driver: normalized}
+	runtime := DatabaseConfig{Driver: normalized}
+	switch {
+	case raw == "":
+		runtime.DSN = filepath.Join(dataDir, "resume-helper.db")
+	case raw == ":memory:" || strings.HasPrefix(raw, "file:"):
+		// Keep special SQLite DSNs untouched.
+		storage.DSN = raw
+		runtime.DSN = raw
+	case filepath.IsAbs(raw):
+		clean := filepath.Clean(raw)
+		runtime.DSN = clean
+		storage.DSN = clean
+		if rel, relErr := filepath.Rel(dataDir, clean); relErr == nil &&
+			rel != "." && rel != ".." &&
+			!strings.HasPrefix(rel, ".."+string(os.PathSeparator)) &&
+			!filepath.IsAbs(rel) {
+			storage.DSN = rel
 		}
-		return storage, runtime, nil
+	default:
+		storage.DSN = raw
+		runtime.DSN = filepath.Join(dataDir, raw)
 	}
-
-	if raw == "" {
-		return DatabaseConfig{}, DatabaseConfig{}, fmt.Errorf(
-			"database.dsn is required when database.driver is %s", normalized,
-		)
-	}
-	return DatabaseConfig{Driver: normalized, DSN: raw},
-		DatabaseConfig{Driver: normalized, DSN: raw}, nil
+	return storage, runtime, nil
 }
 
 // Save writes the current server and database configuration back to the
@@ -199,8 +186,7 @@ func (c *Config) Save() error {
 	}
 	header := "# ResumeTrail portable configuration\n" +
 		"# Updated from the Settings page. You can edit this file, but manual\n" +
-		"# changes only take effect after restarting the application.\n" +
-		"# Database credentials are stored in plain text in this local file.\n\n"
+		"# changes only take effect after restarting the application.\n\n"
 	return os.WriteFile(c.SourcePath, append([]byte(header), data...), 0o644)
 }
 
@@ -283,25 +269,18 @@ func defaultConfigFile(_ string) string {
 # inside the application folder and nothing is written to AppData or other
 # system directories.
 #
-# Tip: Settings > Database in the app can configure SQLite / MySQL /
-# PostgreSQL graphically, test the connection and apply changes without a
-# restart. Manual edits to this file require a restart.
-# Database credentials are local to this file; keep it private.
+# Tip: Settings > Storage in the app can change the SQLite location and apply
+# it without a restart. Manual edits to this file require a restart.
 
 server:
   host: 127.0.0.1
   port: 19876
 
 database:
-  # sqlite | mysql | postgres
+  # SQLite is the only supported storage backend.
   driver: sqlite
-  # SQLite: empty means resume-helper.db next to this file. Relative paths
-  # are also resolved next to this config file.
-  # Default: resume-helper.db
-  # MySQL example:
-  #   dsn: "user:password@tcp(127.0.0.1:3306)/resume_helper?charset=utf8mb4&parseTime=True&loc=Local"
-  # PostgreSQL example:
-  #   dsn: "host=127.0.0.1 user=postgres password=secret dbname=resume_helper port=5432 sslmode=disable TimeZone=Local"
+  # Empty means resume-helper.db next to this file. Relative paths are
+  # resolved against the config file's folder.
   dsn: ""
 `
 }

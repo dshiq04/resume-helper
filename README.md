@@ -1,6 +1,6 @@
 # 履途 ResumeTrail
 
-一个专注、漂亮的简历投递记录工具。后端使用 **Go + Gin + GORM**，前端使用 **React + Ant Design**，并通过 **Wails 3** 以无边框桌面窗口运行。支持本地 SQLite、MySQL、PostgreSQL 三种数据库。
+一个专注、漂亮的简历投递记录工具。后端使用 **Go + Gin + GORM**，前端使用 **React + Ant Design**，并通过 **Wails 3** 以无边框桌面窗口运行。数据保存在本地 SQLite 数据库中。
 
 ![ResumeTrail 界面预览](docs/preview-light.png)
 
@@ -33,8 +33,8 @@
 - **设置独立页面**：通过 `/settings` 路由访问，和投递工作台解耦。
 - **数据统计**：总投递、待推进、面试中、Offer 数量及 Offer 转化率。
 - **便携式数据**：配置文件和 SQLite 数据库默认存放在程序所在目录，不向 AppData 或其他系统目录写入数据。
-- **多数据库支持**：SQLite（零配置本地存储）、MySQL、PostgreSQL，自动迁移表结构，并提供初始化 SQL 文件。
-- **图形化数据库设置**：在设置页选择数据库类型、填写主机 / 端口 / 用户名 / 密码 / 数据库名，支持「测试连接」；保存后立即切换连接并写回 `config.yaml`，无需重启。
+- **本地 SQLite 存储**：零配置本地数据库，自动迁移表结构，无需安装或连接外部数据库服务。
+- **图形化存储设置**：在设置页修改 SQLite 数据库位置，支持「测试连接」；保存后立即切换并写回 `config.yaml`，无需重启。
 - **完整数据迁移（v1.2）**：设置页提供「数据导入 / 导出」入口，打开独立 Wails 窗口；将投递、状态历史、回收站、设置与解密后的简历原文件打包为一个 ZIP（内含 `manifest.json`）。设备码不会导出，导入时会使用当前设备码重新加密简历，同时保留原 ID、时间戳与设置，实现升级或换机后的原样恢复。`manifest.json` 的首个字段为备份创建时的 `version`，导入时要求当前客户端版本不低于备份版本；相同版本（含相同 dev / beta 版本）可正常导入，由其他 dev / beta 版本导出的备份会被拒绝并给出提示。
 - **回收站与撤销删除（v1.2）**：删除投递时先原封不动写入回收站表，再删除原记录；列表提示条提供「撤销」，回收站页面支持恢复、永久删除与清空。
 - **状态时间线（v1.2）**：新增修改记录表，创建投递和每次初筛 → 笔试 → 面试 → Offer 变更都会留痕（同一状态只记录一次），详情页使用 Ant Design Timeline 展示阶段间隔，并统计「卡在初筛多少天」；旧数据缺少历史时会提示补全各阶段日期。
@@ -42,7 +42,7 @@
 - **系统托盘与关闭行为（v1.2）**：应用常驻系统托盘，托盘菜单可打开主窗口、快速录入或退出；关闭主窗口时可选择「最小化到托盘 / 退出应用」并记住选择，设置页可随时修改。
 - **闲置自动锁屏（v1.2）**：设置页可开启「闲置 N 分钟自动锁屏」，在无鼠标 / 键盘活动后自动锁定并要求重新输入密码。
 - **统计增强（v1.2）**：统计页支持本月 / 本季 / 本年 / 自定义时间范围，新增阶段转化漏斗、投递 → 面试平均间隔、面试 → Offer 平均间隔及各企业面试 → Offer 率对比（ECharts），并支持将整页导出为 PNG 图片。
-- **恢复密码脚本（v1.2）**：项目根目录提供 `recover-password.cmd`（Windows）与 `recover-password.sh`；忘记密码时运行脚本，按提示选择数据库并连接，脚本会先确认设置表中存在 `auth.password_hash` 键，再按应用相同的 bcrypt 规则随机生成新密码并打印。
+- **恢复密码脚本（v1.2）**：项目根目录提供 `recover-password.cmd`（Windows）与 `recover-password.sh`；忘记密码时运行脚本，按提示输入 SQLite 数据库文件路径，脚本会先确认设置表中存在 `auth.password_hash` 键，再按应用相同的 bcrypt 规则随机生成新密码并打印。
 - **应用图标与桌面快捷方式**：窗口、任务栏和快捷方式统一使用 `frontend/public/logo.svg` 导出的图标；设置页可检测 / 创建桌面快捷方式，关闭应用时若桌面没有快捷方式，会打开一个独立 Wails 提示窗口询问是否创建。
 
 ## 界面预览
@@ -58,7 +58,7 @@
 | 桌面外壳 | Wails 3（无边框窗口） |
 | HTTP 后端 | Go、Gin |
 | 数据访问 | GORM |
-| 数据库 | SQLite（纯 Go 驱动）、MySQL、PostgreSQL |
+| 数据库 | SQLite（纯 Go 驱动） |
 | 密码 | bcrypt |
 | Excel | excelize |
 | 日志 | Zap |
@@ -233,11 +233,9 @@ SQLite 的 `dsn` 为空时默认使用程序目录下的 `resume-helper.db`；�
 
 ## 配置数据库
 
-推荐直接在应用内「设置 → 数据库」中图形化配置：选择 SQLite / MySQL / PostgreSQL，填写连接信息，先点「测试连接」，再点「保存并应用」。应用会立即切换数据库连接并把配置写回 `config.yaml`，无需重启。切换数据库不会复制旧库数据，请确认目标库已存在且包含所需数据。
+应用只使用本地 SQLite。可以直接在「设置 → 数据库」中修改数据库文件位置：先点「测试连接」，再点「保存并应用」，应用会立即切换连接并把配置写回 `config.yaml`，无需重启。切换数据库文件不会迁移数据。
 
 首次启动会在程序目录（开发模式下为项目根目录）自动生成 `config.yaml`。也可以复制 `config.example.yaml` 后手动修改并重启。
-
-### SQLite（默认）
 
 ```yaml
 server:
@@ -249,41 +247,7 @@ database:
   dsn: ""
 ```
 
-### MySQL
-
-```yaml
-database:
-  driver: mysql
-  dsn: "user:password@tcp(127.0.0.1:3306)/resume_helper?charset=utf8mb4&parseTime=True&loc=Local"
-```
-
-手动初始化数据库：
-
-```bash
-mysql -u root -p < sql/init.mysql.sql
-```
-
-### PostgreSQL
-
-```yaml
-database:
-  driver: postgres
-  dsn: "host=127.0.0.1 user=postgres password=secret dbname=resume_helper port=5432 sslmode=disable TimeZone=Local"
-```
-
-手动初始化数据库：
-
-```bash
-createdb resume_helper
-psql -d resume_helper -f sql/init.postgresql.sql
-```
-
-项目根目录的 `sql/` 文件夹提供：
-
-- `init.mysql.sql`：创建 `resume_helper` 数据库、`applications`、`resumes` 与 `settings` 表及索引。
-- `init.postgresql.sql`：创建 `applications`、`resumes` 与 `settings` 表及索引（在目标数据库中执行）。
-
-> 应用启动时仍会自动执行 GORM `AutoMigrate`。初始化 SQL 主要用于手动建库、DBA 审核或查看实体结构。
+`dsn` 为空时使用程序目录下的 `resume-helper.db`；相对路径会基于配置文件所在目录解析，因此整个文件夹可以整体移动。
 
 ### 环境变量覆盖
 
@@ -293,8 +257,8 @@ psql -d resume_helper -f sql/init.postgresql.sql
 | `RESUME_HELPER_DATA_DIR` | 指定配置与默认数据库所在目录 |
 | `RESUME_HELPER_HOST` | 监听地址，默认 `127.0.0.1` |
 | `RESUME_HELPER_PORT` | 监听端口，默认 `19876`；端口被占用时不再启动第二个实例，旧实例会继续运行 |
-| `RESUME_HELPER_DB_DRIVER` | `sqlite` / `mysql` / `postgres` |
-| `RESUME_HELPER_DB_DSN` | 数据库 DSN |
+| `RESUME_HELPER_DB_DRIVER` | 仅支持 `sqlite` |
+| `RESUME_HELPER_DB_DSN` | SQLite 数据库文件路径 |
 | `RESUME_HELPER_HEADLESS` | `true` / `1` 时仅启动 Gin 服务 |
 
 ## 密码保护
@@ -434,13 +398,10 @@ go test ./...
 ```text
 .
 ├── main.go                              # Wails 窗口 + Gin 启动入口
-├── sql/
-│   ├── init.mysql.sql                   # MySQL 初始化脚本
-│   └── init.postgresql.sql              # PostgreSQL 初始化脚本
 ├── config.example.yaml
 ├── internal/
 │   ├── config/                          # 便携式配置加载与环境变量
-│   ├── database/                        # 多数据库连接、DSN 解析/构建、测试连接、迁移
+│   ├── database/                        # SQLite 连接、路径解析、测试连接、迁移
 │   ├── desktop/                         # Windows 桌面快捷方式检测与创建
 │   ├── logging/                         # Zap 日志初始化（logs 目录）
 │   ├── models/                          # GORM 实体（Application、Resume、Setting）
@@ -474,7 +435,6 @@ go test ./...
 - 导入的 Excel 文件只在内存中解析，不保留临时副本。
 - 简历原始文件保存在程序目录的 `resume/` 文件夹，并以 `.reb` 后缀和 AES-256-GCM 密文形式落盘；密钥由 `settings` 表中的设备标识码派生，删除简历时会同时删除对应文件。
 - 运行日志保存在程序目录的 `logs/` 文件夹，不包含简历文件内容或密码明文。
-- MySQL / PostgreSQL 的 DSN 会出现在用户自己的配置文件中，请妥善保管该文件。
 
 ## 已知说明
 
