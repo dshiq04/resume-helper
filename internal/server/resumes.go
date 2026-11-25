@@ -4,8 +4,10 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"mime/multipart"
 	"net/http"
 	"net/url"
@@ -88,7 +90,7 @@ func (s *Server) listResumes(c *gin.Context) {
 	}
 
 	items := []models.Resume{}
-	if err := build().Order("pinned DESC, created_at DESC, id DESC").Find(&items).Error; err != nil {
+	if err := build().Order("pinned DESC, datetime(created_at) DESC, id DESC").Find(&items).Error; err != nil {
 		apiError(c, http.StatusInternalServerError, "query_failed", "Failed to load resumes.")
 		return
 	}
@@ -287,13 +289,48 @@ func (s *Server) deleteResume(c *gin.Context) {
 		return
 	}
 
+	// Remove the file before the database row. Renaming it first keeps the
+	// record usable if the database delete fails, and reports a locked file
+	// (common on Windows) instead of leaving an orphan behind.
+	filePath := filepath.Join(s.resumeDirectory(), record.StoredName)
+	trashPath := filePath + ".deleting"
+	renamed := false
+	if err := os.Rename(filePath, trashPath); err == nil {
+		renamed = true
+	} else if !errors.Is(err, fs.ErrNotExist) {
+		apiError(c, http.StatusInternalServerError, "delete_failed", "Failed to delete the resume file.")
+		return
+	}
+
 	if err := s.database().Delete(&models.Resume{}, id).Error; err != nil {
+		if renamed {
+			_ = os.Rename(trashPath, filePath)
+		}
 		apiError(c, http.StatusInternalServerError, "delete_failed", "Failed to delete the resume.")
 		return
 	}
-	_ = os.Remove(filepath.Join(s.resumeDirectory(), record.StoredName))
+	if renamed {
+		_ = os.Remove(trashPath)
+	}
 	s.logInfo("resume deleted", zap.Uint("id", record.ID), zap.String("name", record.Name))
 	c.JSON(http.StatusOK, gin.H{"deleted": 1})
+}
+
+// cleanupDeletedResumeFiles removes temporary ".deleting" files left behind
+// when a previous delete could not remove the renamed file (for example a
+// transient Windows lock). These files no longer belong to any database row.
+func (s *Server) cleanupDeletedResumeFiles() {
+	dir := s.resumeDirectory()
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return
+	}
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".deleting") {
+			continue
+		}
+		_ = os.Remove(filepath.Join(dir, entry.Name()))
+	}
 }
 
 func (s *Server) serveResumeFile(c *gin.Context) {

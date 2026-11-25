@@ -123,7 +123,7 @@ func (s *Server) ExportBackup(target string) (*BackupResult, error) {
 		Format:        backupFormat,
 		FormatVersion: backupFormatVersion,
 		AppVersion:    appinfo.Version(),
-		ExportedAt:    time.Now(),
+		ExportedAt:    time.Now().UTC(),
 		Applications:  []models.Application{},
 		Resumes:       []backupResume{},
 		Settings:      []backupSetting{},
@@ -161,9 +161,27 @@ func (s *Server) ExportBackup(target string) (*BackupResult, error) {
 	if err := db.Order("id ASC").Find(&resumes).Error; err != nil {
 		return nil, fmt.Errorf("load resumes: %w", err)
 	}
+	type resumeArchive struct {
+		resume  backupResume
+		content []byte
+	}
+	warnings := []string{}
+	archives := make([]resumeArchive, 0, len(resumes))
 	for _, resume := range resumes {
+		content, err := s.readResumeFile(resume)
+		if err != nil {
+			// A single missing or undecryptable file must not make the whole
+			// backup unusable. Skip it and surface a warning to the UI.
+			warnings = append(warnings, fmt.Sprintf("skipped resume %q: %v", resume.FileName, err))
+			continue
+		}
+		if int64(len(content)) != resume.FileSize && resume.FileSize > 0 {
+			warnings = append(warnings, fmt.Sprintf("%s size differs from its metadata", resume.FileName))
+		}
 		archiveName := path.Join(backupResumeDir, fmt.Sprintf("%d-%s", resume.ID, backupFileName(resume)))
-		manifest.Resumes = append(manifest.Resumes, backupResume{Resume: resume, ArchivePath: archiveName})
+		archive := backupResume{Resume: resume, ArchivePath: archiveName}
+		manifest.Resumes = append(manifest.Resumes, archive)
+		archives = append(archives, resumeArchive{resume: archive, content: content})
 	}
 
 	temp, err := os.CreateTemp(filepath.Dir(target), ".resumetrail-backup-*.zip")
@@ -182,13 +200,12 @@ func (s *Server) ExportBackup(target string) (*BackupResult, error) {
 	writer := zip.NewWriter(temp)
 	counts := BackupCounts{
 		Applications: len(manifest.Applications),
-		Resumes:      len(manifest.Resumes),
+		Resumes:      len(archives),
 		Settings:     len(manifest.Settings),
 		Changes:      len(manifest.Changes),
 		Trash:        len(manifest.Trash),
-		Files:        len(manifest.Resumes),
+		Files:        len(archives),
 	}
-	warnings := []string{}
 
 	manifestHeader := &zip.FileHeader{Name: backupManifestFile, Method: zip.Deflate, Modified: time.Now()}
 	manifestWriter, err := writer.CreateHeader(manifestHeader)
@@ -199,29 +216,21 @@ func (s *Server) ExportBackup(target string) (*BackupResult, error) {
 		return nil, fmt.Errorf("write manifest: %w", err)
 	}
 
-	for _, resume := range manifest.Resumes {
-		content, err := s.readResumeFile(resume.Resume)
-		if err != nil {
-			_ = writer.Close()
-			return nil, fmt.Errorf("decrypt resume %q: %w", resume.FileName, err)
-		}
-		if int64(len(content)) != resume.FileSize && resume.FileSize > 0 {
-			warnings = append(warnings, fmt.Sprintf("%s size differs from its metadata", resume.FileName))
-		}
-		header := &zip.FileHeader{Name: resume.ArchivePath, Method: zip.Deflate, Modified: resume.CreatedAt}
+	for _, archive := range archives {
+		header := &zip.FileHeader{Name: archive.resume.ArchivePath, Method: zip.Deflate, Modified: archive.resume.CreatedAt}
 		if header.Modified.IsZero() {
 			header.Modified = time.Now()
 		}
 		entry, err := writer.CreateHeader(header)
 		if err != nil {
 			_ = writer.Close()
-			return nil, fmt.Errorf("write resume %q: %w", resume.FileName, err)
+			return nil, fmt.Errorf("write resume %q: %w", archive.resume.FileName, err)
 		}
-		if _, err := entry.Write(content); err != nil {
+		if _, err := entry.Write(archive.content); err != nil {
 			_ = writer.Close()
-			return nil, fmt.Errorf("write resume %q: %w", resume.FileName, err)
+			return nil, fmt.Errorf("write resume %q: %w", archive.resume.FileName, err)
 		}
-		counts.Bytes += int64(len(content))
+		counts.Bytes += int64(len(archive.content))
 	}
 
 	if err := writer.Close(); err != nil {
@@ -231,14 +240,23 @@ func (s *Server) ExportBackup(target string) (*BackupResult, error) {
 		return nil, fmt.Errorf("close backup: %w", err)
 	}
 	if err := os.Rename(tempPath, target); err != nil {
-		// Windows cannot replace an existing file with Rename.
-		if removeErr := os.Remove(target); removeErr == nil {
-			if retry := os.Rename(tempPath, target); retry != nil {
-				return nil, fmt.Errorf("save backup: %w", retry)
-			}
-		} else {
+		// Windows cannot replace an existing file with Rename. Move the old
+		// backup aside, install the new one, and only then remove the old
+		// file, so a failed replace never destroys both copies.
+		if _, statErr := os.Stat(target); statErr != nil {
 			return nil, fmt.Errorf("save backup: %w", err)
 		}
+		backupPath := target + ".old-" + strconv.FormatInt(time.Now().UnixNano(), 10)
+		if moveErr := os.Rename(target, backupPath); moveErr != nil {
+			return nil, fmt.Errorf("save backup: %w", err)
+		}
+		if retry := os.Rename(tempPath, target); retry != nil {
+			if restoreErr := os.Rename(backupPath, target); restoreErr != nil {
+				return nil, fmt.Errorf("save backup: %w (the previous backup was kept at %s)", retry, backupPath)
+			}
+			return nil, fmt.Errorf("save backup: %w", retry)
+		}
+		_ = os.Remove(backupPath)
 	}
 	success = true
 
@@ -384,16 +402,35 @@ func (s *Server) InspectBackup(source string) (*BackupResult, error) {
 }
 
 func readBackupManifest(files []*zip.File) (*backupManifest, error) {
-	var manifestFile *zip.File
+	// Match manifest.json at any folder depth so a backup that was unpacked
+	// and compressed again (backup/manifest.json) still imports.
+	var candidates []*zip.File
+	var rootLevel []*zip.File
 	for _, file := range files {
-		if file.Name == backupManifestFile {
-			manifestFile = file
-			break
+		if file.FileInfo().IsDir() {
+			continue
+		}
+		name := normalizeBackupEntryName(backupEntryName(file))
+		if path.Base(name) != backupManifestFile {
+			continue
+		}
+		candidates = append(candidates, file)
+		if name == backupManifestFile {
+			rootLevel = append(rootLevel, file)
 		}
 	}
-	if manifestFile == nil {
+	if len(candidates) == 0 {
 		return nil, errors.New("manifest.json is missing from the backup")
 	}
+	if len(candidates) > 1 {
+		// A single root-level manifest wins; otherwise the archive is
+		// ambiguous and the user must repack it deterministically.
+		if len(rootLevel) != 1 {
+			return nil, errors.New("the backup contains multiple manifest.json files")
+		}
+		candidates = rootLevel
+	}
+	manifestFile := candidates[0]
 	if manifestFile.UncompressedSize64 > maxBackupManifestSize {
 		return nil, errors.New("manifest.json is too large")
 	}
@@ -556,13 +593,53 @@ func compareAppVersions(a, b appVersion) int {
 		return 1
 	case b.pre == "":
 		return -1
-	case a.pre < b.pre:
-		return -1
-	case a.pre > b.pre:
-		return 1
 	default:
+		return comparePrerelease(a.pre, b.pre)
+	}
+}
+
+// comparePrerelease implements the semver precedence rules for dot-separated
+// identifiers: numeric identifiers compare numerically, alphanumeric ones
+// compare lexically, and numeric identifiers have lower precedence than
+// alphanumeric ones. This makes beta.10 newer than beta.2.
+func comparePrerelease(a, b string) int {
+	if a == b {
 		return 0
 	}
+	aParts := strings.Split(a, ".")
+	bParts := strings.Split(b, ".")
+	for index := 0; index < len(aParts) || index < len(bParts); index++ {
+		if index >= len(aParts) {
+			return -1
+		}
+		if index >= len(bParts) {
+			return 1
+		}
+		left, right := aParts[index], bParts[index]
+		leftNumber, leftErr := strconv.Atoi(left)
+		rightNumber, rightErr := strconv.Atoi(right)
+		switch {
+		case leftErr == nil && rightErr == nil:
+			if leftNumber < rightNumber {
+				return -1
+			}
+			if leftNumber > rightNumber {
+				return 1
+			}
+		case leftErr == nil:
+			return -1
+		case rightErr == nil:
+			return 1
+		default:
+			if left < right {
+				return -1
+			}
+			if left > right {
+				return 1
+			}
+		}
+	}
+	return 0
 }
 
 func (s *Server) ImportBackup(source string) (*BackupResult, error) {
@@ -723,6 +800,14 @@ func (s *Server) ImportBackup(source string) (*BackupResult, error) {
 
 	trash := make([]models.DeletedApplication, 0, len(manifest.Trash))
 	for _, item := range manifest.Trash {
+		if !models.IsValidCategory(item.Category) || !models.IsValidStatus(item.Status) {
+			cleanup()
+			return nil, fmt.Errorf("recycle bin item %q has an invalid category or status", item.CompanyName)
+		}
+		if strings.TrimSpace(item.CompanyName) == "" {
+			cleanup()
+			return nil, fmt.Errorf("recycle bin item %d is missing a company name", item.OriginalID)
+		}
 		item.ID = 0
 		trash = append(trash, item)
 	}
@@ -817,22 +902,6 @@ func (s *Server) ImportBackup(source string) (*BackupResult, error) {
 				return err
 			}
 		}
-
-		// PostgreSQL sequences do not advance when rows are inserted with an
-		// explicit id. Move them past the restored ids so the next normal
-		// insert cannot collide with an imported row.
-		if tx.Dialector.Name() == "postgres" {
-			for _, table := range []string{"applications", "resumes"} {
-				statement := fmt.Sprintf(
-					"SELECT setval(pg_get_serial_sequence('%s','id'), COALESCE((SELECT MAX(id) FROM %s), 0) + 1, false)",
-					table,
-					table,
-				)
-				if err := tx.Exec(statement).Error; err != nil {
-					return err
-				}
-			}
-		}
 		return nil
 	})
 	if err != nil {
@@ -844,23 +913,21 @@ func (s *Server) ImportBackup(source string) (*BackupResult, error) {
 	for _, item := range staged {
 		newStored[item.record.StoredName] = struct{}{}
 	}
+	// Only delete files that the previous database actually referenced. Files
+	// the user placed in resume/ manually, or that belong to another database,
+	// must be left alone.
 	for _, storedName := range oldStoredNames {
 		if _, keep := newStored[storedName]; keep {
 			continue
 		}
 		_ = os.Remove(filepath.Join(s.resumeDirectory(), storedName))
 	}
-	if dirEntries, err := os.ReadDir(s.resumeDirectory()); err == nil {
-		for _, entry := range dirEntries {
-			if entry.IsDir() {
-				continue
-			}
-			if _, keep := newStored[entry.Name()]; keep {
-				continue
-			}
-			_ = os.Remove(filepath.Join(s.resumeDirectory(), entry.Name()))
-		}
-	}
+
+	// Importing replaces the settings table, including the password hash, so
+	// every in-memory session must be invalidated. The frontend re-checks the
+	// auth status and shows the lock screen when the imported backup has a
+	// password.
+	s.auth.invalidateAllSessions()
 
 	s.logInfo("backup imported",
 		zap.String("path", source),

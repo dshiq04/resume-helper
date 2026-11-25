@@ -17,7 +17,7 @@ import (
 func moveApplicationToTrash(tx *gorm.DB, record models.Application) (models.DeletedApplication, error) {
 	var changes []models.ApplicationChange
 	if err := tx.Where("application_id = ?", record.ID).
-		Order("changed_at ASC, id ASC").
+		Order("datetime(changed_at) ASC, id ASC").
 		Find(&changes).Error; err != nil {
 		return models.DeletedApplication{}, err
 	}
@@ -36,7 +36,7 @@ func moveApplicationToTrash(tx *gorm.DB, record models.Application) (models.Dele
 		CreatedAt:   record.CreatedAt,
 		UpdatedAt:   record.UpdatedAt,
 		History:     changes,
-		DeletedAt:   time.Now(),
+		DeletedAt:   time.Now().UTC(),
 	}
 	if err := tx.Create(&trash).Error; err != nil {
 		return models.DeletedApplication{}, err
@@ -52,7 +52,7 @@ func moveApplicationToTrash(tx *gorm.DB, record models.Application) (models.Dele
 
 func (s *Server) listTrash(c *gin.Context) {
 	items := []models.DeletedApplication{}
-	if err := s.database().Order("deleted_at DESC, id DESC").Find(&items).Error; err != nil {
+	if err := s.database().Order("datetime(deleted_at) DESC, id DESC").Find(&items).Error; err != nil {
 		apiError(c, http.StatusInternalServerError, "query_failed", "Failed to load the recycle bin.")
 		return
 	}

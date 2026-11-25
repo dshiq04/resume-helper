@@ -89,6 +89,7 @@ func (a *testApp) request(t *testing.T, method, path string, body any, token str
 	if token != "" {
 		req.Header.Set("Authorization", "Bearer "+token)
 	}
+	req.Header.Set("X-ResumeTrail-Token", a.server.APIToken())
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatalf("perform request: %v", err)
@@ -398,6 +399,7 @@ func TestExcelTemplateAndImport(t *testing.T) {
 		t.Fatalf("create import request: %v", err)
 	}
 	req.Header.Set("Content-Type", writer.FormDataContentType())
+	req.Header.Set("X-ResumeTrail-Token", app.server.APIToken())
 	importResp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatalf("perform import: %v", err)
@@ -825,6 +827,7 @@ func (a *testApp) uploadResume(t *testing.T, name, tags, fileName string, conten
 		t.Fatalf("create resume request: %v", err)
 	}
 	req.Header.Set("Content-Type", writer.FormDataContentType())
+	req.Header.Set("X-ResumeTrail-Token", a.server.APIToken())
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatalf("perform resume request: %v", err)

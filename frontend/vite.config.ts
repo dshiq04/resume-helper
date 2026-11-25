@@ -13,7 +13,7 @@ const frontendRoot = fileURLToPath(new URL(".", import.meta.url));
 // same-origin and no proxy is involved.
 export default defineConfig(({ mode }) => {
   const appEnv = loadEnv(mode, frontendRoot, "");
-  const appVersion = process.env.APP_VERSION || appEnv.APP_VERSION || "1.2";
+  const appVersion = process.env.APP_VERSION || appEnv.APP_VERSION || "1.2.1";
   const appName = process.env.APP_NAME || appEnv.APP_NAME || "ResumeTrail";
   const appTitle =
     process.env.APP_TITLE || appEnv.APP_TITLE || "履途 ResumeTrail";
@@ -29,6 +29,41 @@ export default defineConfig(({ mode }) => {
       __APP_DEFAULT_LANGUAGE__: JSON.stringify(defaultLanguage),
     },
     plugins: [
+      {
+        // The Vite dev server serves its own index.html, so it never receives
+        // the per-process API token that Gin injects. Fetch the token from the
+        // running Gin server on demand and expose it to the dev frontend.
+        name: "resume-trail-dev-token",
+        configureServer(server) {
+          const apiTarget =
+            process.env.RESUME_HELPER_API || "http://127.0.0.1:19876";
+          server.middlewares.use("/__resume_token", async (_req, res) => {
+            try {
+              const response = await fetch(`${apiTarget}/`, {
+                headers: { Accept: "text/html" },
+              });
+              const html = await response.text();
+              const match = html.match(
+                /window\.__RESUME_TRAIL_TOKEN__="([0-9a-f]+)"/,
+              );
+              if (!match) {
+                throw new Error("app token not found in index.html");
+              }
+              res.setHeader("Cache-Control", "no-store");
+              res.setHeader("Content-Type", "application/json");
+              res.end(JSON.stringify({ token: match[1] }));
+            } catch (error) {
+              res.statusCode = 502;
+              res.setHeader("Content-Type", "application/json");
+              res.end(
+                JSON.stringify({
+                  error: error instanceof Error ? error.message : String(error),
+                }),
+              );
+            }
+          });
+        },
+      },
       {
         // Vite only expands %VITE_*% placeholders in index.html, so inject the
         // shared .env values ourselves.
@@ -74,6 +109,12 @@ export default defineConfig(({ mode }) => {
         "/api": {
           target: process.env.RESUME_HELPER_API || "http://127.0.0.1:19876",
           changeOrigin: true,
+          // The dev server is same-origin for the browser, but Gin still
+          // validates the forwarded Origin. Use the API origin explicitly so
+          // the proxy is accepted in development.
+          headers: {
+            Origin: process.env.RESUME_HELPER_API || "http://127.0.0.1:19876",
+          },
         },
       },
     },

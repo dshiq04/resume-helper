@@ -5,15 +5,12 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"strings"
 	"time"
 
 	"resume-helper/internal/config"
 	"resume-helper/internal/models"
 
 	"github.com/glebarez/sqlite"
-	"gorm.io/driver/mysql"
-	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 )
@@ -70,17 +67,11 @@ func TestConnection(cfg config.DatabaseConfig) error {
 }
 
 func connect(cfg config.DatabaseConfig) (*gorm.DB, error) {
-	var dialector gorm.Dialector
-
-	switch cfg.Driver {
-	case "sqlite":
-		dialector = sqlite.Open(cfg.DSN)
-	case "mysql":
-		dialector = mysql.Open(cfg.DSN)
-	case "postgres":
-		dialector = postgres.Open(cfg.DSN)
-	default:
-		return nil, fmt.Errorf("unsupported database driver: %s", cfg.Driver)
+	if normalized, err := config.NormalizeDriver(cfg.Driver); err != nil || normalized != "sqlite" {
+		if err != nil {
+			return nil, err
+		}
+		return nil, fmt.Errorf("unsupported database driver: %s (only sqlite is supported)", cfg.Driver)
 	}
 
 	dbLogger := logger.New(log.New(os.Stdout, "\r\n", log.LstdFlags), logger.Config{
@@ -89,67 +80,49 @@ func connect(cfg config.DatabaseConfig) (*gorm.DB, error) {
 		IgnoreRecordNotFoundError: true,
 		Colorful:                  false,
 	})
-	db, err := gorm.Open(dialector, &gorm.Config{
+	db, err := gorm.Open(sqlite.Open(cfg.DSN), &gorm.Config{
 		Logger:                                   dbLogger,
 		DisableForeignKeyConstraintWhenMigrating: true,
 		NowFunc: func() time.Time {
-			return time.Now().Local()
+			// Store timestamps as UTC. SQLite keeps time values as text, and
+			// text comparisons only stay meaningful when every row uses the
+			// same offset. Date filters additionally normalise legacy rows
+			// with datetime() so existing local-offset data keeps working.
+			return time.Now().UTC()
 		},
 	})
 	if err != nil {
-		return nil, fmt.Errorf("connect to %s: %w", cfg.Driver, err)
+		return nil, fmt.Errorf("connect to sqlite: %w", err)
 	}
 
-	if cfg.Driver == "sqlite" {
-		sqlDB, err := db.DB()
-		if err != nil {
-			return nil, fmt.Errorf("get sqlite connection: %w", err)
+	sqlDB, err := db.DB()
+	if err != nil {
+		return nil, fmt.Errorf("get sqlite connection: %w", err)
+	}
+	// A single writer is plenty for a desktop application and avoids
+	// SQLITE_BUSY under rapid inline edits.
+	sqlDB.SetMaxOpenConns(1)
+	sqlDB.SetMaxIdleConns(1)
+	for _, pragma := range []string{
+		"PRAGMA journal_mode=WAL;",
+		"PRAGMA busy_timeout=5000;",
+		"PRAGMA foreign_keys=ON;",
+	} {
+		if err := db.Exec(pragma).Error; err != nil {
+			return nil, fmt.Errorf("apply sqlite pragma: %w", err)
 		}
-		// A single writer is plenty for a desktop application and avoids
-		// SQLITE_BUSY under rapid inline edits.
-		sqlDB.SetMaxOpenConns(1)
-		sqlDB.SetMaxIdleConns(1)
-		for _, pragma := range []string{
-			"PRAGMA journal_mode=WAL;",
-			"PRAGMA busy_timeout=5000;",
-			"PRAGMA foreign_keys=ON;",
-		} {
-			if err := db.Exec(pragma).Error; err != nil {
-				return nil, fmt.Errorf("apply sqlite pragma: %w", err)
-			}
-		}
-	} else {
-		sqlDB, err := db.DB()
-		if err != nil {
-			return nil, fmt.Errorf("get database connection: %w", err)
-		}
-		sqlDB.SetMaxOpenConns(10)
-		sqlDB.SetMaxIdleConns(5)
-		sqlDB.SetConnMaxLifetime(time.Hour)
 	}
 
 	return db, nil
 }
 
-// SafeDSN removes credentials from a DSN so it can be shown in the UI.
-func SafeDSN(driver, dsn string) string {
-	if driver == "sqlite" {
-		return dsn
-	}
-	if dsn == "" {
-		return ""
-	}
-	return "••••••••"
+// SafeDSN returns the SQLite file path. It exists so callers can log the
+// storage location without exposing credentials.
+func SafeDSN(_ string, dsn string) string {
+	return dsn
 }
 
 // DatabaseLabel returns a human readable database description.
-func DatabaseLabel(driver string) string {
-	switch strings.ToLower(driver) {
-	case "mysql":
-		return "MySQL"
-	case "postgres", "postgresql":
-		return "PostgreSQL"
-	default:
-		return "SQLite"
-	}
+func DatabaseLabel(_ string) string {
+	return "SQLite"
 }

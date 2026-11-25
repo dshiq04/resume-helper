@@ -28,7 +28,7 @@ func TestHistoryMissingStatusesRequireBackfilledRecord(t *testing.T) {
 
 	_, body = app.request(t, http.MethodGet, "/api/application/"+uintString(created.ID)+"/history", nil, "")
 	history := decodeJSON[applicationHistoryResponse](t, body)
-	want := []string{models.StatusPending, models.StatusScreening, models.StatusWritten, models.StatusInterview}
+	want := []string{models.StatusPending, models.StatusScreening}
 	if !reflect.DeepEqual(history.MissingStatuses, want) {
 		t.Fatalf("missing statuses = %v, want %v", history.MissingStatuses, want)
 	}

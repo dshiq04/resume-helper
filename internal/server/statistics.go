@@ -21,7 +21,7 @@ func parseStatsRange(c *gin.Context) (*time.Time, *time.Time, bool) {
 		if raw == "" {
 			return nil, true
 		}
-		value, err := parseFlexibleTime(raw)
+		value, err := parseFlexibleRangeTime(raw, key == "to")
 		if err != nil {
 			apiError(c, http.StatusBadRequest, "invalid_range", "Invalid statistics date range.")
 			return nil, false
@@ -44,16 +44,34 @@ func parseStatsRange(c *gin.Context) (*time.Time, *time.Time, bool) {
 	return from, to, true
 }
 
-func (s *Server) applicationsInRange(db *gorm.DB, from, to *time.Time) ([]models.Application, error) {
+// parseStatsCategory reads the optional category filter used by the
+// statistics page. "all" (and an absent value) means no filter.
+func parseStatsCategory(c *gin.Context) (string, bool) {
+	raw := strings.TrimSpace(c.Query("category"))
+	if raw == "" || strings.EqualFold(raw, "all") {
+		return "", true
+	}
+	category := models.NormalizeCategory(raw)
+	if !models.IsValidCategory(category) {
+		apiError(c, http.StatusBadRequest, "invalid_category", "Unknown application category.")
+		return "", false
+	}
+	return category, true
+}
+
+func (s *Server) applicationsInRange(db *gorm.DB, from, to *time.Time, category string) ([]models.Application, error) {
 	query := db.Model(&models.Application{})
+	if category != "" {
+		query = query.Where("category = ?", category)
+	}
 	if from != nil {
-		query = query.Where("applied_at >= ?", *from)
+		query = query.Where("datetime(applied_at) >= datetime(?)", *from)
 	}
 	if to != nil {
-		query = query.Where("applied_at <= ?", *to)
+		query = query.Where("datetime(applied_at) <= datetime(?)", *to)
 	}
 	var items []models.Application
-	err := query.Order("applied_at ASC, id ASC").Find(&items).Error
+	err := query.Order("datetime(applied_at) ASC, id ASC").Find(&items).Error
 	return items, err
 }
 
@@ -88,9 +106,13 @@ func (s *Server) applicationFunnel(c *gin.Context) {
 	if !ok {
 		return
 	}
+	category, ok := parseStatsCategory(c)
+	if !ok {
+		return
+	}
 
 	db := s.database()
-	applications, err := s.applicationsInRange(db, from, to)
+	applications, err := s.applicationsInRange(db, from, to, category)
 	if err != nil {
 		apiError(c, http.StatusInternalServerError, "query_failed", "Failed to load the conversion funnel.")
 		return
@@ -123,7 +145,9 @@ func (s *Server) applicationFunnel(c *gin.Context) {
 	var offerIntervalCount int64
 
 	for _, application := range applications {
-		changes := changesByApplication[application.ID]
+		// Use the same authoritative timeline as the detail page so milestones
+		// that were rolled back no longer count toward later funnel stages.
+		changes := reconcileApplicationChanges(application, changesByApplication[application.ID])
 		statuses := map[string]bool{}
 		for _, change := range changes {
 			statuses[change.Status] = true

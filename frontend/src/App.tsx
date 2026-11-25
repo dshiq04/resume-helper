@@ -31,6 +31,7 @@ import { ShortcutPromptWindowPage } from "./pages/ShortcutPromptWindowPage";
 import { StatisticsPage } from "./pages/StatisticsPage";
 import { TrashPage } from "./pages/TrashPage";
 import { createTheme, type ThemeMode } from "./theme";
+import { isDesktopRuntime } from "./utils/desktop";
 
 const ResumePreviewWindowPage = lazy(() =>
   import("./pages/ResumePreviewWindowPage").then((module) => ({
@@ -148,8 +149,10 @@ function AppRoot() {
     return () => window.removeEventListener("resumetrail:unauthorized", handler);
   }, []);
 
-  // Idle auto-lock. Activity is tracked on the window because every screen of
-  // the main window shares the same session.
+  // Idle auto-lock. Activity is tracked per window, but a separate window
+  // (quick entry, resume preview, editor) must also keep the whole application
+  // awake. Activity is broadcast to the other windows through Wails events and,
+  // as a browser fallback, through localStorage's storage event.
   useEffect(() => {
     if (
       stage !== "ready" ||
@@ -160,21 +163,60 @@ function AppRoot() {
       return;
     }
 
+    const activityEvent = "resumetrail:activity";
+    const activityKey = "resumetrail.activityAt";
+    const timeout = preferences.idleLockMinutes * 60_000;
     let timer = 0;
-    const lock = () => {
-      void (async () => {
-        try {
-          await api.logout();
-        } catch {
-          // Locking locally is still the safe outcome.
-        }
-        clearToken();
-        setStage("locked");
-      })();
-    };
-    const reset = () => {
+    let lastBroadcast = 0;
+
+    const armTimer = () => {
       window.clearTimeout(timer);
-      timer = window.setTimeout(lock, preferences.idleLockMinutes * 60_000);
+      timer = window.setTimeout(() => {
+        void (async () => {
+          try {
+            await api.logout();
+          } catch {
+            // Locking locally is still the safe outcome.
+          }
+          clearToken();
+          setStage("locked");
+          // Other windows share the same session; ask them to re-check auth.
+          window.dispatchEvent(new Event("resumetrail:auth-changed"));
+          if (isDesktopRuntime()) {
+            void Events.Emit("resumetrail:auth-changed").catch(() => {
+              // Ignore: another window may already be closing.
+            });
+          }
+        })();
+      }, timeout);
+    };
+
+    const notifyOtherWindows = () => {
+      const now = Date.now();
+      if (now - lastBroadcast < 5_000) return;
+      lastBroadcast = now;
+      window.dispatchEvent(new Event(activityEvent));
+      try {
+        localStorage.setItem(activityKey, String(now));
+      } catch {
+        // Storage can be unavailable in hardened browser profiles.
+      }
+      if (isDesktopRuntime()) {
+        void Events.Emit(activityEvent).catch(() => {
+          // Ignore: this is only a convenience signal.
+        });
+      }
+    };
+
+    const onLocalActivity = () => {
+      armTimer();
+      notifyOtherWindows();
+    };
+    const onRemoteActivity = () => {
+      armTimer();
+    };
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === activityKey) armTimer();
     };
 
     const events: Array<keyof WindowEventMap> = [
@@ -186,14 +228,23 @@ function AppRoot() {
       "scroll",
     ];
     for (const event of events) {
-      window.addEventListener(event, reset, { passive: true });
+      window.addEventListener(event, onLocalActivity, { passive: true });
     }
-    reset();
+    window.addEventListener(activityEvent, onRemoteActivity);
+    window.addEventListener("storage", onStorage);
+    const unsubscribe = isDesktopRuntime()
+      ? Events.On(activityEvent, onRemoteActivity)
+      : () => undefined;
+
+    armTimer();
     return () => {
       window.clearTimeout(timer);
       for (const event of events) {
-        window.removeEventListener(event, reset);
+        window.removeEventListener(event, onLocalActivity);
       }
+      window.removeEventListener(activityEvent, onRemoteActivity);
+      window.removeEventListener("storage", onStorage);
+      unsubscribe();
     };
   }, [passwordEnabled, preferences, stage]);
 
@@ -216,18 +267,30 @@ function AppRoot() {
   useEffect(() => {
     const handleDatabaseChanged = () => {
       void checkAuth();
+      void loadPreferences();
       void loadStats();
+    };
+    // Importing a backup replaces the settings table (including the password
+    // hash) and invalidates every session, so the window must re-read both
+    // auth status and preferences instead of trusting its cached state.
+    const handleAuthChanged = () => {
+      void checkAuth();
+      void loadPreferences();
     };
     const refreshStats = () => void loadStats();
     const unsubscribe = Events.On("resumetrail:data-changed", refreshStats);
+    const unsubscribeAuth = Events.On("resumetrail:auth-changed", handleAuthChanged);
     window.addEventListener("resumetrail:database-changed", handleDatabaseChanged);
     window.addEventListener("resumetrail:data-changed", refreshStats);
+    window.addEventListener("resumetrail:auth-changed", handleAuthChanged);
     return () => {
       unsubscribe();
+      unsubscribeAuth();
       window.removeEventListener("resumetrail:database-changed", handleDatabaseChanged);
       window.removeEventListener("resumetrail:data-changed", refreshStats);
+      window.removeEventListener("resumetrail:auth-changed", handleAuthChanged);
     };
-  }, [checkAuth, loadStats]);
+  }, [checkAuth, loadPreferences, loadStats]);
 
   const handleAuthenticated = useCallback((_session: AuthSession) => {
     setStage("ready");

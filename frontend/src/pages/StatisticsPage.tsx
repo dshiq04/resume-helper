@@ -79,13 +79,20 @@ export function StatisticsPage() {
     };
   }, [range]);
 
+  // The category selector scopes the whole page: KPIs, funnel and company
+  // comparison use the same category as the trend and status charts.
+  const categoryScope = useMemo(
+    () => ({ ...rangeQuery, category }),
+    [category, rangeQuery],
+  );
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const [dailyResult, statsResult, funnelResult] = await Promise.all([
         api.dailyStats(rangeQuery),
-        api.stats(rangeQuery),
-        api.funnel(rangeQuery),
+        api.stats(categoryScope),
+        api.funnel(categoryScope),
       ]);
       setDaily(dailyResult.daily ?? []);
       setStats(statsResult);
@@ -95,7 +102,7 @@ export function StatisticsPage() {
     } finally {
       setLoading(false);
     }
-  }, [message, rangeQuery, t]);
+  }, [categoryScope, message, rangeQuery, t]);
 
   useEffect(() => {
     void load();

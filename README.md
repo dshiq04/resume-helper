@@ -1,6 +1,6 @@
 # 履途 ResumeTrail
 
-一个专注、漂亮的简历投递记录工具。后端使用 **Go + Gin + GORM**，前端使用 **React + Ant Design**，并通过 **Wails 3** 以无边框桌面窗口运行。支持本地 SQLite、MySQL、PostgreSQL 三种数据库。
+一个专注、漂亮的简历投递记录工具。后端使用 **Go + Gin + GORM**，前端使用 **React + Ant Design**，并通过 **Wails 3** 以无边框桌面窗口运行。数据保存在本地 SQLite 数据库中。
 
 ![ResumeTrail 界面预览](docs/preview-light.png)
 
@@ -15,7 +15,7 @@
 - **Zap 日志**：使用 `go.uber.org/zap` 记录启动、数据库、HTTP 请求与错误信息，日志按天写入程序目录下的 `logs/` 文件夹。日志级别包含 DEBUG（调试）、INFO（常规操作）、WARN（可恢复异常）与 ERROR（需要关注的错误）。
 - **三类投递看板**：春招、秋招、实习，侧边栏可快速切换并显示数量；分类使用 React Router 路由页面（`/spring`、`/autumn`、`/internship`）。
 - **完整投递字段**：企业名称、投递链接、状态、投递时间；状态默认「初筛」，投递时间由后端服务器在落库时生成。
-- **内联编辑**：点击企业名称或链接即可直接修改；状态下拉框即时更新。
+- **修改投递**：企业名称、链接等字段默认只读展示，点击行尾「修改」打开独立编辑窗口；状态下拉框可在表格内即时更新。
 - **表格内新增**：点击「新增投递」后直接在表格 / 卡片顶部生成可编辑草稿行，最右侧的对勾按钮保存成功后才写入数据库；取消按钮可丢弃草稿。
 - **独立快速录入窗口**：约 400×170 的原生独立窗口，默认保持在其他窗口上方（标题栏可切换窗口置顶），填写企业名称与投递链接后点「加入」直接落库；成功后自动清空并提示，适合连续录入，主窗口保持原样。记录的置顶仍可在主列表中操作。
 - **官网直达**：鼠标悬浮到投递链接时出现打开按钮，点击后通过系统默认浏览器打开（Wails 桌面环境）。链接按原始内容保存，不会自动添加 `http://` 或 `https://`。
@@ -33,8 +33,8 @@
 - **设置独立页面**：通过 `/settings` 路由访问，和投递工作台解耦。
 - **数据统计**：总投递、待推进、面试中、Offer 数量及 Offer 转化率。
 - **便携式数据**：配置文件和 SQLite 数据库默认存放在程序所在目录，不向 AppData 或其他系统目录写入数据。
-- **多数据库支持**：SQLite（零配置本地存储）、MySQL、PostgreSQL，自动迁移表结构，并提供初始化 SQL 文件。
-- **图形化数据库设置**：在设置页选择数据库类型、填写主机 / 端口 / 用户名 / 密码 / 数据库名，支持「测试连接」；保存后立即切换连接并写回 `config.yaml`，无需重启。
+- **本地 SQLite 存储**：零配置本地数据库，自动迁移表结构，无需安装或连接外部数据库服务。
+- **图形化存储设置**：在设置页修改 SQLite 数据库位置，支持「测试连接」；保存后立即切换并写回 `config.yaml`，无需重启。
 - **完整数据迁移（v1.2）**：设置页提供「数据导入 / 导出」入口，打开独立 Wails 窗口；将投递、状态历史、回收站、设置与解密后的简历原文件打包为一个 ZIP（内含 `manifest.json`）。设备码不会导出，导入时会使用当前设备码重新加密简历，同时保留原 ID、时间戳与设置，实现升级或换机后的原样恢复。`manifest.json` 的首个字段为备份创建时的 `version`，导入时要求当前客户端版本不低于备份版本；相同版本（含相同 dev / beta 版本）可正常导入，由其他 dev / beta 版本导出的备份会被拒绝并给出提示。
 - **回收站与撤销删除（v1.2）**：删除投递时先原封不动写入回收站表，再删除原记录；列表提示条提供「撤销」，回收站页面支持恢复、永久删除与清空。
 - **状态时间线（v1.2）**：新增修改记录表，创建投递和每次初筛 → 笔试 → 面试 → Offer 变更都会留痕（同一状态只记录一次），详情页使用 Ant Design Timeline 展示阶段间隔，并统计「卡在初筛多少天」；旧数据缺少历史时会提示补全各阶段日期。
@@ -42,7 +42,7 @@
 - **系统托盘与关闭行为（v1.2）**：应用常驻系统托盘，托盘菜单可打开主窗口、快速录入或退出；关闭主窗口时可选择「最小化到托盘 / 退出应用」并记住选择，设置页可随时修改。
 - **闲置自动锁屏（v1.2）**：设置页可开启「闲置 N 分钟自动锁屏」，在无鼠标 / 键盘活动后自动锁定并要求重新输入密码。
 - **统计增强（v1.2）**：统计页支持本月 / 本季 / 本年 / 自定义时间范围，新增阶段转化漏斗、投递 → 面试平均间隔、面试 → Offer 平均间隔及各企业面试 → Offer 率对比（ECharts），并支持将整页导出为 PNG 图片。
-- **恢复密码脚本（v1.2）**：项目根目录提供 `recover-password.cmd`（Windows）与 `recover-password.sh`；忘记密码时运行脚本，按提示选择数据库并连接，脚本会先确认设置表中存在 `auth.password_hash` 键，再按应用相同的 bcrypt 规则随机生成新密码并打印。
+- **恢复密码脚本（v1.2）**：项目根目录提供 `recover-password.cmd`（Windows）与 `recover-password.sh`；忘记密码时运行脚本，按提示输入 SQLite 数据库文件路径，脚本会先确认设置表中存在 `auth.password_hash` 键，再按应用相同的 bcrypt 规则随机生成新密码并打印。
 - **应用图标与桌面快捷方式**：窗口、任务栏和快捷方式统一使用 `frontend/public/logo.svg` 导出的图标；设置页可检测 / 创建桌面快捷方式，关闭应用时若桌面没有快捷方式，会打开一个独立 Wails 提示窗口询问是否创建。
 
 ## 界面预览
@@ -58,7 +58,7 @@
 | 桌面外壳 | Wails 3（无边框窗口） |
 | HTTP 后端 | Go、Gin |
 | 数据访问 | GORM |
-| 数据库 | SQLite（纯 Go 驱动）、MySQL、PostgreSQL |
+| 数据库 | SQLite（纯 Go 驱动） |
 | 密码 | bcrypt |
 | Excel | excelize |
 | 日志 | Zap |
@@ -77,15 +77,20 @@
 | `/spring` | 春招投递 |
 | `/autumn` | 秋招投递 |
 | `/internship` | 实习投递 |
+| `/social` | 社会招聘投递 |
 | `/resumes` | 简历库 |
-| `/application-view` | 投递详情窗口（点击企业头像打开） |
+| `/statistics` | 数据统计 |
+| `/application-view` | 投递详情窗口（点击企业头像打开；浏览器模式下在当前标签页打开） |
+| `/application-edit` | 修改投递窗口（点击行尾「修改」打开；浏览器模式下在当前标签页打开） |
+| `/quick-entry` | 独立快速录入窗口（由应用自动打开） |
+| `/shortcut-prompt` | 桌面快捷方式提示窗口（由应用自动打开） |
 | `/resume-preview` | 独立简历预览窗口（由应用自动打开） |
 | `/settings` | 设置页 |
 | `/trash` | 回收站 |
 | `/close-prompt` | 关闭行为提示窗口（由应用自动打开） |
 | `/data-transfer` | 数据导入 / 导出窗口（由应用自动打开） |
 
-所有 API 请求统一通过 `src/api/client.ts` 中的 Axios 实例发送，自动附加 Bearer Token，并统一处理 401 会话过期。
+所有 API 请求统一通过 `src/api/client.ts` 中的 Axios 实例发送，自动附加 Bearer Token 与进程级 `X-ResumeTrail-Token`，并统一处理 401 会话过期。
 
 ## 快速开始
 
@@ -215,11 +220,11 @@ SQLite 的 `dsn` 为空时默认使用程序目录下的 `resume-helper.db`；�
 
 | 变量 | 说明 | 默认值 |
 | --- | --- | --- |
-| `APP_VERSION` | 版本号：设置页、健康检查 / 系统信息接口和备份文件 | `1.2` |
+| `APP_VERSION` | 版本号：设置页、健康检查 / 系统信息接口和备份文件 | `1.2.1` |
 | `APP_NAME` | 英文应用名称：窗口与进程标识 | `ResumeTrail` |
 | `APP_TITLE` | 显示名称：窗口标题、托盘菜单、桌面快捷方式名称 | `履途 ResumeTrail` |
 | `APP_DEFAULT_LANGUAGE` | 默认界面语言：`zh-CN` / `zh-TW` / `en` / `ja` / `ko` | `zh-CN` |
-| `VITE_SHOW_DEVELOPMENT_WATERMARK` | 开发中水印开关：`true` 开启，`false` 关闭 | `true` |
+| `VITE_SHOW_DEVELOPMENT_WATERMARK` | 开发中水印开关：`true` 开启，`false` 关闭（开发环境默认开启，生产构建默认关闭，分别见 `.env.development` / `.env.production`） | 生产 `false` |
 
 - 修改后需要重新构建前端。
 - 前端启动后会通过 `POST /api/app-info` 把元信息发送给后端；后端在收到之前使用内置默认值。
@@ -228,11 +233,9 @@ SQLite 的 `dsn` 为空时默认使用程序目录下的 `resume-helper.db`；�
 
 ## 配置数据库
 
-推荐直接在应用内「设置 → 数据库」中图形化配置：选择 SQLite / MySQL / PostgreSQL，填写连接信息，先点「测试连接」，再点「保存并应用」。应用会立即切换数据库连接并把配置写回 `config.yaml`，无需重启。切换数据库不会复制旧库数据，请确认目标库已存在且包含所需数据。
+应用只使用本地 SQLite。可以直接在「设置 → 数据库」中修改数据库文件位置：先点「测试连接」，再点「保存并应用」，应用会立即切换连接并把配置写回 `config.yaml`，无需重启。切换数据库文件不会迁移数据。
 
 首次启动会在程序目录（开发模式下为项目根目录）自动生成 `config.yaml`。也可以复制 `config.example.yaml` 后手动修改并重启。
-
-### SQLite（默认）
 
 ```yaml
 server:
@@ -244,41 +247,7 @@ database:
   dsn: ""
 ```
 
-### MySQL
-
-```yaml
-database:
-  driver: mysql
-  dsn: "user:password@tcp(127.0.0.1:3306)/resume_helper?charset=utf8mb4&parseTime=True&loc=Local"
-```
-
-手动初始化数据库：
-
-```bash
-mysql -u root -p < init.mysql.sql
-```
-
-### PostgreSQL
-
-```yaml
-database:
-  driver: postgres
-  dsn: "host=127.0.0.1 user=postgres password=secret dbname=resume_helper port=5432 sslmode=disable TimeZone=Local"
-```
-
-手动初始化数据库：
-
-```bash
-createdb resume_helper
-psql -d resume_helper -f init.postgresql.sql
-```
-
-项目根目录提供：
-
-- `init.mysql.sql`（项目根目录）：创建 `resume_helper` 数据库、`applications`、`resumes` 与 `settings` 表及索引。
-- `init.postgresql.sql`（项目根目录）：创建 `applications`、`resumes` 与 `settings` 表及索引（在目标数据库中执行）。
-
-> 应用启动时仍会自动执行 GORM `AutoMigrate`。初始化 SQL 主要用于手动建库、DBA 审核或查看实体结构。
+`dsn` 为空时使用程序目录下的 `resume-helper.db`；相对路径会基于配置文件所在目录解析，因此整个文件夹可以整体移动。
 
 ### 环境变量覆盖
 
@@ -287,9 +256,9 @@ psql -d resume_helper -f init.postgresql.sql
 | `RESUME_HELPER_CONFIG` | 指定 config.yaml 路径（必须存在） |
 | `RESUME_HELPER_DATA_DIR` | 指定配置与默认数据库所在目录 |
 | `RESUME_HELPER_HOST` | 监听地址，默认 `127.0.0.1` |
-| `RESUME_HELPER_PORT` | 监听端口，默认 `19876`；端口被占用时会自动使用随机端口 |
-| `RESUME_HELPER_DB_DRIVER` | `sqlite` / `mysql` / `postgres` |
-| `RESUME_HELPER_DB_DSN` | 数据库 DSN |
+| `RESUME_HELPER_PORT` | 监听端口，默认 `19876`；端口被占用时不再启动第二个实例，旧实例会继续运行 |
+| `RESUME_HELPER_DB_DRIVER` | 仅支持 `sqlite` |
+| `RESUME_HELPER_DB_DSN` | SQLite 数据库文件路径 |
 | `RESUME_HELPER_HEADLESS` | `true` / `1` 时仅启动 Gin 服务 |
 
 ## 密码保护
@@ -337,6 +306,10 @@ psql -d resume_helper -f init.postgresql.sql
 | `POST` | `/api/auth/logout` | 注销会话 |
 | `GET` | `/api/applications` | 分页列表，支持 `search`、`category`、`status`；置顶记录优先 |
 | `POST` | `/api/applications` | 新增投递 |
+| `GET` | `/api/application/:id` | 单条投递详情（含当前状态天数） |
+| `GET` | `/api/application/:id/history` | 状态时间线与缺失阶段 |
+| `POST` | `/api/application/:id/history` | 补全某个阶段的发生日期 |
+| `GET` | `/api/applications/companies` | 企业名称自动补全（支持 `search`） |
 | `PUT` | `/api/application/:id` | 局部更新（企业、链接、状态、分类、置顶） |
 | `DELETE` | `/api/application/:id` | 删除单条 |
 | `POST` | `/api/applications/batch-delete` | 批量删除 |
@@ -350,7 +323,9 @@ psql -d resume_helper -f init.postgresql.sql
 | `PUT` | `/api/resume/:id` | 更新名称 / 标签 / 置顶 |
 | `DELETE` | `/api/resume/:id` | 删除简历记录与文件 |
 | `GET` | `/api/resume/:id/file` | 读取原始文件（后端用设备标识码解密后返回，`download=1` 强制下载） |
-| `GET` | `/api/stats` | 分类 / 状态 / 简历数量统计 |
+| `GET` | `/api/stats` | 分类 / 状态 / 简历数量统计（支持 `from`、`to`、`category`） |
+| `GET` | `/api/stats/daily` | 按日期与分类的投递数量趋势 |
+| `GET` | `/api/stats/funnel` | 阶段转化漏斗、平均间隔与企业对比（支持 `category`） |
 | `GET` | `/api/system/info` | 数据库、配置文件、版本信息 |
 | `GET` | `/api/system/device` | 当前设备标识码与简历加密算法 |
 | `GET` | `/api/system/platform` | 当前运行平台（电脑 / 平板 / 手机）与操作系统版本 |
@@ -360,11 +335,24 @@ psql -d resume_helper -f init.postgresql.sql
 | `GET` | `/api/system/shortcut` | 查询桌面快捷方式状态 |
 | `POST` | `/api/system/shortcut` | 创建桌面快捷方式 |
 | `POST` | `/api/system/shortcut/prompt` | 处理关闭时的快捷方式提示窗口选择 |
+| `PUT` | `/api/system/shortcut/prompt-setting` | 保存是否在关闭时显示快捷方式提示 |
+| `POST` | `/api/system/close-prompt` | 处理关闭行为提示窗口选择（最小化到托盘 / 退出） |
+| `POST` | `/api/system/data-transfer` | 打开数据导入 / 导出窗口 |
+| `POST` | `/api/system/application-edit` | 打开独立修改投递窗口 |
+| `POST` | `/api/system/application-view` | 打开独立投递详情窗口 |
+| `GET` | `/api/system/preferences` | 读取关闭行为与闲置锁屏设置 |
+| `PUT` | `/api/system/preferences` | 更新关闭行为与闲置锁屏设置 |
 | `POST` | `/api/system/quick-entry` | 打开独立的快速录入窗口 |
 | `GET` | `/api/system/quick-entry/defaults` | 按服务器时间返回默认投递位置（秋招 / 春招 / 实习） |
 | `POST` | `/api/system/resume-preview` | 打开独立的简历预览窗口 |
 
-开启密码后，除健康检查、认证接口和静态资源外，其余 `/api` 请求需要携带：
+服务端每次启动都会生成一个随机的进程级 Token，并注入到页面 `index.html`；除健康检查外，所有 `/api` 请求都必须携带：
+
+```http
+X-ResumeTrail-Token: <process token>
+```
+
+该 Token 用于阻止其他网页直接访问本地 API，并减少误调用；它不等同于本机进程隔离（同一用户下的进程仍可能读取注入到页面中的 Token）。开启密码后，除认证接口外还需要额外的会话 Token：
 
 ```http
 Authorization: Bearer <token>
@@ -410,12 +398,10 @@ go test ./...
 ```text
 .
 ├── main.go                              # Wails 窗口 + Gin 启动入口
-├── init.mysql.sql                       # MySQL 初始化脚本
-├── init.postgresql.sql                  # PostgreSQL 初始化脚本
 ├── config.example.yaml
 ├── internal/
 │   ├── config/                          # 便携式配置加载与环境变量
-│   ├── database/                        # 多数据库连接、DSN 解析/构建、测试连接、迁移
+│   ├── database/                        # SQLite 连接、路径解析、测试连接、迁移
 │   ├── desktop/                         # Windows 桌面快捷方式检测与创建
 │   ├── logging/                         # Zap 日志初始化（logs 目录）
 │   ├── models/                          # GORM 实体（Application、Resume、Setting）
@@ -449,7 +435,6 @@ go test ./...
 - 导入的 Excel 文件只在内存中解析，不保留临时副本。
 - 简历原始文件保存在程序目录的 `resume/` 文件夹，并以 `.reb` 后缀和 AES-256-GCM 密文形式落盘；密钥由 `settings` 表中的设备标识码派生，删除简历时会同时删除对应文件。
 - 运行日志保存在程序目录的 `logs/` 文件夹，不包含简历文件内容或密码明文。
-- MySQL / PostgreSQL 的 DSN 会出现在用户自己的配置文件中，请妥善保管该文件。
 
 ## 已知说明
 

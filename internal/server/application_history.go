@@ -42,7 +42,7 @@ func recordStatusChange(db *gorm.DB, applicationID uint, status string, changedA
 		return nil
 	}
 	if changedAt.IsZero() {
-		changedAt = time.Now()
+		changedAt = time.Now().UTC()
 	}
 	return db.Clauses(clause.OnConflict{DoNothing: true}).Create(&models.ApplicationChange{
 		ApplicationID: applicationID,
@@ -51,16 +51,17 @@ func recordStatusChange(db *gorm.DB, applicationID uint, status string, changedA
 	}).Error
 }
 
-// updateStatusChange records a normal status transition. When the new status
-// comes later in the timeline order than the previous status, an existing
-// milestone is refreshed with the server time so the timeline never keeps a
-// stale timestamp for a status the user just re-entered.
-func updateStatusChange(db *gorm.DB, applicationID uint, previousStatus, status string, changedAt time.Time) error {
+// updateStatusChange records a normal status transition. The timestamp of an
+// existing milestone is refreshed whenever the user enters that stage again,
+// including regressions such as interview → screening. Without this, the
+// "days in current status" values would keep counting from the first time the
+// stage was ever reached.
+func updateStatusChange(db *gorm.DB, applicationID uint, _ string, status string, changedAt time.Time) error {
 	if applicationID == 0 || status == "" {
 		return nil
 	}
 	if changedAt.IsZero() {
-		changedAt = time.Now()
+		changedAt = time.Now().UTC()
 	}
 
 	var existing models.ApplicationChange
@@ -76,7 +77,7 @@ func updateStatusChange(db *gorm.DB, applicationID uint, previousStatus, status 
 		return err
 	}
 
-	if timelineStatusRank(status) > timelineStatusRank(previousStatus) && changedAt.After(existing.ChangedAt) {
+	if changedAt.After(existing.ChangedAt) {
 		return db.Model(&existing).Update("changed_at", changedAt).Error
 	}
 	return nil
@@ -104,7 +105,7 @@ func isTerminalStatus(status string) bool {
 func (s *Server) loadChanges(db *gorm.DB, applicationID uint) ([]models.ApplicationChange, error) {
 	var items []models.ApplicationChange
 	err := db.Where("application_id = ?", applicationID).
-		Order("changed_at ASC, id ASC").
+		Order("datetime(changed_at) ASC, id ASC").
 		Find(&items).Error
 	return items, err
 }
@@ -119,7 +120,7 @@ func (s *Server) getApplicationHistory(c *gin.Context) {
 	var record models.Application
 	if err := db.First(&record, id).Error; err != nil {
 		if isRecordNotFound(err) {
-			fail(c, http.StatusNotFound, "not_found", "原内容不存在")
+			fail(c, http.StatusNotFound, "not_found", "The record does not exist.")
 			return
 		}
 		apiError(c, http.StatusInternalServerError, "query_failed", "Failed to load the application.")
@@ -231,7 +232,7 @@ func (s *Server) createApplicationHistory(c *gin.Context) {
 		return
 	}
 
-	changedAt := time.Now()
+	changedAt := time.Now().UTC()
 	if strings.TrimSpace(input.ChangedAt) != "" {
 		parsed, err := parseFlexibleTime(input.ChangedAt)
 		if err != nil {
@@ -245,7 +246,7 @@ func (s *Server) createApplicationHistory(c *gin.Context) {
 	var record models.Application
 	if err := db.First(&record, id).Error; err != nil {
 		if isRecordNotFound(err) {
-			fail(c, http.StatusNotFound, "not_found", "原内容不存在")
+			fail(c, http.StatusNotFound, "not_found", "The record does not exist.")
 			return
 		}
 		apiError(c, http.StatusInternalServerError, "query_failed", "Failed to load the application.")
@@ -282,6 +283,32 @@ func parseFlexibleTime(value string) (time.Time, error) {
 		lastErr = err
 	}
 	return time.Time{}, lastErr
+}
+
+// parseFlexibleRangeTime parses a range bound. A bare date used as the upper
+// bound means the whole day, so it is extended to the end of that day instead
+// of silently excluding every record created after midnight.
+func parseFlexibleRangeTime(value string, upperBound bool) (time.Time, error) {
+	parsed, err := parseFlexibleTime(value)
+	if err != nil {
+		return time.Time{}, err
+	}
+	if upperBound && isDateOnly(value) {
+		// AddDate keeps the end of day correct across DST transitions.
+		parsed = parsed.AddDate(0, 0, 1).Add(-time.Nanosecond)
+	}
+	return parsed, nil
+}
+
+// isDateOnly reports whether value is exactly a "YYYY-MM-DD" date without a
+// time or timezone component.
+func isDateOnly(value string) bool {
+	value = strings.TrimSpace(value)
+	if len(value) != len("2006-01-02") {
+		return false
+	}
+	_, err := time.ParseInLocation("2006-01-02", value, time.Local)
+	return err == nil
 }
 
 func daysSince(value time.Time) int {
@@ -330,7 +357,7 @@ func reconcileApplicationChanges(record models.Application, changes []models.App
 	if !foundCurrent {
 		changedAt := record.UpdatedAt
 		if changedAt.IsZero() || (len(filtered) > 0 && changedAt.Before(filtered[len(filtered)-1].ChangedAt)) {
-			changedAt = time.Now()
+			changedAt = time.Now().UTC()
 		}
 		if changedAt.IsZero() {
 			changedAt = record.AppliedAt
@@ -359,7 +386,7 @@ func (s *Server) attachStatusDays(db *gorm.DB, items []models.Application) []app
 	if len(ids) > 0 {
 		var changes []models.ApplicationChange
 		if err := db.Where("application_id IN ?", ids).
-			Order("changed_at ASC, id ASC").
+			Order("datetime(changed_at) ASC, id ASC").
 			Find(&changes).Error; err == nil {
 			for _, change := range changes {
 				key := statusKey(change.ApplicationID, change.Status)

@@ -17,6 +17,8 @@ import {
 } from "@ant-design/icons";
 import { Call, Dialogs, Events } from "@wailsio/runtime";
 import type { BackupResult } from "../api/types";
+import { ResizeHandles } from "../components/ResizeHandles";
+import { getToken } from "../api/client";
 import { useI18n } from "../i18n";
 import { closeWindow, isDesktopRuntime } from "../utils/desktop";
 
@@ -102,7 +104,11 @@ export function DataTransferWindowPage() {
       });
       if (!path) return;
       setBusy(true);
-      const exported = (await Call.ByName(EXPORT_BINDING, path)) as BackupResult;
+      const exported = (await Call.ByName(
+        EXPORT_BINDING,
+        path,
+        getToken(),
+      )) as BackupResult;
       setResult(exported);
       Events.Emit("resumetrail:data-changed").catch(() => {
         // The main window may not be listening; the operation still succeeded.
@@ -134,7 +140,11 @@ export function DataTransferWindowPage() {
       const path = Array.isArray(selected) ? selected[0] : selected;
       if (!path) return;
       setBusy(true);
-      const inspected = (await Call.ByName(INSPECT_BINDING, path)) as BackupResult;
+      const inspected = (await Call.ByName(
+        INSPECT_BINDING,
+        path,
+        getToken(),
+      )) as BackupResult;
       setPreview(inspected);
     } catch (caught) {
       if (isCancelled(caught)) return;
@@ -149,11 +159,20 @@ export function DataTransferWindowPage() {
     setBusy(true);
     setError("");
     try {
-      const imported = (await Call.ByName(IMPORT_BINDING, preview.path)) as BackupResult;
+      const imported = (await Call.ByName(
+        IMPORT_BINDING,
+        preview.path,
+        getToken(),
+      )) as BackupResult;
       setResult(imported);
       setPreview(null);
       Events.Emit("resumetrail:data-changed").catch(() => {
         // The main window may not be listening; the operation still succeeded.
+      });
+      // The imported settings may add, replace or remove the password and the
+      // backend invalidated every session, so re-check the auth state.
+      Events.Emit("resumetrail:auth-changed").catch(() => {
+        // The main window may not be listening.
       });
     } catch (caught) {
       setError(errorText(caught) || t("transfer.failed"));
@@ -161,6 +180,23 @@ export function DataTransferWindowPage() {
       setBusy(false);
     }
   };
+
+  const warningsPanel = (data: BackupResult) =>
+    data.warnings && data.warnings.length > 0 ? (
+      <Alert
+        type="warning"
+        showIcon
+        className="transfer-alert"
+        message={t("transfer.warnings", { count: data.warnings.length })}
+        description={
+          <ul className="transfer-warning-list">
+            {data.warnings.map((warning) => (
+              <li key={warning}>{warning}</li>
+            ))}
+          </ul>
+        }
+      />
+    ) : null;
 
   const countsPanel = (data: BackupResult) => (
     <div className="transfer-counts">
@@ -297,6 +333,7 @@ export function DataTransferWindowPage() {
                   ]}
                 />
                 {countsPanel(result)}
+                {warningsPanel(result)}
               </div>
             )}
           </section>
@@ -382,12 +419,15 @@ export function DataTransferWindowPage() {
               </>
             )}
             {result && (
-              <Result
-                status="success"
-                icon={<CheckCircleOutlined />}
-                title={t("transfer.importSuccess")}
-                subTitle={`${t("transfer.applications")}: ${result.counts.applications} · ${t("transfer.resumes")}: ${result.counts.resumes}`}
-              />
+              <>
+                <Result
+                  status="success"
+                  icon={<CheckCircleOutlined />}
+                  title={t("transfer.importSuccess")}
+                  subTitle={`${t("transfer.applications")}: ${result.counts.applications} · ${t("transfer.resumes")}: ${result.counts.resumes}`}
+                />
+                {warningsPanel(result)}
+              </>
             )}
           </section>
         )}
@@ -409,6 +449,7 @@ export function DataTransferWindowPage() {
           </div>
         )}
       </div>
+      <ResizeHandles />
     </div>
   );
 }

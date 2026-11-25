@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"strconv"
 	"strings"
 
 	"resume-helper/internal/config"
@@ -33,57 +32,14 @@ func main() {
 		defaults = database.ParseSettings(cfg.Database.Driver, cfg.Database.DSN, cfg.DataDir)
 	}
 
-	driver := strings.ToLower(prompt(reader, "数据库类型 / Driver (sqlite/mysql/postgres)", defaults.Driver))
-	if driver == "" {
-		driver = "sqlite"
-	}
-
-	var dsn string
-	switch driver {
-	case "sqlite", "sqlite3":
-		driver = "sqlite"
-		path := prompt(reader, "SQLite 文件路径 / SQLite file", defaults.SQLitePath)
-		if path == "" {
-			path = "resume-helper.db"
-		}
-		dsn = path
-	case "mysql":
-		driver = "mysql"
-		host := prompt(reader, "主机 / Host", firstNonEmpty(defaults.Host, "127.0.0.1"))
-		port := promptInt(reader, "端口 / Port", firstNonZero(defaults.Port, 3306))
-		user := prompt(reader, "用户名 / User", defaults.User)
-		password := promptSecret(reader, "密码 / Password", defaults.Password)
-		name := prompt(reader, "数据库名 / Database", defaults.Database)
-		built, err := database.BuildDSN(database.Settings{
-			Driver: driver, Host: host, Port: port, User: user, Password: password, Database: name,
-		})
-		if err != nil {
-			fail(err)
-		}
-		dsn = built
-	case "postgres", "postgresql", "pg":
-		driver = "postgres"
-		host := prompt(reader, "主机 / Host", firstNonEmpty(defaults.Host, "127.0.0.1"))
-		port := promptInt(reader, "端口 / Port", firstNonZero(defaults.Port, 5432))
-		user := prompt(reader, "用户名 / User", defaults.User)
-		password := promptSecret(reader, "密码 / Password", defaults.Password)
-		name := prompt(reader, "数据库名 / Database", defaults.Database)
-		sslMode := prompt(reader, "SSL 模式 / SSL mode", firstNonEmpty(defaults.SSLMode, "disable"))
-		built, err := database.BuildDSN(database.Settings{
-			Driver: driver, Host: host, Port: port, User: user, Password: password,
-			Database: name, SSLMode: sslMode,
-		})
-		if err != nil {
-			fail(err)
-		}
-		dsn = built
-	default:
-		fail(fmt.Errorf("不支持的数据库类型 / unsupported driver: %s", driver))
+	path := prompt(reader, "SQLite 文件路径 / SQLite file", defaults.SQLitePath)
+	if path == "" {
+		path = "resume-helper.db"
 	}
 
 	fmt.Println()
-	fmt.Printf("即将连接 / Connecting to: %s\n", driver)
-	db, err := database.Open(config.DatabaseConfig{Driver: driver, DSN: dsn})
+	fmt.Printf("即将连接 / Connecting to: %s\n", path)
+	db, err := database.Open(config.DatabaseConfig{Driver: "sqlite", DSN: path})
 	if err != nil {
 		fail(fmt.Errorf("连接数据库失败 / cannot connect: %w", err))
 	}
@@ -144,31 +100,6 @@ func prompt(reader *bufio.Reader, label, fallback string) string {
 	return line
 }
 
-// promptSecret never echoes the stored password in the prompt. Pressing Enter
-// keeps the existing value.
-func promptSecret(reader *bufio.Reader, label, fallback string) string {
-	if strings.TrimSpace(fallback) != "" {
-		fmt.Printf("%s [留空保留原密码 / Enter to keep existing]: ", label)
-	} else {
-		fmt.Printf("%s: ", label)
-	}
-	line, _ := reader.ReadString('\n')
-	line = strings.TrimSpace(line)
-	if line == "" {
-		return strings.TrimSpace(fallback)
-	}
-	return line
-}
-
-func promptInt(reader *bufio.Reader, label string, fallback int) int {
-	value := prompt(reader, label, strconv.Itoa(fallback))
-	parsed, err := strconv.Atoi(value)
-	if err != nil || parsed <= 0 || parsed > 65535 {
-		return fallback
-	}
-	return parsed
-}
-
 func confirm(reader *bufio.Reader, label string, fallback bool) bool {
 	suffix := "y/N"
 	if fallback {
@@ -181,24 +112,6 @@ func confirm(reader *bufio.Reader, label string, fallback bool) bool {
 		return fallback
 	}
 	return line == "y" || line == "yes" || line == "是"
-}
-
-func firstNonEmpty(values ...string) string {
-	for _, value := range values {
-		if strings.TrimSpace(value) != "" {
-			return value
-		}
-	}
-	return ""
-}
-
-func firstNonZero(values ...int) int {
-	for _, value := range values {
-		if value != 0 {
-			return value
-		}
-	}
-	return 0
 }
 
 func fail(err error) {

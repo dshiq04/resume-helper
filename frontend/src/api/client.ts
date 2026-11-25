@@ -43,13 +43,47 @@ const http = axios.create({
   },
 });
 
-http.interceptors.request.use((config) => {
+http.interceptors.request.use(async (config) => {
   const token = getToken();
   if (token) {
     config.headers.set("Authorization", `Bearer ${token}`);
   }
+  const appToken = await loadAppToken();
+  if (appToken) {
+    config.headers.set("X-ResumeTrail-Token", appToken);
+  }
   return config;
 });
+
+let devTokenPromise: Promise<string> | null = null;
+
+// loadAppToken returns the per-process token injected into index.html. The
+// Vite dev server serves its own HTML, so in development it is fetched from
+// the running Gin server through a small dev-only middleware.
+function loadAppToken(): Promise<string> {
+  const injected = getAppToken();
+  if (injected) return Promise.resolve(injected);
+  if (!import.meta.env.DEV) return Promise.resolve("");
+  if (!devTokenPromise) {
+    devTokenPromise = fetch("/__resume_token")
+      .then(async (response) => {
+        if (!response.ok) return "";
+        const payload = (await response.json()) as { token?: unknown };
+        return typeof payload.token === "string" ? payload.token : "";
+      })
+      .catch(() => "");
+  }
+  return devTokenPromise;
+}
+
+// getAppToken returns the per-process token injected into index.html. It
+// protects the local API even when password protection is disabled.
+export function getAppToken(): string {
+  return (
+    (window as Window & { __RESUME_TRAIL_TOKEN__?: string })
+      .__RESUME_TRAIL_TOKEN__ ?? ""
+  );
+}
 
 export class ApiError extends Error {
   status: number;
@@ -272,13 +306,13 @@ export const api = {
     anchor.remove();
     window.setTimeout(() => URL.revokeObjectURL(url), 1000);
   },
-  stats(range?: { from?: string; to?: string }) {
+  stats(range?: { from?: string; to?: string; category?: string }) {
     return request<Stats>("/stats", { params: range });
   },
   dailyStats(range?: { from?: string; to?: string }) {
     return request<DailyStats>("/stats/daily", { params: range });
   },
-  funnel(range?: { from?: string; to?: string }) {
+  funnel(range?: { from?: string; to?: string; category?: string }) {
     return request<FunnelStats>("/stats/funnel", { params: range });
   },
   applyAppInfo(input: AppInfoInput) {

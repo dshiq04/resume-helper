@@ -17,6 +17,7 @@ import { ApplicationTable } from "../components/applications/ApplicationTable";
 import { ApplicationCards } from "../components/applications/ApplicationCards";
 import { ImportModal } from "../components/ImportModal";
 import type { WorkspaceOutletContext } from "../layouts/WorkspaceLayout";
+import { isDesktopRuntime } from "../utils/desktop";
 
 interface DashboardProps {
   category: CategoryFilter;
@@ -45,6 +46,11 @@ export function Dashboard({ category }: DashboardProps) {
   };
 
   const handleEdit = async (record: { id: number }) => {
+    if (!isDesktopRuntime()) {
+      // Headless/browser preview: the standalone page works in the same tab.
+      window.location.assign(`/application-edit?id=${record.id}`);
+      return;
+    }
     try {
       await api.openApplicationEdit(record.id);
     } catch (error) {
@@ -53,6 +59,10 @@ export function Dashboard({ category }: DashboardProps) {
   };
 
   const handleView = async (record: { id: number }) => {
+    if (!isDesktopRuntime()) {
+      window.location.assign(`/application-view?id=${record.id}`);
+      return;
+    }
     try {
       await api.openApplicationView(record.id);
     } catch (error) {

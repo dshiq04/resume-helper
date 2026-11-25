@@ -16,6 +16,10 @@ export function apiErrorMessage(error: unknown, t: Translate): string {
         return t("error.tooMany");
       case "invalid_password":
         return t("error.passwordIncorrect");
+      case "too_many_attempts":
+        return t("error.tooManyAttempts");
+      case "not_found":
+        return t("error.notFound");
       case "network_error":
         return t("error.network");
       case "unauthorized":

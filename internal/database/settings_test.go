@@ -7,57 +7,32 @@ import (
 	"resume-helper/internal/config"
 )
 
-func TestBuildAndParseMySQLSettings(t *testing.T) {
+func TestBuildAndParseSQLiteSettings(t *testing.T) {
 	dsn, err := BuildDSN(Settings{
-		Driver:   "mysql",
-		Host:     "127.0.0.1",
-		Port:     3307,
-		User:     "resume",
-		Password: "p@ss word",
-		Database: "resume_helper",
+		Driver:     "sqlite",
+		SQLitePath: "data/custom.db",
 	})
 	if err != nil {
 		t.Fatalf("BuildDSN(): %v", err)
 	}
+	if dsn != "data/custom.db" {
+		t.Fatalf("dsn = %q, want data/custom.db", dsn)
+	}
 
-	parsed := ParseSettings("mysql", dsn, t.TempDir())
+	dataDir := t.TempDir()
+	parsed := ParseSettings("sqlite", dsn, dataDir)
 	if parsed.ParseError != "" {
 		t.Fatalf("ParseSettings() error: %s", parsed.ParseError)
 	}
-	if parsed.Host != "127.0.0.1" || parsed.Port != 3307 {
-		t.Fatalf("unexpected address: %s:%d", parsed.Host, parsed.Port)
-	}
-	if parsed.User != "resume" || parsed.Password != "p@ss word" || parsed.Database != "resume_helper" {
-		t.Fatalf("unexpected mysql settings: %+v", parsed)
+	if parsed.Driver != "sqlite" || parsed.SQLitePath != "data/custom.db" {
+		t.Fatalf("unexpected sqlite settings: %+v", parsed)
 	}
 }
 
-func TestBuildAndParsePostgresSettings(t *testing.T) {
-	dsn, err := BuildDSN(Settings{
-		Driver:   "postgres",
-		Host:     "db.example.com",
-		Port:     5433,
-		User:     "resume",
-		Password: "s3cret/with?chars",
-		Database: "resume helper",
-		SSLMode:  "require",
-	})
-	if err != nil {
-		t.Fatalf("BuildDSN(): %v", err)
-	}
-
-	parsed := ParseSettings("postgres", dsn, t.TempDir())
-	if parsed.ParseError != "" {
-		t.Fatalf("ParseSettings() error: %s", parsed.ParseError)
-	}
-	if parsed.Host != "db.example.com" || parsed.Port != 5433 {
-		t.Fatalf("unexpected address: %s:%d", parsed.Host, parsed.Port)
-	}
-	if parsed.User != "resume" || parsed.Password != "s3cret/with?chars" || parsed.Database != "resume helper" {
-		t.Fatalf("unexpected postgres settings: %+v", parsed)
-	}
-	if parsed.SSLMode != "require" {
-		t.Fatalf("SSLMode = %q, want require", parsed.SSLMode)
+func TestParseSettingsRejectsUnsupportedDriver(t *testing.T) {
+	parsed := ParseSettings("mysql", "user:password@tcp(127.0.0.1:3306)/resume_helper", t.TempDir())
+	if parsed.ParseError == "" {
+		t.Fatal("unsupported driver should be reported as a parse error")
 	}
 }
 
@@ -65,5 +40,11 @@ func TestTestConnectionSQLite(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "connection.db")
 	if err := TestConnection(config.DatabaseConfig{Driver: "sqlite", DSN: path}); err != nil {
 		t.Fatalf("TestConnection(): %v", err)
+	}
+}
+
+func TestTestConnectionRejectsUnsupportedDriver(t *testing.T) {
+	if err := TestConnection(config.DatabaseConfig{Driver: "postgres", DSN: "postgres://localhost/db"}); err == nil {
+		t.Fatal("expected an error for an unsupported driver")
 	}
 }

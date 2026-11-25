@@ -15,8 +15,6 @@ import (
 
 type databaseInput struct {
 	database.Settings
-	// UseDSN switches from the graphical fields to the raw DSN fallback.
-	UseDSN bool `json:"useDsn"`
 }
 
 func (s *Server) getDatabaseSettings(c *gin.Context) {
@@ -28,15 +26,11 @@ func (s *Server) getDatabaseSettings(c *gin.Context) {
 	s.dbMu.RUnlock()
 
 	settings := database.ParseSettings(driver, dsn, dataDir)
-	location := ""
-	if driver == "sqlite" {
-		location = dsn
-	}
 	c.JSON(http.StatusOK, gin.H{
 		"settings":    settings,
 		"configPath":  configPath,
 		"dataDir":     dataDir,
-		"location":    location,
+		"location":    dsn,
 		"envOverride": databaseEnvOverride(),
 	})
 }
@@ -79,6 +73,10 @@ func (s *Server) updateDatabaseSettings(c *gin.Context) {
 		return
 	}
 
+	s.dbMu.RLock()
+	oldDSN := s.cfg.Database.DSN
+	s.dbMu.RUnlock()
+
 	newDB, err := database.Open(runtimeCfg)
 	if err != nil {
 		apiError(c, http.StatusBadRequest, "connection_failed", err.Error())
@@ -104,6 +102,12 @@ func (s *Server) updateDatabaseSettings(c *gin.Context) {
 	s.dbMu.Unlock()
 	s.auth.setDB(newDB)
 
+	// Sessions belong to the previous database. Switching files may bring a
+	// different password hash, so force every window to authenticate again.
+	if oldDSN != runtimeCfg.DSN {
+		s.auth.invalidateAllSessions()
+	}
+
 	// Keep the device identifier (and therefore the resume encryption key)
 	// available after switching databases. An identifier already present in the
 	// new database wins; otherwise the current one is written to it.
@@ -128,10 +132,6 @@ func (s *Server) updateDatabaseSettings(c *gin.Context) {
 	s.dbMu.RUnlock()
 
 	settings := database.ParseSettings(runtimeCfg.Driver, runtimeCfg.DSN, dataDir)
-	location := ""
-	if runtimeCfg.Driver == "sqlite" {
-		location = runtimeCfg.DSN
-	}
 	envOverride := databaseEnvOverride()
 	warning := ""
 	if envOverride {
@@ -142,7 +142,7 @@ func (s *Server) updateDatabaseSettings(c *gin.Context) {
 		"settings":    settings,
 		"configPath":  configPath,
 		"dataDir":     dataDir,
-		"location":    location,
+		"location":    runtimeCfg.DSN,
 		"envOverride": envOverride,
 		"warning":     warning,
 	})
@@ -154,16 +154,11 @@ func (s *Server) resolveDatabaseInput(input databaseInput) (config.DatabaseConfi
 		return config.DatabaseConfig{}, config.DatabaseConfig{}, err
 	}
 
-	dsn := ""
-	if input.UseDSN {
-		dsn = strings.TrimSpace(input.DSN)
-	} else {
-		settings := input.Settings
-		settings.Driver = driver
-		dsn, err = database.BuildDSN(settings)
-		if err != nil {
-			return config.DatabaseConfig{}, config.DatabaseConfig{}, err
-		}
+	settings := input.Settings
+	settings.Driver = driver
+	dsn, err := database.BuildDSN(settings)
+	if err != nil {
+		return config.DatabaseConfig{}, config.DatabaseConfig{}, err
 	}
 
 	s.dbMu.RLock()
